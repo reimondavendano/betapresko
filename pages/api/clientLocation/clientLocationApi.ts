@@ -1,0 +1,61 @@
+// src/api/clientLocationApi.ts
+import { supabase } from '../../../lib/supabase'; // Adjust path as needed
+import { ClientLocation, UUID } from '../../../types/database'; // Import ClientLocation and UUID types
+
+export const clientLocationApi = {
+  /**
+   * Creates a new client location.
+   * @param newLocationData The data for the new client location.
+   * @returns The created ClientLocation object.
+   */
+  createClientLocation: async (newLocationData: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at' | 'is_primary'>): Promise<ClientLocation> => {
+    // Supabase will automatically generate 'id', 'created_at', 'updated_at'
+    // 'is_primary' defaults to false as per your database schema
+    const { data, error } = await supabase
+      .from('client_locations')
+      .insert([
+        {
+          client_id: newLocationData.client_id,
+          name: newLocationData.name,
+          address_line1: newLocationData.address_line1,
+          street: newLocationData.street,
+          barangay_id: newLocationData.barangay_id,
+          city_id: newLocationData.city_id,
+          landmark: newLocationData.landmark,
+          is_primary: false, // Default as per your database schema
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating client location:', error);
+      throw new Error(error.message);
+    }
+    return data as ClientLocation;
+  },
+
+  /**
+   * Fetches all client locations for a specific client ID.
+   * This queries the Supabase 'client_locations' table.
+   * @param clientId The UUID of the client.
+   * @returns A promise that resolves to an array of ClientLocation objects.
+   */
+  getByClientId: async (clientId: UUID): Promise<ClientLocation[]> => {
+    const { data, error } = await supabase
+      .from('client_locations')
+      .select('*')
+      .eq('client_id', clientId); // Filter by the client_id
+
+    if (error) {
+      console.error('Error fetching client locations:', error);
+      throw new Error(error.message);
+    }
+    return data as ClientLocation[];
+  },
+
+  // You can add more API functions related to client locations here, e.g.:
+  // getById: async (id: UUID): Promise<ClientLocation | null> => { ... },
+  // update: async (id: UUID, updates: Partial<ClientLocation>): Promise<ClientLocation> => { ... },
+  // delete: async (id: UUID): Promise<void> => { ... },
+};

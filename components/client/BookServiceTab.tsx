@@ -1,0 +1,221 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store';
+import {
+  setAvailableServices,
+  setBookingResources,
+  resetClientBooking,
+  setDevices,
+  setCurrentClient,
+  setLocations,
+} from '@/lib/features/client/clientSlice';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { CalendarPlus, CheckCircle } from 'lucide-react';
+import { Step1SelectService } from './../../components/client/steps/Step1SelectService';
+import { Step2SelectDevices } from './../../components/client/steps/Step2SelectDevice';
+import { Step3ConfirmBooking } from './../../components/client/steps/Step3ConfirmBooking';
+
+import { clientApi } from '../../pages/api/clients/clientApi';
+import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
+import { deviceApi } from '../../pages/api/device/deviceApi';
+import { servicesApi } from '../../pages/api/service/servicesApi';
+import { brandsApi } from '../../pages/api/brands/brandsApi';
+import { acTypesApi } from '../../pages/api/types/acTypesApi';
+import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
+import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi';
+import { clientPanelBooking } from '../../pages/api/clientPanelBooking/clientPanelBooking';
+import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi';
+
+interface BookServiceTabProps {
+  clientId: string;
+}
+
+export function BookServiceTab({ clientId }: BookServiceTabProps) {
+  const dispatch = useDispatch();
+  const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // New state to trigger a refresh
+
+
+  const clientBookingState = useSelector((state: RootState) => state.client.booking);
+  const currentClient = useSelector((state: RootState) => state.client.currentClient);
+  const clientLocations = useSelector((state: RootState) => state.client.locations);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [
+          client,
+          fetchedLocations,
+          fetchedDevices,
+          services,
+          brands,
+          acTypes,
+          horsepowers,
+          blockedDates,
+          customSettings,
+        ] = await Promise.all([
+          clientApi.getClientById(clientId), // Corrected API method
+          clientLocationApi.getByClientId(clientId),
+          deviceApi.getByClientId(clientId),
+          servicesApi.getServices(),
+          brandsApi.getBrands(),
+          acTypesApi.getACTypes(),
+          horsepowerApi.getHorsepowerOptions(),
+          blockedDatesApi.getBlockedDates(),
+          customSettingsApi.getCustomSettings(),
+        ]);
+
+        if (client) {
+          dispatch(setCurrentClient(client));
+        }
+        dispatch(setLocations(fetchedLocations)); // Corrected action
+        dispatch(setDevices(fetchedDevices));
+
+        dispatch(setAvailableServices(services));
+        dispatch(
+          setBookingResources({
+            brands,
+            acTypes,
+            horsepowers,
+            blockedDates,
+            customSettings,
+          })
+        );
+      } catch (err: any) {
+        console.error('Failed to fetch booking initial data:', err);
+        setError(err.message || 'Failed to load booking resources.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+
+    return () => {
+      dispatch(resetClientBooking());
+    };
+  }, [dispatch, clientId, refreshKey]);
+
+  const handleBookingSubmit = async () => {
+    if (!currentClient || !currentClient.id) {
+      setError('Client information is not available. Please try refreshing the page.');
+      return;
+    }
+    if (!clientBookingState.selectedService) {
+      setError('Please select a service.');
+      return;
+    }
+    if (!clientBookingState.appointmentDate) {
+      setError('Please select an appointment date.');
+      return;
+    }
+    if (clientBookingState.selectedDevices.length === 0 && clientBookingState.newDevices.length === 0) {
+      setError('Please select at least one existing device or add a new unit.');
+      return;
+    }
+
+    const clientLocation = clientLocations.length > 0 ? clientLocations[0] : null;
+    if (!clientLocation) {
+      setError('No client location found. Please add a location for this client.');
+      return;
+    }
+
+    const payload = {
+      clientId: currentClient.id,
+      locationId: clientLocation.id,
+      serviceId: clientBookingState.selectedService.id,
+      appointmentDate: clientBookingState.appointmentDate,
+      appointmentTime: '09:00 AM',
+      totalAmount: clientBookingState.totalAmount,
+      totalUnits:
+        clientBookingState.selectedDevices.length +
+        clientBookingState.newDevices.reduce((sum, d) => sum + d.quantity, 0),
+      notes: null,
+      selectedDeviceIds: clientBookingState.selectedDevices.map((d) => d.id),
+      newDevices: clientBookingState.newDevices.map((nd) => {
+        // Find the corresponding AC type name from the booking resources
+        const brandType = clientBookingState.availableBrands.find(
+          (type) => type.id === nd.brand_id
+        );
+        const brandName = brandType ? brandType.name : 'New AC Unit';
+        return {
+          name: brandName, // Use the found name in the payload
+          brand_id: nd.brand_id,
+          ac_type_id: nd.ac_type_id,
+          horsepower_id: nd.horsepower_id,
+          quantity: nd.quantity,
+        };
+      }),
+    };
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      await clientPanelBooking.createClientBooking(payload);
+      setIsModalOpen(true); // This will open the custom modal
+    } catch (err: any) {
+      console.error('Booking failed:', err);
+      setError(err.message || 'Booking failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setStep(1);
+    dispatch(resetClientBooking());
+    setRefreshKey(prevKey => prevKey + 1); // Increment the key to trigger useEffect
+  };
+
+  const renderStep = () => {
+    if (isLoading) {
+      return <div className="text-center text-gray-600">Loading booking resources...</div>;
+    }
+    if (error) {
+      return <div className="text-center text-red-600">Error: {error}</div>;
+    }
+
+    switch (step) {
+      case 1:
+        return <Step1SelectService onNext={() => setStep(2)} />;
+      case 2:
+        return <Step2SelectDevices onNext={() => setStep(3)} onBack={() => setStep(1)} />;
+      case 3:
+        return <Step3ConfirmBooking onBack={() => setStep(2)} onSubmit={handleBookingSubmit} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Card className="rounded-xl shadow-lg p-6 bg-white min-h-[400px]">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl font-bold text-blue-600 flex items-center justify-center">
+          <CalendarPlus className="w-8 h-8 mr-3" />
+          Book a New Service
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{renderStep()}</CardContent>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Booking Successful!</h2>
+            <p className="text-gray-600 mb-6">Your service has been successfully booked.</p>
+            <Button onClick={handleCloseModal} className="w-full">
+              Book Another Service
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}

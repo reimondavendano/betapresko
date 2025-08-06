@@ -1,0 +1,271 @@
+// types/database.d.ts
+
+// Common types
+type UUID = string;
+type Timestamp = string; // ISO 8601 string, e.g., "2024-08-06T10:00:00Z"
+type DateString = string; // YYYY-MM-DD format
+type TimeString = string; // HH:MM AM/PM format
+
+export interface City {
+  id: UUID;
+  name: string;
+  province: string;
+  created_at: Timestamp;
+}
+
+export interface Barangay {
+  id: UUID;
+  city_id: UUID;
+  name: string;
+  created_at: Timestamp;
+}
+
+export interface Service {
+  id: UUID;
+  name: string;
+  description: string | null;
+  base_price: number; // decimal(10,2) in SQL maps to number in TS
+  is_active: boolean;
+  created_at: Timestamp;
+}
+
+export interface Brand {
+  id: UUID;
+  name: string;
+  is_active: boolean;
+  created_at: Timestamp;
+}
+
+export interface ACType {
+  id: UUID;
+  name: string;
+  // Removed 'price' field as pricing will now come from custom_settings
+  is_active: boolean;
+  created_at: Timestamp;
+}
+
+export interface HorsepowerOption {
+  id: UUID;
+  value: number; // decimal(3,2) in SQL maps to number in TS
+  display_name: string;
+  is_active: boolean;
+  created_at: Timestamp;
+}
+
+export interface Client {
+  id: UUID;
+  name: string;
+  mobile: string;
+  email: string | null;
+  points: number;
+  points_expiry: DateString | null;
+  discounted: boolean;
+  sms_opt_in: boolean;
+  qr_code: string; // GENERATED ALWAYS as text
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ClientLocation {
+  id: UUID;
+  client_id: UUID;
+  name: string;
+  is_primary: boolean;
+  address_line1: string | null;
+  street: string | null;
+  barangay_id: UUID | null; // Updated to reference barangays(id)
+  city_id: UUID | null;     // Updated to reference cities(id)
+  landmark: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'voided';
+
+export interface Appointment {
+  id: UUID;
+  client_id: UUID;
+  location_id: UUID;
+  service_id: UUID;
+  appointment_date: DateString;
+  appointment_time: TimeString | null;
+  status: AppointmentStatus;
+  amount: number; // decimal(10,2) in SQL maps to number in TS
+  total_units: number;
+  notes: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface Device {
+  id: UUID;
+  client_id: UUID;
+  location_id: UUID;
+  appointment_id: UUID | null;
+  name: string; // Added 'name' field for unique identifier
+  brand_id: UUID | null;
+  ac_type_id: UUID | null;
+  horsepower_id: UUID | null;
+  last_cleaning_date: DateString | null;
+  due_3_months: DateString | null; // GENERATED ALWAYS AS date
+  due_4_months: DateString | null; // GENERATED ALWAYS AS date
+  due_6_months: DateString | null; // GENERATED ALWAYS AS date
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+// New: Interface for device_history table
+export interface DeviceHistory {
+  device_id: UUID;
+  client_id: UUID;
+  location_id: UUID;
+  appointment_id: UUID | null;
+  name: string; // Added 'name' field for unique identifier
+  brand_id: UUID | null;
+  ac_type_id: UUID | null;
+  horsepower_id: UUID | null;
+  last_cleaning_date: DateString | null;
+  due_3_months: DateString | null; // GENERATED ALWAYS AS date
+  due_4_months: DateString | null; // GENERATED ALWAYS AS date
+  due_6_months: DateString | null; // GENERATED ALWAYS AS date
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface BlockedDate {
+  id: UUID;
+  name: string;
+  from_date: DateString;
+  to_date: DateString;
+  reason: string | null;
+  created_at: Timestamp;
+}
+
+export interface CustomSetting {
+  id: UUID;
+  setting_category: string;
+  setting_key: string;
+  setting_value: string | null;
+  setting_type: string;
+  description: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+// New: Parsed structure for custom pricing settings
+export interface ParsedCustomSettings {
+  splitTypePrice: number;
+  windowTypePrice: number;
+  surcharge: number;
+  discount: number;
+}
+
+export interface AdminUser {
+  id: UUID;
+  username: string;
+  email: string;
+  password_hash: string;
+  role: string;
+  is_active: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+// Supabase Database Type Definition
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  public: {
+    Tables: {
+      cities: {
+        Row: City // The type for a row in the "cities" table
+        Insert: Omit<City, 'id' | 'created_at'> // For insert operations, omit auto-generated fields
+        Update: Partial<Omit<City, 'id' | 'created_at'>> // For update operations
+      }
+      barangays: {
+        Row: Barangay
+        Insert: Omit<Barangay, 'id' | 'created_at'>
+        Update: Partial<Omit<Barangay, 'id' | 'created_at'>>
+      }
+      services: {
+        Row: Service
+        Insert: Omit<Service, 'id' | 'created_at'>
+        Update: Partial<Omit<Service, 'id' | 'created_at'>>
+      }
+      brands: {
+        Row: Brand
+        Insert: Omit<Brand, 'id' | 'created_at'>
+        Update: Partial<Omit<Brand, 'id' | 'created_at'>>
+      }
+      ac_types: { // Assuming your table name is 'ac_types'
+        Row: ACType
+        Insert: Omit<ACType, 'id' | 'created_at'>
+        Update: Partial<Omit<ACType, 'id' | 'created_at'> >
+      }
+      horsepower_options: { // Assuming your table name is 'horsepower_options'
+        Row: HorsepowerOption
+        Insert: Omit<HorsepowerOption, 'id' | 'created_at'>
+        Update: Partial<Omit<HorsepowerOption, 'id' | 'created_at'>>
+      }
+      clients: {
+        Row: Client
+        Insert: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'qr_code'> // Omit generated fields
+        Update: Partial<Omit<Client, 'id' | 'created_at' | 'updated_at' | 'qr_code'>>
+      }
+      client_locations: { // Assuming your table name is 'client_locations'
+        Row: ClientLocation
+        Insert: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ClientLocation, 'id' | 'created_at' | 'updated_at'>>
+      }
+      appointments: {
+        Row: Appointment
+        Insert: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Appointment, 'id' | 'created_at' | 'updated_at'>>
+      }
+      devices: {
+        Row: Device
+        Insert: Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months'>
+        Update: Partial<Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months'>>
+      }
+      device_history: { // New: Table for device history
+        Row: DeviceHistory;
+        Insert: Omit<DeviceHistory, 'id' | 'created_at'>;
+        Update: Partial<Omit<DeviceHistory, 'id' | 'created_at'>>;
+      }
+      blocked_dates: {
+        Row: BlockedDate
+        Insert: Omit<BlockedDate, 'id' | 'created_at'>
+        Update: Partial<Omit<BlockedDate, 'id' | 'created_at'>>
+      }
+      custom_settings: { // Assuming your table name is 'custom_settings'
+        Row: CustomSetting
+        Insert: Omit<CustomSetting, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<CustomSetting, 'id' | 'created_at' | 'updated_at'>>
+      }
+      admin_users: {
+        Row: AdminUser
+        Insert: Omit<AdminUser, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<AdminUser, 'id' | 'created_at' | 'updated_at'>>
+      }
+      // Add other tables here following the same pattern
+    }
+    Views: {
+      // Add views here if you have any
+    }
+    Functions: {
+      // Add stored procedures/functions here if you have any
+    }
+    Enums: {
+      // Add enums here if you have any
+    }
+    CompositeTypes: {
+      // Add composite types here if you have any
+    }
+  }
+}

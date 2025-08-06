@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   User,
   MapPin,
@@ -265,9 +266,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
              <p className="text-lg opacity-90">{getCityName(locations[0]?.city_id) || 'Your City'}, Philippines</p>
            </div>
            <div className="flex-shrink-0">
-             <img
-               src={`../assets/images/icon.jpg`}
+             {/* Replaced img with Next.js Image component for optimization */}
+             <Image
+               src={`/assets/images/icon.jpg`}
                alt="Welcome Illustration"
+               width={150} // Specify width
+               height={150} // Specify height
                className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
              />
            </div>
@@ -348,11 +352,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                 Expires on: {format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), 'MMM d, yyyy')}
               </Badge>
             </div>
-            <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onBookNewCleaningClick}>
+            <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
               Refer A Friend
             </Button>
             <p className="text-xs text-gray-500 mt-2">
-              Note: Points will be credited after the completion of your booking or referral's booking.
+              Note: Points will be credited after the completion of your booking or referral&apos;s booking.
             </p>
           </CardContent>
         </Card>

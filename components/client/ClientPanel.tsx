@@ -124,7 +124,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
 
           {/* Tab Content Area */}
           <div className="lg:w-3/4 flex-grow">
-            {activeTab === 'dashboard' && <ClientDashboardTab clientId={clientId} onBookNewCleaningClick={() => setActiveTab('bookService')}  />}
+            {activeTab === 'dashboard' && <ClientDashboardTab clientId={clientId} onBookNewCleaningClick={() => setActiveTab('bookService')} onReferClick={() => setActiveTab('referFriend')} />}
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}
             {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />}
             {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />}

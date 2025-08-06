@@ -383,7 +383,7 @@ export function UnitsStep() {
           </div>
           <div className="flex justify-between items-center text-lg">
             <span>Discount:</span>
-            <span className="font-semibold text-red-600">- ₱{customPricingSettings.discount.toLocaleString()}</span>
+            <span className="font-semibold text-red-600">- {customPricingSettings.discount.toLocaleString()}%</span>
           </div>
           <div className="border-t pt-2 mt-2">
             <div className="flex justify-between items-center text-xl font-bold">

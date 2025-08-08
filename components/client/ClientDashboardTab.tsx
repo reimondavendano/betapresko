@@ -40,14 +40,13 @@ import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
 import { appointmentApi } from '../../pages/api/appointments/appointmentApi';
 import { deviceApi } from '../../pages/api/device/deviceApi';
-import { locationApi } from '../../pages/api/city/locationApi';
 import { servicesApi } from '../../pages/api/service/servicesApi';
 import { brandsApi } from '../../pages/api/brands/brandsApi';
 import { acTypesApi } from '../../pages/api/types/acTypesApi';
 import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
 
 // Import types
-import { Client, ClientLocation, Appointment, Device, City, Barangay, Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
+import { Client, ClientLocation, Appointment, Device,  Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
 
 interface ClientDashboardTabProps {
   clientId: string;
@@ -69,8 +68,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const itemsPerPage = 5; // You can adjust this value
 
   // Lookup data for displaying names instead of IDs
-  const [allCities, setAllCities] = useState<City[]>([]);
-  const [allBarangays, setAllBarangays] = useState<Barangay[]>([]);
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allACTypes, setAllACTypes] = useState<ACType[]>([]);
@@ -86,16 +83,13 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
-        const [citiesData, barangaysData, servicesData, brandsData, acTypesData, hpOptionsData] = await Promise.all([
-          locationApi.getCities(),
-          locationApi.getAllBarangays(),
+        const [servicesData, brandsData, acTypesData, hpOptionsData] = await Promise.all([
+
           servicesApi.getServices(),
           brandsApi.getBrands(),
           acTypesApi.getACTypes(),
           horsepowerApi.getHorsepowerOptions(),
         ]);
-        setAllCities(citiesData);
-        setAllBarangays(barangaysData);
         setAllServices(servicesData);
         setAllBrands(brandsData);
         setAllACTypes(acTypesData);
@@ -142,10 +136,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     fetchClientData();
   }, [clientId]);
 
-  // --- Helper functions to get names from IDs ---
-  const getCityName = (id: UUID | null) => allCities.find(c => c.id === id)?.name || 'N/A';
-  const getBarangayName = (id: UUID | null) => allBarangays.find(b => b.id === id)?.name || 'N/A';
+
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
+  const getLocationCity = (id: UUID | null) => locations.find(s => s.id === id)?.city || 'N/A';
   const getBrandName = (id: UUID | null) => allBrands.find(b => b.id === id)?.name || 'N/A';
   const getACTypeName = (id: UUID | null) => allACTypes.find(t => t.id === id)?.name || 'N/A';
   const getHorsepowerDisplayName = (id: UUID | null) => allHorsepowerOptions.find(hp => hp.id === id)?.display_name || 'N/A';
@@ -263,7 +256,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
            <div className="text-center md:text-left mb-4 md:mb-0">
              <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-             <p className="text-lg opacity-90">{getCityName(locations[0]?.city_id) || 'Your City'}, Philippines</p>
+             <p className="text-lg opacity-90">{getLocationCity(locations[0]?.city) || 'Your City'}, Philippines</p>
            </div>
            <div className="flex-shrink-0">
              {/* Replaced img with Next.js Image component for optimization */}

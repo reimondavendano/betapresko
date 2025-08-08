@@ -11,10 +11,10 @@ import { Badge } from '@/components/ui/badge';
 // Import API functions
 import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
-import { locationApi } from '../../pages/api/city/locationApi'; // For city/barangay names
+
 
 // Import types
-import { Client, ClientLocation, City, Barangay, UUID } from '../../types/database';
+import { Client, ClientLocation, UUID } from '../../types/database';
 
 interface ClientInfoTabProps {
   clientId: string;
@@ -26,27 +26,9 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Lookup data for displaying names instead of IDs
-  const [allCities, setAllCities] = useState<City[]>([]);
-  const [allBarangays, setAllBarangays] = useState<Barangay[]>([]);
 
-  // Fetch all lookup data (cities, barangays)
-  useEffect(() => {
-    const fetchLookupData = async () => {
-      try {
-        const [citiesData, barangaysData] = await Promise.all([
-          locationApi.getCities(),
-          locationApi.getAllBarangays(),
-        ]);
-        setAllCities(citiesData);
-        setAllBarangays(barangaysData);
-      } catch (err: any) {
-        console.error('Error fetching lookup data:', err);
-        setError('Failed to load essential data.');
-      }
-    };
-    fetchLookupData();
-  }, []);
+
+
 
   // Fetch client-specific data
   useEffect(() => {
@@ -77,8 +59,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
   }, [clientId]);
 
   // --- Helper functions to get names from IDs ---
-  const getCityName = (id: UUID | null) => allCities.find(c => c.id === id)?.name || 'N/A';
-  const getBarangayName = (id: UUID | null) => allBarangays.find(b => b.id === id)?.name || 'N/A';
+
 
   if (isLoading) {
     return (
@@ -183,7 +164,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
                   </div> */}
                 </div>
                 <p className="text-gray-600 text-sm">
-                  {location.address_line1}, {location.street}, {getBarangayName(location.barangay_id)}, {getCityName(location.city_id)}
+                  {location.address_line1}, {location.street}, {location.barangay}, {location.city}
                 </p>
                 {location.landmark && (
                   <p className="text-gray-500 text-sm">Landmark: {location.landmark}</p>

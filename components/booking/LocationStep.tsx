@@ -44,7 +44,7 @@ const getGeocodedAddress = async (lat: number, lng: number): Promise<Partial<Cli
     return {
       address_line1: address.house_number ? `${address.house_number} ${address.residential}` : address.road,
       street: address.road,
-      barangay: address.quarter || address.neighbourhood,
+      barangay: address.quarter,
       city: address.city + ', ' + address.state,
       landmark: address.amenity || address.shop || address.historic,
     };

@@ -142,10 +142,12 @@ export function ConfirmStep() {
         currentClientId = createdClient.id;
         dispatch(setClientId(currentClientId));
 
-        // If a referral ID was used, remove it from session storage
+       // If a referral ID was used, remove it from session storage with a delay
         if (referralId) {
-          sessionStorage.removeItem('referralId');
-          console.log('[SESSION] Referral ID removed from session storage.');
+          setTimeout(() => {
+            sessionStorage.removeItem('referralId');
+            console.log('[SESSION] Referral ID removed from session storage after a delay.');
+          }, 5000); // 2000 milliseconds = 2 seconds
         }
 
         // Create client location for the new client

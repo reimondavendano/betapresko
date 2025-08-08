@@ -19,7 +19,7 @@ const SignUpPage = () => {
     setTimeout(() => {
       window.location.href =   window.location.href = typeof window !== 'undefined'
     ? `${window.location.origin}/booking`
-    : `https://betapresko.vercel.app/booking`;;
+    : `https://betapresko.vercel.app/booking`;
     }, 1000);
 
   }, []); // The dependency array is now empty since we don't need 'onRedirect'

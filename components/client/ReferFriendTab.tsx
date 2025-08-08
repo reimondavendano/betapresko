@@ -15,13 +15,13 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
   const [isError, setIsError] = useState(false);
 
   // Mock referral link
-  const referralLink = `https://your-app.com/signup?ref=${clientId}`;
+   const referralLink = typeof window !== 'undefined'
+    ? `${window.location.origin}/signup?ref=${clientId}`
+    : `https://betapresko.vercel.app//signup?ref=${clientId}`;
   
   // The message to share, with the referral link embedded
   const shareMessage = `Thank you for supporting Presko AC! For our services, you may click the link to register.`;
 
-  // For WhatsApp, the message needs to be fully URI-encoded.
-  const whatsappShareLink = `https://wa.me/?text=${encodeURIComponent(shareMessage + ' ' + referralLink)}`;
 
   // For Facebook, we use the sharer.php endpoint.
   // The 'u' parameter is for the URL to share, and 'quote' is for the pre-filled message.

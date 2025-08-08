@@ -135,6 +135,7 @@ export function ConfirmStep() {
         const newLocationData = {
           client_id: currentClientId,
           name: locationInfo.name || 'My Home',
+          is_primary: locationInfo.is_primary,
           address_line1: locationInfo.address_line1,
           street: locationInfo.street,
           landmark: locationInfo.landmark || null,

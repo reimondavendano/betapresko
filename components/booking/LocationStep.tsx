@@ -17,6 +17,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 
+const toBoolean = (value: unknown): boolean => !!value;
+
 const mockGeolocation = (onSuccess: (position: GeolocationPosition) => void, onError: () => void) => {
   if ('geolocation' in navigator) {
     navigator.geolocation.getCurrentPosition(onSuccess, onError, {
@@ -32,22 +34,23 @@ const mockGeolocation = (onSuccess: (position: GeolocationPosition) => void, onE
 const getGeocodedAddress = async (lat: number, lng: number): Promise<Partial<ClientLocation>> => {
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch address from geocoding service');
-    }
+    if (!response.ok) throw new Error('Failed to fetch address');
+
     const data = await response.json();
     const address = data.address;
 
+    console.log(address);
+
     return {
-      address_line1: address.house_number ? `${address.house_number} ${address.road}` : address.road,
+      address_line1: address.house_number ? `${address.house_number} ${address.residential}` : address.road,
       street: address.road,
-      barangay: address.suburb || address.village || address.neighbourhood,
-      city: address.city || address.town || address.village,
+      barangay: address.quarter || address.neighbourhood,
+      city: address.city + ', ' + address.state,
       landmark: address.amenity || address.shop || address.historic,
     };
   } catch (error) {
     console.error('Reverse Geocoding Error:', error);
-    throw new Error('Could not get address from coordinates. Please enter manually.');
+    throw new Error('Could not get address');
   }
 };
 
@@ -59,14 +62,14 @@ export function LocationStep() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const locationMethodRef = useRef(locationMethod);
   const [L, setL] = useState<any>(null);
 
   useEffect(() => {
     import('leaflet').then((module) => {
       setL(module);
-    }).catch(error => {
-      console.error('Failed to load Leaflet:', error);
-    });
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -81,73 +84,105 @@ export function LocationStep() {
       const defaultCenter = [14.8436, 120.8124];
       const map = L.map('map').setView(defaultCenter, 18);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      const marker = L.marker(defaultCenter, {
-        draggable: false
-      }).addTo(map);
+      const marker = L.marker(defaultCenter, { draggable: true }).addTo(map);
 
       mapRef.current = map;
       markerRef.current = marker;
 
-      map.on('moveend', async () => {
-        const center = map.getCenter();
-        if (markerRef.current) {
-          markerRef.current.setLatLng(center);
-        }
+      let markerWasDragged = false;
+
+      marker.on('dragstart', () => {
+        isDraggingRef.current = true;
+        markerWasDragged = true;
+      });
+
+      marker.on('dragend', async () => {
+        const pos = marker.getLatLng();
+        isDraggingRef.current = false;
+
         setIsGettingLocation(true);
         try {
-          const address = await getGeocodedAddress(center.lat, center.lng);
-          const cleanAddress = Object.fromEntries(
-            Object.entries(address).map(([key, value]) => [key, value === null || value === undefined ? '' : value])
-          );
+          const address = await getGeocodedAddress(pos.lat, pos.lng);
+          const cleanAddress = Object.fromEntries(Object.entries(address).map(([k, v]) => [k, v ?? '']));
           dispatch(setLocationInfo({ ...locationInfo, ...cleanAddress, name: 'My House' }));
           dispatch(setLocationMethod('manual'));
           setLocationError(null);
         } catch (error) {
-          console.error('Reverse Geocoding Error:', error);
-          setLocationError('Could not get address from coordinates. Please enter manually.');
+          setLocationError('Could not get address.');
+        } finally {
+          setIsGettingLocation(false);
+          markerWasDragged = false;
+        }
+      });
+
+      map.on('moveend', async () => {
+        if (markerWasDragged) return;
+
+        const center = map.getCenter();
+        setIsGettingLocation(true);
+        try {
+          const address = await getGeocodedAddress(center.lat, center.lng);
+          const cleanAddress = Object.fromEntries(Object.entries(address).map(([k, v]) => [k, v ?? '']));
+          dispatch(setLocationInfo({ ...locationInfo, ...cleanAddress, name: 'My House' }));
+          if (locationMethodRef.current !== 'current') {
+            dispatch(setLocationMethod('manual'));
+          }
+          setLocationError(null);
+        } catch (error) {
+          setLocationError('Could not get address.');
         } finally {
           setIsGettingLocation(false);
         }
       });
     }
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      mapRef.current?.remove();
+      mapRef.current = null;
     };
   }, [L]);
 
   useEffect(() => {
+    locationMethodRef.current = locationMethod;
+
     if (locationMethod === 'current' && L && mapRef.current && markerRef.current) {
       setIsGettingLocation(true);
       setLocationError(null);
+
+      const timeoutId = setTimeout(() => {
+        if (locationMethodRef.current === 'current') {
+          setLocationError('Timed out. Please try again.');
+          setIsGettingLocation(false);
+          dispatch(setLocationMethod('manual'));
+        }
+      }, 7000);
+
       mockGeolocation(
         async (position) => {
           try {
             const address = await getGeocodedAddress(position.coords.latitude, position.coords.longitude);
-            const cleanAddress = Object.fromEntries(
-              Object.entries(address).map(([key, value]) => [key, value === null || value === undefined ? '' : value])
-            );
+            const cleanAddress = Object.fromEntries(Object.entries(address).map(([k, v]) => [k, v ?? '']));
             dispatch(setLocationInfo({ ...locationInfo, ...cleanAddress, name: 'Current Location' }));
             mapRef.current?.setView([position.coords.latitude, position.coords.longitude], 18);
             markerRef.current?.setLatLng([position.coords.latitude, position.coords.longitude]);
           } catch (error) {
-            console.error('Reverse Geocoding Error:', error);
-            setLocationError('Could not get address from coordinates. Please enter manually.');
+            setLocationError('Could not get address.');
           } finally {
+            clearTimeout(timeoutId);
             setIsGettingLocation(false);
           }
         },
         () => {
-          setLocationError('Failed to get current location. Please enter your address manually.');
+          clearTimeout(timeoutId);
+          setLocationError('Failed to get current location.');
           setIsGettingLocation(false);
           dispatch(setLocationMethod('manual'));
         }
       );
+
+      return () => clearTimeout(timeoutId);
     }
   }, [locationMethod, dispatch, L]);
 
@@ -156,18 +191,13 @@ export function LocationStep() {
       if (!L || !mapRef.current || !markerRef.current) return;
 
       const { address_line1, street, barangay, city } = locationInfo;
-
       if (!address_line1 || !street || !barangay || !city) return;
 
       const fullAddress = `${address_line1}, ${street}, ${barangay}, ${city}, Philippines`;
 
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`
-        );
-
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
         const data = await response.json();
-
         if (data && data.length > 0) {
           const { lat, lon } = data[0];
           const latNum = parseFloat(lat);
@@ -193,24 +223,10 @@ export function LocationStep() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    dispatch(setLocationInfo({ ...locationInfo, [name]: type === 'checkbox' ? checked : value }));
+    dispatch(setLocationInfo({ ...locationInfo, [name]: type === 'checkbox' ? toBoolean(checked) : value }));
   };
+  
 
-  useEffect(() => {
-    const fetchExistingLocations = async () => {
-      if (clientId) {
-        try {
-          const locations = await clientLocationApi.getByClientId(clientId);
-          if (locations.length > 0) {
-            dispatch(setLocationInfo({ ...locationInfo, is_primary: false }));
-          }
-        } catch (error) {
-          console.error("Failed to fetch client locations:", error);
-        }
-      }
-    };
-    fetchExistingLocations();
-  }, [clientId, dispatch, locationInfo]);
 
   return (
     <div className="flex justify-center p-4">
@@ -226,9 +242,9 @@ export function LocationStep() {
             <div id="map" className="w-full h-80 rounded-lg shadow-inner mb-4"></div>
 
             {/* Location Method Selection */}
-            <RadioGroup 
-              onValueChange={handleLocationMethodChange} 
-              value={locationMethod} 
+            <RadioGroup
+              onValueChange={handleLocationMethodChange}
+              value={locationMethod}
               className="flex space-x-4 mb-4"
             >
               <div className="flex items-center space-x-2">
@@ -270,11 +286,11 @@ export function LocationStep() {
                   />
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox
+                   <Checkbox
                     id="is-primary"
                     name="is_primary"
-                    checked={locationInfo.is_primary}
-                    onCheckedChange={(checked) => dispatch(setLocationInfo({ ...locationInfo, is_primary: !!checked }))}
+                    checked={true} // Hardcoded to true
+                    disabled // Making it read-only
                   />
                   <Label htmlFor="is-primary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                     Set as Primary

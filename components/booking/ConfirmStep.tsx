@@ -95,15 +95,22 @@ export function ConfirmStep() {
   const [error, setError] = useState<string | null>(null);
 
   const getServiceName = () => selectedService?.name || '';
-  const getBrandName = (id: string) => availableBrands.find(brand => brand.id === id)?.name || '';
-  const getACTypeName = (id: string) => availableACTypes.find(type => type.id === id)?.name || '';
-  const getHorsepowerName = (id: string) => availableHorsepowerOptions.find(hp => hp.id === id)?.display_name || '';
+  const getBrandName = (id: string | null) => {
+    const brand = availableBrands.find(brand => brand.id === id);
+    return brand ? brand.name : '';
+  };
+  const getACTypeName = (id: string | null) => {
+    const acType = availableACTypes.find(type => type.id === id);
+    return acType ? acType.name : '';
+  };
+  const getHorsepowerName = (id: string | null) => {
+    const horsepower = availableHorsepowerOptions.find(hp => hp.id === id);
+    return horsepower ? horsepower.display_name : '';
+  };
 
   const handleClientInfoChange = (field: string, value: string) => {
     dispatch(setClientInfo({ ...clientInfo, [field]: value }));
   };
-
-  // Removed handleLocationInfoChange as these fields are now read-only
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -121,15 +128,25 @@ export function ConfirmStep() {
         setIsSubmitting(false);
         return;
       } else {
+        // Get referral ID from session storage
+        const referralId = sessionStorage.getItem('referralId');
+
         const newClientData = {
           name: clientInfo.name,
           mobile: clientInfo.mobile,
           email: clientInfo.email || null,
           sms_opt_in: true,
+          ref_id: referralId || null, // Add the ref_id here
         };
         const createdClient: Client = await clientApi.createClient(newClientData);
         currentClientId = createdClient.id;
         dispatch(setClientId(currentClientId));
+
+        // If a referral ID was used, remove it from session storage
+        if (referralId) {
+          sessionStorage.removeItem('referralId');
+          console.log('[SESSION] Referral ID removed from session storage.');
+        }
 
         // Create client location for the new client
         const newLocationData = {

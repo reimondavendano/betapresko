@@ -48,6 +48,25 @@ export const clientApi = {
   },
 
   /**
+   * Updates an existing client by ID.
+   */
+  updateClient: async (id: UUID, updatedData: Partial<Client>): Promise<Client> => {
+    const { data, error } = await supabase
+      .from('clients')
+      .update(updatedData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating client:', error);
+      throw new Error(error.message);
+    }
+    return data as Client;
+  },
+
+
+  /**
    * Fetches a client by ID.
    */
   getClientById: async (id: UUID): Promise<Client | null> => {

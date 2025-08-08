@@ -1,7 +1,8 @@
 'use client';
 
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Gift, Share2 } from 'lucide-react';
+import { Gift, Link, Check, X, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ReferFriendTabProps {
@@ -9,18 +10,53 @@ interface ReferFriendTabProps {
 }
 
 export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
-  // Mock referral code or link
-  const referralLink = `https://your-app.com/signup?ref=${clientId}`; 
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  // Mock referral link
+  const referralLink = `https://your-app.com/signup?ref=${clientId}`;
+  
+  // The message to share, with the referral link embedded
+  const shareMessage = `Thank you for supporting Presko AC! For our services, you may click the link to register.`;
+
+  // For WhatsApp, the message needs to be fully URI-encoded.
+  const whatsappShareLink = `https://wa.me/?text=${encodeURIComponent(shareMessage + ' ' + referralLink)}`;
+
+  // For Facebook, we use the sharer.php endpoint.
+  // The 'u' parameter is for the URL to share, and 'quote' is for the pre-filled message.
+  const facebookShareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${encodeURIComponent(shareMessage)}`;
+
+  // Function to display a temporary notification
+  const showTempNotification = (message: string, error = false) => {
+    setNotificationMessage(message);
+    setIsError(error);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+      setNotificationMessage('');
+    }, 3000); // Hide after 3 seconds
+  };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink)
-      .then(() => {
-        alert('Referral link copied to clipboard!'); // Replace with a more elegant toast/notification
-      })
-      .catch((err) => {
-        console.error('Failed to copy link: ', err);
-        alert('Failed to copy link. Please try again.');
-      });
+    try {
+      // Create a temporary textarea element to hold the text
+      const tempInput = document.createElement('textarea');
+      tempInput.value = referralLink;
+      document.body.appendChild(tempInput);
+      
+      // Select the text and execute the copy command
+      tempInput.select();
+      document.execCommand('copy');
+      
+      // Clean up the temporary element
+      document.body.removeChild(tempInput);
+
+      showTempNotification('Referral link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy link: ', err);
+      showTempNotification('Failed to copy link. Please try again.', true);
+    }
   };
 
   return (
@@ -35,21 +71,46 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
         <p className="text-gray-700 text-lg">
           Share the love for clean air! Refer your friends and earn points for every successful booking they make.
         </p>
+        
+        {/* Referral Link and Copy Button */}
         <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 flex items-center justify-between flex-wrap gap-2">
           <p className="font-mono text-gray-800 text-sm break-all">{referralLink}</p>
-          <Button 
-            onClick={handleCopyLink} 
-            variant="outline" 
+          <Button
+            onClick={handleCopyLink}
+            variant="outline"
             size="sm"
             className="flex-shrink-0"
           >
-            <Share2 className="w-4 h-4 mr-2" /> Copy Link
+            <Link className="w-4 h-4 mr-2" />
+            Copy Link
           </Button>
         </div>
-        <p className="text-sm text-gray-500">
-          Your friends will get a special discount on their first service!
-        </p>
+
+        {/* Share Buttons */}
+        <p className="text-gray-600 text-base">Or, share directly:</p>
+        <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <a href={facebookShareLink} target="_blank" rel="noopener noreferrer" className="w-full">
+                <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center"
+                >
+                    <Facebook className="w-5 h-5 mr-3" />
+                    Share on Facebook
+                </Button>
+            </a>
+        </div>
       </CardContent>
+
+      {/* Custom Notification Modal */}
+      {showNotification && (
+        <div className={`fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-xl flex items-center ${isError ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+          {isError ? (
+            <X className="w-5 h-5 mr-2" />
+          ) : (
+            <Check className="w-5 h-5 mr-2" />
+          )}
+          <span>{notificationMessage}</span>
+        </div>
+      )}
     </Card>
   );
 }

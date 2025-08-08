@@ -28,7 +28,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
-import { format, addMonths, isBefore } from 'date-fns';
+import { format, addMonths, isBefore, addYears } from 'date-fns';
 
 // Import UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,13 +118,52 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           setIsLoading(false);
           return;
         }
-        setClient(fetchedClient);
 
         const [fetchedLocations, fetchedDevices, fetchedAppointments] = await Promise.all([
           clientLocationApi.getByClientId(clientId),
           deviceApi.getByClientId(clientId),
           appointmentApi.getByClientId(clientId),
         ]);
+        
+        // Calculate points
+        let calculatedPoints = 0;
+        fetchedAppointments.forEach(appt => {
+          if (appt.status === 'completed') {
+            calculatedPoints += 1;
+            if (appt.total_units && appt.total_units >= 3) {
+              calculatedPoints += 1;
+            }
+          }
+        });
+        
+        // Calculate points expiry date (1 year from the last completed appointment)
+        let pointsExpiry = null;
+        if (calculatedPoints > 0) {
+          const lastCompletedAppointment = fetchedAppointments.reduce((latest, current) => {
+            if (current.status === 'completed') {
+              const currentTimestamp = new Date(current.appointment_date).getTime();
+              const latestTimestamp = latest ? new Date(latest.appointment_date).getTime() : 0;
+              return currentTimestamp > latestTimestamp ? current : latest;
+            }
+            return latest;
+          }, null as Appointment | null);
+
+          if (lastCompletedAppointment) {
+            pointsExpiry = addYears(new Date(lastCompletedAppointment.appointment_date), 1).toISOString();
+          }
+        }
+        
+        // Check if points or expiry need to be updated in the database
+        if (fetchedClient.points !== calculatedPoints || fetchedClient.points_expiry !== pointsExpiry) {
+          const updatedClient = await clientApi.updateClient(clientId, {
+            points: calculatedPoints,
+            points_expiry: pointsExpiry,
+          });
+          setClient(updatedClient);
+        } else {
+          setClient(fetchedClient);
+        }
+
         setLocations(fetchedLocations);
         setDevices(fetchedDevices);
         setAppointments(fetchedAppointments);
@@ -145,21 +184,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   // Helper to get the location city name
   const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city || 'N/A';
   const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
-
-
-  const calculateDisplayPoints = (): number => {
-    let calculatedPoints = 0;
-    appointments.forEach(appt => {
-      if (appt.status === 'completed') {
-        calculatedPoints += 1;
-        // Assuming `total_units` is a property on the Appointment object
-        if (appt.total_units && appt.total_units >= 3) {
-          calculatedPoints += 1;
-        }
-      }
-    });
-    return calculatedPoints;
-  };
 
   const getDeviceCleaningStatus = () => {
     const statusByLocation = new Map<UUID, { location: ClientLocation, dueDevices: number, lastServiceDate: string | null, totalDevices: number, acNames: string[] }>();
@@ -258,7 +282,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     );
   }
 
-  const displayPoints = calculateDisplayPoints();
   const primaryLocation = locations.find(loc => loc.is_primary) || locations[0];
 
 
@@ -289,7 +312,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Points</p>
-            <p className="text-3xl font-bold text-blue-600">{displayPoints}</p>
+            <p className="text-3xl font-bold text-blue-600">{client.points}</p>
           </div>
           <Star className="w-10 h-10 text-yellow-500" />
         </Card>
@@ -370,11 +393,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         </CardHeader>
         <CardContent className="p-0 space-y-4">
           <div className="flex justify-between items-center text-gray-700">
-            <p className="text-2xl font-bold text-blue-600">{displayPoints}</p>
+            <p className="text-2xl font-bold text-blue-600">{client.points}</p>
             {/* Conditional rendering for the badge */}
-            {displayPoints > 0 && (
+            {client.points > 0 && client.points_expiry && (
               <Badge variant="outline" className="text-sm border-yellow-500 text-yellow-700">
-                Expires on: {format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), 'MMM d, yyyy')}
+                Expires on: {format(new Date(client.points_expiry), 'MMM d, yyyy')}
               </Badge>
             )}
           </div>

@@ -18,6 +18,7 @@ interface BookingState {
     name: string;
     mobile: string;
     email: string;
+    ref_id: string;
   };
   locationInfo: {
     name: string;
@@ -52,6 +53,7 @@ const initialState: BookingState = {
     name: '',
     mobile: '',
     email: '',
+    ref_id: '',
   },
   locationInfo: {
     name: 'My House',

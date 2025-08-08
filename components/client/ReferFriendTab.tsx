@@ -25,7 +25,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
 
   // For Facebook, we use the sharer.php endpoint.
   // The 'u' parameter is for the URL to share, and 'quote' is for the pre-filled message.
-  const facebookShareLink = `https://www.facebook.com/sharer/sharer.php?u=${referralLink}&quote=${encodeURIComponent(shareMessage)}`;
+  const facebookShareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${encodeURIComponent(shareMessage)}`;
 
   // Function to display a temporary notification
   const showTempNotification = (message: string, error = false) => {

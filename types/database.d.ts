@@ -48,6 +48,7 @@ export interface Client {
   points_expiry: DateString | null;
   discounted: boolean;
   sms_opt_in: boolean;
+  ref_id: string | null;
   qr_code: string; // GENERATED ALWAYS as text
   created_at: Timestamp;
   updated_at: Timestamp;

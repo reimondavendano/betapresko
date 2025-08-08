@@ -19,8 +19,8 @@ export const clientLocationApi = {
           name: newLocationData.name,
           address_line1: newLocationData.address_line1,
           street: newLocationData.street,
-          barangay_id: newLocationData.barangay_id,
-          city_id: newLocationData.city_id,
+          barangay: newLocationData.barangay,
+          city: newLocationData.city,
           landmark: newLocationData.landmark,
           is_primary: false, // Default as per your database schema
         }
@@ -55,7 +55,5 @@ export const clientLocationApi = {
   },
 
   // You can add more API functions related to client locations here, e.g.:
-  // getById: async (id: UUID): Promise<ClientLocation | null> => { ... },
-  // update: async (id: UUID, updates: Partial<ClientLocation>): Promise<ClientLocation> => { ... },
-  // delete: async (id: UUID): Promise<void> => { ... },
+  // getById: async (id: UUID): Promise<ClientLocation...
 };

@@ -2,37 +2,35 @@
 
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import type { RootState } from '@/lib/store' // Use type-only import for RootState
-import { setClientInfo, setLocationInfo, setStep, setIsExistingClient, setClientId, resetBooking } from '../../lib/features/booking/bookingSlice' // Added resetBooking
+import type { RootState } from '@/lib/store'
+import { setClientInfo, setLocationInfo, setStep, setIsExistingClient, setClientId, resetBooking } from '../../lib/features/booking/bookingSlice'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  User, 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  Settings, 
-  Phone, 
-  Mail, // Added Mail icon for email input
+import {
+  User,
+  MapPin,
+  Calendar,
+  Clock,
+  Settings,
+  Phone,
+  Mail,
   ChevronLeft,
   CheckCircle,
-  Loader2, // Import Loader2 for processing state
-  XCircle, // Import XCircle for modal close button
-  AlertCircle // Import AlertCircle for modal icon
+  Loader2,
+  XCircle,
+  AlertCircle
 } from 'lucide-react'
 
-// Import new API functions
 import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
-import { appointmentApi } from '../../pages/api/appointments/appointmentApi'; // New import
-import { deviceApi } from '../../pages/api/device/deviceApi'; // New import
-import { Client, ClientLocation, Appointment, Device, UUID } from '../../types/database'; // Import new types
+import { appointmentApi } from '../../pages/api/appointments/appointmentApi';
+import { deviceApi } from '../../pages/api/device/deviceApi';
+import { Client, ClientLocation, Appointment, Device, UUID } from '../../types/database';
 
-// Modal Component for Client Exists
 interface ClientExistsModalProps {
   onClose: () => void;
   onGoToDashboard: () => void;
@@ -42,9 +40,9 @@ const ClientExistsModal = ({ onClose, onGoToDashboard }: ClientExistsModalProps)
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-sm rounded-lg shadow-lg relative">
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
           onClick={onClose}
         >
@@ -52,7 +50,7 @@ const ClientExistsModal = ({ onClose, onGoToDashboard }: ClientExistsModalProps)
         </Button>
         <CardHeader className="text-center">
           <CardTitle className="text-xl font-bold text-blue-600 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 mr-2" /> {/* Added AlertCircle icon */}
+            <AlertCircle className="w-6 h-6 mr-2" />
             Client Already Exists!
           </CardTitle>
         </CardHeader>
@@ -75,20 +73,15 @@ const ClientExistsModal = ({ onClose, onGoToDashboard }: ClientExistsModalProps)
   );
 };
 
-
 export function ConfirmStep() {
   const dispatch = useDispatch();
-  const { 
-    selectedCity, 
-    selectedBarangay, 
-    selectedService, 
-    selectedDevices, 
-    appointmentDate, 
+  const {
+    selectedService,
+    selectedDevices,
+    appointmentDate,
     totalAmount,
-    clientInfo, // Contains name, mobile, email
-    locationInfo, // Contains name, address_line1, street, landmark
-    isExistingClient, // State from Redux, though we'll re-check
-    // Access the globally available lookup data from Redux
+    clientInfo,
+    locationInfo,
     availableBrands,
     availableACTypes,
     availableHorsepowerOptions,
@@ -99,70 +92,59 @@ export function ConfirmStep() {
   const [clientDashboardUrl, setClientDashboardUrl] = useState('');
   const [showClientExistsModal, setShowClientExistsModal] = useState(false);
   const [existingClientId, setExistingClientId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-
-  // Helper functions to get names from IDs using Redux state lookup data
-  const getServiceName = () => selectedService?.name || ''; 
+  const getServiceName = () => selectedService?.name || '';
   const getBrandName = (id: string) => availableBrands.find(brand => brand.id === id)?.name || '';
   const getACTypeName = (id: string) => availableACTypes.find(type => type.id === id)?.name || '';
   const getHorsepowerName = (id: string) => availableHorsepowerOptions.find(hp => hp.id === id)?.display_name || '';
 
   const handleClientInfoChange = (field: string, value: string) => {
-    dispatch(setClientInfo({ [field]: value }));
+    dispatch(setClientInfo({ ...clientInfo, [field]: value }));
   };
 
-  const handleLocationInfoChange = (field: string, value: string) => {
-    dispatch(setLocationInfo({ [field]: value }));
-  };
+  // Removed handleLocationInfoChange as these fields are now read-only
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    setError(null); // Clear previous errors
+    setError(null);
 
     try {
-      // 1. Check if client exists by mobile number
       const existingClient = await clientApi.getClientByMobile(clientInfo.mobile);
 
       let currentClientId: UUID;
       let currentLocationId: UUID;
 
       if (existingClient) {
-        // Client exists, show modal and prepare redirect
         setExistingClientId(existingClient.id);
         setShowClientExistsModal(true);
-        setIsSubmitting(false); // Stop submitting state
-        return; // Stop the function here
+        setIsSubmitting(false);
+        return;
       } else {
-        // 2. If client does NOT exist, create new client
         const newClientData = {
           name: clientInfo.name,
           mobile: clientInfo.mobile,
-          email: clientInfo.email || null, // Allow null if email is empty
-          sms_opt_in: true, // Default to true as per DB schema
+          email: clientInfo.email || null,
+          sms_opt_in: true,
         };
         const createdClient: Client = await clientApi.createClient(newClientData);
         currentClientId = createdClient.id;
-        dispatch(setClientId(currentClientId)); // Store new client ID in Redux
+        dispatch(setClientId(currentClientId));
 
-        // 3. Create client location for the new client
-        if (!selectedCity || !selectedBarangay) {
-          throw new Error("City or Barangay not selected. Cannot create location.");
-        }
-
+        // Create client location for the new client
         const newLocationData = {
           client_id: currentClientId,
-          name: locationInfo.name || 'My Home', // Use default if not provided
+          name: locationInfo.name || 'My Home',
           address_line1: locationInfo.address_line1,
           street: locationInfo.street,
-          barangay_id: selectedBarangay.id,
-          city_id: selectedCity.id,
-          landmark: locationInfo.landmark || null, // Allow null if empty
+          landmark: locationInfo.landmark || null,
+          city: locationInfo.city,
+          barangay: locationInfo.barangay // Use the selected barangay ID from Redux state
         };
         const createdLocation: ClientLocation = await clientLocationApi.createClientLocation(newLocationData);
         currentLocationId = createdLocation.id;
       }
 
-      // 4. Create Appointment
       if (!selectedService || !appointmentDate || !currentClientId || !currentLocationId) {
         throw new Error("Missing data for appointment creation.");
       }
@@ -170,44 +152,40 @@ export function ConfirmStep() {
       const newAppointmentData = {
         client_id: currentClientId,
         location_id: currentLocationId,
-        service_id: selectedService.id, // Use selectedService.id
+        service_id: selectedService.id,
         appointment_date: appointmentDate,
-        appointment_time: null, // Assuming no time selection for now, or add it if needed
+        appointment_time: null,
         amount: totalAmount,
         total_units: selectedDevices.reduce((sum, device) => sum + device.quantity, 0),
-        notes: null, // Add notes if you have a field for it
+        notes: null,
       };
       const createdAppointment: Appointment = await appointmentApi.createAppointment(newAppointmentData);
 
-      // 5. Create Devices associated with the new appointment
       for (const device of selectedDevices) {
-        const brandName = getBrandName(device.brand_id); // Get brand name for device naming
+        const brandName = getBrandName(device.brand_id);
         for (let i = 0; i < device.quantity; i++) {
-          const deviceName = `${brandName}-${i + 1}`; // e.g., "Samsung-1", "Samsung-2"
+          const deviceName = `${brandName}-${i + 1}`;
           const newDeviceData = {
             client_id: currentClientId,
             location_id: currentLocationId,
-            appointment_id: createdAppointment.id, // Link to the new appointment
-            name: deviceName, // Assign the unique name
+            appointment_id: createdAppointment.id,
+            name: deviceName,
             brand_id: device.brand_id,
             ac_type_id: device.ac_type_id,
             horsepower_id: device.horsepower_id,
-            last_cleaning_date: appointmentDate, // Set last_cleaning_date to the appointment date
+            last_cleaning_date: appointmentDate,
           };
           await deviceApi.createDevice(newDeviceData);
         }
       }
 
-      // Generate client dashboard URL for the newly created client
-      const dashboardUrl = `/client/${currentClientId}`; // Your actual client dashboard route
+      const dashboardUrl = `/client/${currentClientId}`;
       setClientDashboardUrl(dashboardUrl);
-      
-      setIsSubmitting(false);
-      setIsCompleted(true); // Transition to completion screen
 
+      setIsSubmitting(false);
+      setIsCompleted(true);
     } catch (err: any) {
       console.error('Booking submission error:', err);
-      // You might want a more user-friendly error display here
       setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
       setIsSubmitting(false);
     }
@@ -215,29 +193,20 @@ export function ConfirmStep() {
 
   const handleGoToExistingClientDashboard = () => {
     if (existingClientId) {
-      window.open(`/client/${existingClientId}`, '_blank'); // Open in new tab
-      setShowClientExistsModal(false); // Close modal
-      dispatch(resetBooking()); // Reset booking state
-      dispatch(setStep(1)); // Go back to first step of booking
+      window.open(`/client/${existingClientId}`, '_blank');
+      setShowClientExistsModal(false);
+      dispatch(resetBooking());
+      dispatch(setStep(1));
     }
   };
 
   const handleBack = () => {
-    dispatch(setStep(4)); // Go back to the Schedule Step
+    dispatch(setStep(4));
   };
 
-  // State for error messages
-  const [error, setError] = useState<string | null>(null);
-
-  // Form validation for button disable
-  const isFormValid = 
+  const isFormValid =
     clientInfo.name.trim() !== '' &&
-    clientInfo.mobile.trim() !== '' &&
-    locationInfo.address_line1.trim() !== '' &&
-    locationInfo.street.trim() !== '' &&
-    selectedCity !== null &&
-    selectedBarangay !== null;
-
+    clientInfo.mobile.trim() !== '';
 
   if (isCompleted) {
     return (
@@ -249,26 +218,16 @@ export function ConfirmStep() {
             </div>
             <h2 className="text-2xl font-bold text-green-900 mb-4">Booking Confirmed!</h2>
             <p className="text-green-800 mb-6">
-              Your aircon service appointment has been successfully booked. 
+              Your aircon service appointment has been successfully booked.
               You will receive an SMS confirmation shortly.
             </p>
             <div className="space-y-4">
-              <Button 
+              <Button
                 onClick={() => window.open(clientDashboardUrl)}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 Go to Your Dashboard
               </Button>
-              {/* <Button 
-                onClick={() => {
-                  dispatch(resetBooking()); // Reset booking state
-                  dispatch(setStep(1)); // Go back to the first step
-                }} 
-                variant="outline" 
-                className="w-full"
-              >
-                Book Another Service
-              </Button> */}
             </div>
           </CardContent>
         </Card>
@@ -299,16 +258,6 @@ export function ConfirmStep() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center">
-                <MapPin className="w-5 h-5 text-blue-600 mr-3" />
-                <div>
-                  <p className="font-medium">Location</p>
-                  <p className="text-sm text-gray-600">
-                    {selectedBarangay?.name || 'N/A'}, {selectedCity?.name || 'N/A'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center">
                 <Settings className="w-5 h-5 text-green-600 mr-3" />
                 <div>
                   <p className="font-medium">Service</p>
@@ -332,7 +281,7 @@ export function ConfirmStep() {
                       <div key={index} className="bg-gray-50 p-3 rounded-lg">
                         <p className="text-sm">
                           {getBrandName(device.brand_id)} {getACTypeName(device.ac_type_id)} - {getHorsepowerName(device.horsepower_id)}
-                          {device.quantity > 1 && ` (x${device.quantity})`} {/* Display quantity here */}
+                          {device.quantity > 1 && ` (x${device.quantity})`}
                         </p>
                         <p className="text-xs text-gray-600">Quantity: {device.quantity}</p>
                       </div>
@@ -353,116 +302,121 @@ export function ConfirmStep() {
           </Card>
         </div>
 
-        {/* Client Information Form */}
+        {/* Combined Client Information and Service Address Form */}
         <div className="space-y-6">
           <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <User className="w-5 h-5 mr-2" />
-                Your Information
+                Client & Service Information
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={clientInfo.name}
-                  onChange={(e) => handleClientInfoChange('name', e.target.value)}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="mobile">Mobile Number *</Label>
-                <Input
-                  id="mobile"
-                  value={clientInfo.mobile}
-                  onChange={(e) => handleClientInfoChange('mobile', e.target.value)}
-                  placeholder="+63 912 345 6789"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email" // Set type to email for better mobile keyboard
-                  value={clientInfo.email}
-                  onChange={(e) => handleClientInfoChange('email', e.target.value)}
-                  placeholder="you@example.com"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <MapPin className="w-5 h-5 mr-2" />
-                Service Address
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="locationName">Location Name</Label>
-                <Input
-                  id="locationName"
-                  value={locationInfo.name}
-                  onChange={(e) => handleLocationInfoChange('name', e.target.value)}
-                  placeholder="e.g., My House, Office"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="addressLine1">Address Line 1 *</Label>
-                <Input
-                  id="addressLine1"
-                  value={locationInfo.address_line1}
-                  onChange={(e) => handleLocationInfoChange('address_line1', e.target.value)}
-                  placeholder="Block C Lot 3"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="street">Street *</Label>
-                <Input
-                  id="street"
-                  value={locationInfo.street}
-                  onChange={(e) => handleLocationInfoChange('street', e.target.value)}
-                  placeholder="24 De Agosto"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>City *</Label>
-                  {/* Directly display city name from Redux state object */}
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedCity?.name || 'N/A'}
-                  </p>
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name">Full Name *</Label>
+                    <Input
+                      id="name"
+                      value={clientInfo.name}
+                      onChange={(e) => handleClientInfoChange('name', e.target.value)}
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mobile">Mobile Number *</Label>
+                    <Input
+                      id="mobile"
+                      value={clientInfo.mobile}
+                      onChange={(e) => handleClientInfoChange('mobile', e.target.value)}
+                      placeholder="+63 912 345 6789"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label>Barangay *</Label>
-                  {/* Directly display barangay name from Redux state object */}
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedBarangay?.name || 'N/A'}
-                  </p>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={clientInfo.email}
+                    onChange={(e) => handleClientInfoChange('email', e.target.value)}
+                    placeholder="you@example.com"
+                  />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="landmark">Landmark</Label>
-                <Input
-                  id="landmark"
-                  value={locationInfo.landmark}
-                  onChange={(e) => handleLocationInfoChange('landmark', e.target.value)}
-                  placeholder="Beside Alfamart"
-                />
+              <div className="border-t pt-4 mt-4 space-y-4">
+                <div className="flex items-center">
+                  <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                  <h4 className="font-medium text-lg">Service Address</h4>
+                </div>
+                <div>
+                  <Label htmlFor="locationName">Location Name (e.g., Home, Office)</Label>
+                  <Input
+                    id="locationName"
+                    value={locationInfo.name}
+                    readOnly
+                    disabled
+                    className="cursor-not-allowed bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="addressLine1">Address Line 1 *</Label>
+                  <Input
+                    id="addressLine1"
+                    value={locationInfo.address_line1}
+                    readOnly
+                    disabled
+                    className="cursor-not-allowed bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="street">Street *</Label>
+                  <Input
+                    id="street"
+                    value={locationInfo.street}
+                    readOnly
+                    disabled
+                    className="cursor-not-allowed bg-gray-100"
+                  />
+                </div>
+                {/* Read-only City and Barangay fields */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="barangay">Barangay</Label>
+                    <Input
+                      id="barangay"
+                      value={locationInfo.barangay || ''}
+                      readOnly
+                      disabled
+                      placeholder="Barangay"
+                      className="cursor-not-allowed bg-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={locationInfo.city || ''}
+                      readOnly
+                      disabled
+                      placeholder="City"
+                      className="cursor-not-allowed bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="landmark">Landmark</Label>
+                  <Textarea
+                    id="landmark"
+                    value={locationInfo.landmark}
+                    readOnly
+                    disabled
+                    className="cursor-not-allowed bg-gray-100"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -479,10 +433,10 @@ export function ConfirmStep() {
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Schedule
         </Button>
-        
+
         <Button
           onClick={handleSubmit}
-          disabled={!isFormValid || isSubmitting} // Use isFormValid for disabling
+          disabled={!isFormValid || isSubmitting}
           className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? (
@@ -496,9 +450,8 @@ export function ConfirmStep() {
         </Button>
       </div>
 
-      {/* Client Exists Modal */}
       {showClientExistsModal && (
-        <ClientExistsModal 
+        <ClientExistsModal
           onClose={() => setShowClientExistsModal(false)}
           onGoToDashboard={handleGoToExistingClientDashboard}
         />

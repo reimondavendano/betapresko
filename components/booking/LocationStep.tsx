@@ -1,215 +1,363 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { RootState } from '../../lib/store' // Adjust path to your Redux store
-import { setSelectedCity, setSelectedBarangay, setStep } from '../../lib/features/booking/bookingSlice' // Adjust path to your slice
-import { locationApi } from '../../pages/api/city/locationApi' // Adjust path to your API file
-import { City, Barangay } from '../../types/database' // Import types for City and Barangay
+import { RootState } from '../../lib/store'
+import { setStep, setLocationInfo, setLocationMethod, setClientId } from '../../lib/features/booking/bookingSlice'
 import { MapPin, ChevronRight, Loader2 } from 'lucide-react'
+import { ClientLocation } from '@/types/database';
+import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
+import 'leaflet/dist/leaflet.css';
+import type * as L from 'leaflet';
 
-// --- UI COMPONENTS IMPORTED FROM COMPONENTS/UI ---
-// These imports assume you have these components set up in your project
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 
-// --- END UI COMPONENTS IMPORTED FROM COMPONENTS/UI ---
+const mockGeolocation = (onSuccess: (position: GeolocationPosition) => void, onError: () => void) => {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 0,
+    });
+  } else {
+    onError();
+  }
+};
 
+const getGeocodedAddress = async (lat: number, lng: number): Promise<Partial<ClientLocation>> => {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch address from geocoding service');
+    }
+    const data = await response.json();
+    const address = data.address;
+
+    return {
+      address_line1: address.house_number ? `${address.house_number} ${address.road}` : address.road,
+      street: address.road,
+      barangay: address.suburb || address.village || address.neighbourhood,
+      city: address.city || address.town || address.village,
+      landmark: address.amenity || address.shop || address.historic,
+    };
+  } catch (error) {
+    console.error('Reverse Geocoding Error:', error);
+    throw new Error('Could not get address from coordinates. Please enter manually.');
+  }
+};
 
 export function LocationStep() {
   const dispatch = useDispatch();
-  const { selectedCity, selectedBarangay } = useSelector((state: RootState) => state.booking);
+  const { locationInfo, locationMethod, clientId } = useSelector((state: RootState) => state.booking);
 
-  const [cities, setCities] = useState<City[]>([]);
-  const [barangays, setBarangays] = useState<Barangay[]>([]);
-  const [isLoadingCities, setIsLoadingCities] = useState(true);
-  const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+  const [L, setL] = useState<any>(null);
 
-  // Fetch cities on component mount
   useEffect(() => {
-    const fetchCities = async () => {
-      setIsLoadingCities(true);
-      setError(null);
-      try {
-        const fetchedCities = await locationApi.getCities();
-        setCities(fetchedCities);
-        // If a city was previously selected in Redux, try to find it in the fetched list
-        if (selectedCity && !fetchedCities.some(c => c.id === selectedCity.id)) {
-          dispatch(setSelectedCity(null)); // Clear if previously selected city is not found
+    import('leaflet').then((module) => {
+      setL(module);
+    }).catch(error => {
+      console.error('Failed to load Leaflet:', error);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (L && !mapRef.current) {
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const defaultCenter = [14.8436, 120.8124];
+      const map = L.map('map').setView(defaultCenter, 18);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      const marker = L.marker(defaultCenter, {
+        draggable: false
+      }).addTo(map);
+
+      mapRef.current = map;
+      markerRef.current = marker;
+
+      map.on('moveend', async () => {
+        const center = map.getCenter();
+        if (markerRef.current) {
+          markerRef.current.setLatLng(center);
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load cities.');
-      } finally {
-        setIsLoadingCities(false);
+        setIsGettingLocation(true);
+        try {
+          const address = await getGeocodedAddress(center.lat, center.lng);
+          const cleanAddress = Object.fromEntries(
+            Object.entries(address).map(([key, value]) => [key, value === null || value === undefined ? '' : value])
+          );
+          dispatch(setLocationInfo({ ...locationInfo, ...cleanAddress, name: 'My House' }));
+          dispatch(setLocationMethod('manual'));
+          setLocationError(null);
+        } catch (error) {
+          console.error('Reverse Geocoding Error:', error);
+          setLocationError('Could not get address from coordinates. Please enter manually.');
+        } finally {
+          setIsGettingLocation(false);
+        }
+      });
+    }
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
-    fetchCities();
-  }, [dispatch, selectedCity]); // Add selectedCity to dependencies to re-evaluate if it's still valid
+  }, [L]);
 
-  // Fetch barangays when selectedCity changes
   useEffect(() => {
-    if (selectedCity) {
-      const fetchBarangays = async () => {
-        setIsLoadingBarangays(true);
-        setError(null);
-        try {
-          const fetchedBarangays = await locationApi.getBarangaysByCityId(selectedCity.id);
-          setBarangays(fetchedBarangays);
-          // If a barangay was previously selected for this city, try to find it
-          if (selectedBarangay && !fetchedBarangays.some(b => b.id === selectedBarangay.id)) {
-            dispatch(setSelectedBarangay(null)); // Clear if previously selected barangay is not found
+    if (locationMethod === 'current' && L && mapRef.current && markerRef.current) {
+      setIsGettingLocation(true);
+      setLocationError(null);
+      mockGeolocation(
+        async (position) => {
+          try {
+            const address = await getGeocodedAddress(position.coords.latitude, position.coords.longitude);
+            const cleanAddress = Object.fromEntries(
+              Object.entries(address).map(([key, value]) => [key, value === null || value === undefined ? '' : value])
+            );
+            dispatch(setLocationInfo({ ...locationInfo, ...cleanAddress, name: 'Current Location' }));
+            mapRef.current?.setView([position.coords.latitude, position.coords.longitude], 18);
+            markerRef.current?.setLatLng([position.coords.latitude, position.coords.longitude]);
+          } catch (error) {
+            console.error('Reverse Geocoding Error:', error);
+            setLocationError('Could not get address from coordinates. Please enter manually.');
+          } finally {
+            setIsGettingLocation(false);
           }
-        } catch (err: any) {
-          setError(err.message || 'Failed to load barangays.');
-        } finally {
-          setIsLoadingBarangays(false);
+        },
+        () => {
+          setLocationError('Failed to get current location. Please enter your address manually.');
+          setIsGettingLocation(false);
+          dispatch(setLocationMethod('manual'));
         }
-      };
-      fetchBarangays();
-    } else {
-      setBarangays([]); // Clear barangays if no city is selected
-      dispatch(setSelectedBarangay(null)); // Ensure Redux state is also cleared
+      );
     }
-  }, [selectedCity, dispatch, selectedBarangay]); // Add selectedBarangay to dependencies
+  }, [locationMethod, dispatch, L]);
 
-  const handleCitySelect = (cityId: string) => {
-    const city = cities.find(c => c.id === cityId);
-    if (city) {
-      dispatch(setSelectedCity(city));
-    } else {
-      dispatch(setSelectedCity(null)); // Clear if no city selected (e.g., placeholder)
-    }
-  };
+  useEffect(() => {
+    const updateMapFromAddress = async () => {
+      if (!L || !mapRef.current || !markerRef.current) return;
 
-  const handleBarangaySelect = (barangayId: string) => {
-    const barangay = barangays.find(b => b.id === barangayId);
-    if (barangay) {
-      dispatch(setSelectedBarangay(barangay));
-    } else {
-      dispatch(setSelectedBarangay(null)); // Clear if no barangay selected (e.g., placeholder)
-    }
-  };
+      const { address_line1, street, barangay, city } = locationInfo;
+
+      if (!address_line1 || !street || !barangay || !city) return;
+
+      const fullAddress = `${address_line1}, ${street}, ${barangay}, ${city}, Philippines`;
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`
+        );
+
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          const { lat, lon } = data[0];
+          const latNum = parseFloat(lat);
+          const lonNum = parseFloat(lon);
+          mapRef.current.setView([latNum, lonNum], 18);
+          markerRef.current.setLatLng([latNum, lonNum]);
+        }
+      } catch (err) {
+        console.error("Geocoding failed:", err);
+      }
+    };
+
+    updateMapFromAddress();
+  }, [locationInfo.address_line1, locationInfo.street, locationInfo.barangay, locationInfo.city, L]);
 
   const handleNext = () => {
-    if (selectedCity && selectedBarangay) {
-      dispatch(setStep(2)); // Proceed to the next step (e.g., Device selection)
-    }
+    dispatch(setStep(2));
   };
 
-  const selectedCityName = selectedCity?.name;
-  const selectedBarangayName = selectedBarangay?.name;
+  const handleLocationMethodChange = (value: 'manual' | 'current') => {
+    dispatch(setLocationMethod(value));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    dispatch(setLocationInfo({ ...locationInfo, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  useEffect(() => {
+    const fetchExistingLocations = async () => {
+      if (clientId) {
+        try {
+          const locations = await clientLocationApi.getByClientId(clientId);
+          if (locations.length > 0) {
+            dispatch(setLocationInfo({ ...locationInfo, is_primary: false }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch client locations:", error);
+        }
+      }
+    };
+    fetchExistingLocations();
+  }, [clientId, dispatch, locationInfo]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 font-inter">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Select Your Location</h2>
-        <p className="text-gray-600">Choose your city and barangay to get started</p>
-      </div>
+    <div className="flex justify-center p-4">
+      <div className="max-w-xl w-full">
+        <Card className="shadow-lg rounded-xl overflow-hidden">
+          <CardHeader className="bg-[#99BCC0] text-white p-6">
+            <CardTitle className="flex items-center text-2xl font-bold">
+              <MapPin className="w-6 h-6 mr-3" />
+              Your Location
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <div id="map" className="w-full h-80 rounded-lg shadow-inner mb-4"></div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-          <strong className="font-bold">Error!</strong>
-          <span className="block sm:inline"> {error}</span>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-            Service Location
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* City Selection */}
-          <div>
-            <label htmlFor="city-select" className="block text-sm font-medium text-gray-700 mb-2">
-              City *
-            </label>
-            <Select
-              value={selectedCity?.id || ''}
-              onValueChange={handleCitySelect}
-              disabled={isLoadingCities}
+            {/* Location Method Selection */}
+            <RadioGroup 
+              onValueChange={handleLocationMethodChange} 
+              value={locationMethod} 
+              className="flex space-x-4 mb-4"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={isLoadingCities ? 'Loading cities...' : 'Select your city'} />
-              </SelectTrigger>
-              <SelectContent>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-                      {city.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="current" id="current" />
+                <Label htmlFor="current" className="text-gray-700">Use My Current Location</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="manual" id="manual" />
+                <Label htmlFor="manual" className="text-gray-700">Manual Input Address</Label>
+              </div>
+            </RadioGroup>
 
-          {/* Barangay Selection */}
-          <div>
-            <label htmlFor="barangay-select" className="block text-sm font-medium text-gray-700 mb-2">
-              Barangay *
-            </label>
-            <Select
-              value={selectedBarangay?.id || ''}
-              onValueChange={handleBarangaySelect}
-              disabled={!selectedCity || isLoadingBarangays || barangays.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    !selectedCity
-                      ? 'Select a city first'
-                      : isLoadingBarangays
-                      ? 'Loading barangays...'
-                      : barangays.length === 0
-                      ? 'No barangays available'
-                      : 'Select your barangay'
-                  }
+            {locationMethod === 'current' && (
+              <div className="flex items-center space-x-2 text-blue-600">
+                {isGettingLocation ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Getting your location...</span>
+                  </>
+                ) : locationError ? (
+                  <span className="text-red-500">{locationError}</span>
+                ) : (
+                  <span className="text-green-600">Location autofilled successfully!</span>
+                )}
+              </div>
+            )}
+
+            {/* Form Inputs */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location-name">Location Name</Label>
+                  <Input
+                    id="location-name"
+                    name="name"
+                    placeholder="e.g., My Home, Office"
+                    value={locationInfo.name}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is-primary"
+                    name="is_primary"
+                    checked={locationInfo.is_primary}
+                    onCheckedChange={(checked) => dispatch(setLocationInfo({ ...locationInfo, is_primary: !!checked }))}
+                  />
+                  <Label htmlFor="is-primary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Set as Primary
+                  </Label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="address-line1">Address Line 1</Label>
+                  <Input
+                    id="address-line1"
+                    name="address_line1"
+                    placeholder="Ex: Block C Lot 3"
+                    value={locationInfo.address_line1}
+                    onChange={handleInputChange}
+                    disabled={isGettingLocation && locationMethod === 'current'}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="street">Street</Label>
+                  <Input
+                    id="street"
+                    name="street"
+                    placeholder="Ex: 24 De Agosto"
+                    value={locationInfo.street}
+                    onChange={handleInputChange}
+                    disabled={isGettingLocation && locationMethod === 'current'}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="barangay">Barangay</Label>
+                  <Input
+                    id="barangay"
+                    name="barangay"
+                    placeholder="Ex: Caingin"
+                    value={locationInfo.barangay}
+                    onChange={handleInputChange}
+                    disabled={isGettingLocation && locationMethod === 'current'}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    name="city"
+                    placeholder="Ex: Malolos"
+                    value={locationInfo.city}
+                    onChange={handleInputChange}
+                    disabled={isGettingLocation && locationMethod === 'current'}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="landmark">Landmark</Label>
+                <Input
+                  id="landmark"
+                  name="landmark"
+                  placeholder="Ex: Beside Alfamart"
+                  value={locationInfo.landmark}
+                  onChange={handleInputChange}
+                  disabled={isGettingLocation && locationMethod === 'current'}
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {barangays.map((barangay) => (
-                  <SelectItem key={barangay.id} value={barangay.id}>
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-green-500" />
-                      {barangay.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Selected Location Summary */}
-          {selectedCity && selectedBarangay && (
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">Selected Location:</h4>
-              <p className="text-blue-800">
-                <MapPin className="w-4 h-4 inline mr-1" />
-                {selectedBarangayName}, {selectedCityName}, Bulacan
-              </p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <div className="flex justify-center mt-8">
-        <Button
-          onClick={handleNext}
-          disabled={!selectedCity || !selectedBarangay}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
-        >
-          Continue to Services
-          <ChevronRight className="w-4 h-4 ml-2" />
-        </Button>
+        <div className="flex justify-center mt-8">
+          <Button
+            onClick={handleNext}
+            disabled={!locationInfo.address_line1 || !locationInfo.barangay || !locationInfo.city}
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
+          >
+            Continue to Services
+            <ChevronRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
-  );
+  )
 }
-
-

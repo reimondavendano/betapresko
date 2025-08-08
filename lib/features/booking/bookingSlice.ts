@@ -1,9 +1,9 @@
 // src/lib/features/booking/bookingSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { City, Barangay, Service, Brand, ACType, HorsepowerOption, BlockedDate, UUID, DateString, ParsedCustomSettings } from '../../../types/database'; // Added ParsedCustomSettings and BlockedDate
+import { Service, Brand, ACType, HorsepowerOption, BlockedDate, UUID, DateString, ParsedCustomSettings } from '../../../types/database';
 
-export interface BookingDevice { // Exported the interface
-  id?: UUID; // Make the ID optional, will be present for existing devices
+export interface BookingDevice { 
+  id?: UUID; 
   brand_id: UUID;
   ac_type_id: UUID;
   horsepower_id: UUID;
@@ -12,56 +12,59 @@ export interface BookingDevice { // Exported the interface
 
 interface BookingState {
   step: number;
-  selectedCity: City | null;
-  selectedBarangay: Barangay | null;
   selectedService: Service | null;
   selectedDevices: BookingDevice[];
   clientInfo: {
     name: string;
     mobile: string;
-    email: string; // Added email field
+    email: string;
   };
   locationInfo: {
     name: string;
     address_line1: string;
     street: string;
     landmark: string;
+    city: string;
+    barangay: string;
+    is_primary: boolean;
   };
+  locationMethod: 'manual' | 'current';
   appointmentDate: DateString | null;
-  appointmentTime: string | null; // Added appointmentTime
-  totalAmount: number; // This will now represent the final total after discount
+  appointmentTime: string | null;
+  totalAmount: number;
   isExistingClient: boolean;
   clientId: UUID | null;
   
   availableBrands: Brand[];
   availableACTypes: ACType[];
   availableHorsepowerOptions: HorsepowerOption[];
-  discount: number; // New: To store the discount value
-  availableBlockedDates: BlockedDate[]; // Added for blocked dates
+  discount: number;
+  availableBlockedDates: BlockedDate[];
   
-  // New: Custom pricing settings from database
   customPricingSettings: ParsedCustomSettings; 
 }
 
 const initialState: BookingState = {
   step: 1,
-  selectedCity: null,
-  selectedBarangay: null,
   selectedService: null,
   selectedDevices: [],
   clientInfo: {
     name: '',
     mobile: '',
-    email: '', // Initialize email
+    email: '',
   },
   locationInfo: {
     name: 'My House',
     address_line1: '',
     street: '',
     landmark: '',
+    city: '',
+    barangay: '',
+    is_primary: false,
   },
+  locationMethod: 'manual',
   appointmentDate: null,
-  appointmentTime: null, // Initialize appointmentTime
+  appointmentTime: null,
   totalAmount: 0,
   isExistingClient: false,
   clientId: null,
@@ -69,10 +72,9 @@ const initialState: BookingState = {
   availableBrands: [],
   availableACTypes: [],
   availableHorsepowerOptions: [],
-  discount: 0, // Default discount
-  availableBlockedDates: [], // Initialize blocked dates
+  discount: 0,
+  availableBlockedDates: [],
   
-  // Initialize customPricingSettings with default values to avoid errors before fetching
   customPricingSettings: {
     splitTypePrice: 0,
     windowTypePrice: 0,
@@ -87,13 +89,6 @@ const bookingSlice = createSlice({
   reducers: {
     setStep: (state, action: PayloadAction<number>) => {
       state.step = action.payload;
-    },
-    setSelectedCity: (state, action: PayloadAction<City | null>) => {
-      state.selectedCity = action.payload;
-      state.selectedBarangay = null;
-    },
-    setSelectedBarangay: (state, action: PayloadAction<Barangay | null>) => {
-      state.selectedBarangay = action.payload;
     },
     setSelectedService: (state, action: PayloadAction<Service | null>) => {
       state.selectedService = action.payload;
@@ -119,7 +114,7 @@ const bookingSlice = createSlice({
     setAppointmentDate: (state, action: PayloadAction<DateString | null>) => {
       state.appointmentDate = action.payload;
     },
-    setAppointmentTime: (state, action: PayloadAction<string | null>) => { // New reducer for time
+    setAppointmentTime: (state, action: PayloadAction<string | null>) => {
       state.appointmentTime = action.payload;
     },
     setTotalAmount: (state, action: PayloadAction<number>) => {
@@ -131,9 +126,10 @@ const bookingSlice = createSlice({
     setClientId: (state, action: PayloadAction<UUID | null>) => {
       state.clientId = action.payload;
     },
-    // Removed setSelectedLocationId
     resetBooking: () => initialState,
-
+    setLocationMethod: (state, action: PayloadAction<'manual' | 'current'>) => {
+      state.locationMethod = action.payload;
+    },
     setAvailableBrands: (state, action: PayloadAction<Brand[]>) => {
       state.availableBrands = action.payload;
     },
@@ -143,16 +139,14 @@ const bookingSlice = createSlice({
     setAvailableHorsepowerOptions: (state, action: PayloadAction<HorsepowerOption[]>) => {
       state.availableHorsepowerOptions = action.payload;
     },
-    setDiscount: (state, action: PayloadAction<number>) => { // New reducer for discount
+    setDiscount: (state, action: PayloadAction<number>) => {
       state.discount = action.payload;
     },
-    setAvailableBlockedDates: (state, action: PayloadAction<BlockedDate[]>) => { // New reducer
+    setAvailableBlockedDates: (state, action: PayloadAction<BlockedDate[]>) => {
       state.availableBlockedDates = action.payload;
     },
-    // New reducer to set all custom pricing settings
     setCustomPricingSettings: (state, action: PayloadAction<ParsedCustomSettings>) => {
       state.customPricingSettings = action.payload;
-      // Also update the discount in the main state for backward compatibility if needed
       state.discount = action.payload.discount;
     },
   },
@@ -160,8 +154,6 @@ const bookingSlice = createSlice({
 
 export const {
   setStep,
-  setSelectedCity,
-  setSelectedBarangay,
   setSelectedService,
   setSelectedDevices,
   addDevice,
@@ -170,18 +162,18 @@ export const {
   setClientInfo,
   setLocationInfo,
   setAppointmentDate,
-  setAppointmentTime, // Export new action
+  setAppointmentTime,
   setTotalAmount,
   setIsExistingClient,
   setClientId,
-  // Removed setSelectedLocationId
   resetBooking,
+  setLocationMethod,
   setAvailableBrands,
   setAvailableACTypes,
   setAvailableHorsepowerOptions,
-  setDiscount, // Export new action
-  setAvailableBlockedDates, // Export new action
-  setCustomPricingSettings, // Export new action
+  setDiscount,
+  setAvailableBlockedDates,
+  setCustomPricingSettings,
 } = bookingSlice.actions;
 
 export default bookingSlice.reducer;

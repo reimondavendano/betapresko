@@ -6,19 +6,6 @@ type Timestamp = string; // ISO 8601 string, e.g., "2024-08-06T10:00:00Z"
 type DateString = string; // YYYY-MM-DD format
 type TimeString = string; // HH:MM AM/PM format
 
-export interface City {
-  id: UUID;
-  name: string;
-  province: string;
-  created_at: Timestamp;
-}
-
-export interface Barangay {
-  id: UUID;
-  city_id: UUID;
-  name: string;
-  created_at: Timestamp;
-}
 
 export interface Service {
   id: UUID;
@@ -73,8 +60,8 @@ export interface ClientLocation {
   is_primary: boolean;
   address_line1: string | null;
   street: string | null;
-  barangay_id: UUID | null; // Updated to reference barangays(id)
-  city_id: UUID | null;     // Updated to reference cities(id)
+  barangay: UUID | null; // Updated to reference barangays(id)
+  city: UUID | null;     // Updated to reference cities(id)
   landmark: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
@@ -116,20 +103,13 @@ export interface Device {
 
 // New: Interface for device_history table
 export interface DeviceHistory {
-  device_id: UUID;
-  client_id: UUID;
-  location_id: UUID;
-  appointment_id: UUID | null;
-  name: string; // Added 'name' field for unique identifier
-  brand_id: UUID | null;
-  ac_type_id: UUID | null;
-  horsepower_id: UUID | null;
-  last_cleaning_date: DateString | null;
-  due_3_months: DateString | null; // GENERATED ALWAYS AS date
-  due_4_months: DateString | null; // GENERATED ALWAYS AS date
-  due_6_months: DateString | null; // GENERATED ALWAYS AS date
+  id: UUID; // Primary key for the history record
+  device_id: UUID; // Foreign key to the devices table
+  appointment_id: UUID; // Foreign key to the appointments table
+  service_date: DateString; // Date when the service was performed
+  service_type_id: UUID; // Foreign key to the services table (e.g., Cleaning, Repair)
+  notes: string | null;
   created_at: Timestamp;
-  updated_at: Timestamp;
 }
 
 export interface BlockedDate {
@@ -183,16 +163,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      cities: {
-        Row: City // The type for a row in the "cities" table
-        Insert: Omit<City, 'id' | 'created_at'> // For insert operations, omit auto-generated fields
-        Update: Partial<Omit<City, 'id' | 'created_at'>> // For update operations
-      }
-      barangays: {
-        Row: Barangay
-        Insert: Omit<Barangay, 'id' | 'created_at'>
-        Update: Partial<Omit<Barangay, 'id' | 'created_at'>>
-      }
       services: {
         Row: Service
         Insert: Omit<Service, 'id' | 'created_at'>

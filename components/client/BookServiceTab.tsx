@@ -45,6 +45,7 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
   const clientBookingState = useSelector((state: RootState) => state.client.booking);
   const currentClient = useSelector((state: RootState) => state.client.currentClient);
   const clientLocations = useSelector((state: RootState) => state.client.locations);
+  const allDevices = useSelector((state: RootState) => state.client.devices);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,16 +121,26 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       setError('Please select at least one existing device or add a new unit.');
       return;
     }
+    
+    const primaryLocationId = clientLocations.find(loc => loc.is_primary)?.id || null;
 
-    const clientLocation = clientLocations.length > 0 ? clientLocations[0] : null;
-    if (!clientLocation) {
-      setError('No client location found. Please add a location for this client.');
-      return;
-    }
+    const newDevicesWithLocation = clientBookingState.newDevices.map(nd => {
+        const brandName = clientBookingState.availableBrands.find(b => b.id === nd.brand_id)?.name;
+        const acTypeName = clientBookingState.availableACTypes.find(t => t.id === nd.ac_type_id)?.name;
+        
+        // Construct a name, defaulting to 'New AC Unit' if a brand cannot be found
+        const deviceName = brandName && acTypeName ? `${brandName} ${acTypeName}` : 'New AC Unit';
 
+        return {
+            ...nd,
+            name: deviceName,
+            location_id: nd.location_id || primaryLocationId,
+        };
+    });
+    
     const payload = {
       clientId: currentClient.id,
-      locationId: clientLocation.id,
+      primaryLocationId: primaryLocationId, // Pass primaryLocationId separately
       serviceId: clientBookingState.selectedService.id,
       appointmentDate: clientBookingState.appointmentDate,
       appointmentTime: '09:00 AM',
@@ -138,28 +149,15 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
         clientBookingState.selectedDevices.length +
         clientBookingState.newDevices.reduce((sum, d) => sum + d.quantity, 0),
       notes: null,
-      selectedDeviceIds: clientBookingState.selectedDevices.map((d) => d.id),
-      newDevices: clientBookingState.newDevices.map((nd) => {
-        // Find the corresponding AC type name from the booking resources
-        const brandType = clientBookingState.availableBrands.find(
-          (type) => type.id === nd.brand_id
-        );
-        const brandName = brandType ? brandType.name : 'New AC Unit';
-        return {
-          name: brandName, // Use the found name in the payload
-          brand_id: nd.brand_id,
-          ac_type_id: nd.ac_type_id,
-          horsepower_id: nd.horsepower_id,
-          quantity: nd.quantity,
-        };
-      }),
+      selectedDevices: clientBookingState.selectedDevices, // Pass the full objects
+      newDevices: newDevicesWithLocation, // Pass the new units with default location
     };
 
     setIsLoading(true);
     setError(null);
     try {
       await clientPanelBooking.createClientBooking(payload);
-      setIsModalOpen(true); // This will open the custom modal
+      setIsModalOpen(true);
     } catch (err: any) {
       console.error('Booking failed:', err);
       setError(err.message || 'Booking failed. Please try again.');
@@ -172,7 +170,7 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
     setIsModalOpen(false);
     setStep(1);
     dispatch(resetClientBooking());
-    setRefreshKey(prevKey => prevKey + 1); // Increment the key to trigger useEffect
+    setRefreshKey(prevKey => prevKey + 1);
   };
 
   const renderStep = () => {

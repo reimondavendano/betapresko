@@ -2,36 +2,36 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { User, LayoutDashboard, Briefcase, Gift, Menu, X } from 'lucide-react'; // Import Menu and X icons
+import { User, LayoutDashboard, Briefcase, Gift, Menu, X, Home } from 'lucide-react'; // Added Home icon
 
 // Import UI components
-import { Button } from '@/components/ui/button'; // Assuming you have a Button component
-import { Card, CardContent } from '@/components/ui/card'; // Assuming you have Card components
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 // Import tab content components
 import { ClientDashboardTab } from './ClientDashboardTab';
 import { ClientInfoTab } from './ClientInfoTab';
 import { BookServiceTab } from './BookServiceTab';
 import { ReferFriendTab } from './ReferFriendTab';
+import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'; // New component for locations
 
 // Logo component
 const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={150} height={50} />
 
-
 interface ClientPanelProps {
   params: {
-    id?: string; // Client ID passed from the URL
+    id?: string;
   };
 }
 
 export default function ClientPanel({ params }: ClientPanelProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // New state for mobile menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const clientId = params?.id;
 
   const handleTabClick = (tabName: string) => {
     setActiveTab(tabName);
-    setIsMobileMenuOpen(false); // Close menu after selecting a tab
+    setIsMobileMenuOpen(false);
   };
 
   if (!clientId) {
@@ -49,7 +49,6 @@ export default function ClientPanel({ params }: ClientPanelProps) {
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <NewLogo />
-            {/* Hamburger menu button for mobile */}
             <div className="lg:hidden">
               <Button
                 variant="ghost"
@@ -59,7 +58,6 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
             </div>
-            {/* Client ID for larger screens */}
             <span className="hidden lg:block text-sm text-gray-500">Client ID: {clientId.substring(0, 8)}...</span>
           </div>
         </div>
@@ -67,9 +65,9 @@ export default function ClientPanel({ params }: ClientPanelProps) {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)} // Close menu when clicking outside
+          onClick={() => setIsMobileMenuOpen(false)}
         ></div>
       )}
 
@@ -104,6 +102,14 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 Client Info
               </Button>
               <Button
+                variant={activeTab === 'clientAddLocation' ? 'default' : 'ghost'}
+                onClick={() => handleTabClick('clientAddLocation')}
+                className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${activeTab === 'clientAddLocation' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'hover:bg-gray-100'}`}
+              >
+                <Home className="w-5 h-5 mr-3" />
+                Add Location
+              </Button>
+              <Button
                 variant={activeTab === 'bookService' ? 'default' : 'ghost'}
                 onClick={() => handleTabClick('bookService')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${activeTab === 'bookService' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'hover:bg-gray-100'}`}
@@ -124,8 +130,9 @@ export default function ClientPanel({ params }: ClientPanelProps) {
 
           {/* Tab Content Area */}
           <div className="lg:w-3/4 flex-grow">
-            {activeTab === 'dashboard' && <ClientDashboardTab clientId={clientId} onBookNewCleaningClick={() => setActiveTab('bookService')} onReferClick={() => setActiveTab('referFriend')} />}
+            {activeTab === 'dashboard' && <ClientDashboardTab clientId={clientId} onBookNewCleaningClick={() => handleTabClick('bookService')} onReferClick={() => handleTabClick('referFriend')} />}
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}
+            {activeTab === 'clientAddLocation' && <ClientAddLocationTab clientId={clientId} />}
             {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />}
             {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />}
           </div>

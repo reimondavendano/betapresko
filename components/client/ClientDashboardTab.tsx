@@ -22,13 +22,13 @@ import {
   Phone,
   Home,
   ChevronRight,
-  ChevronLeft // Added for previous page button
+  ChevronLeft
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from 'recharts'; // Import Recharts components
-import { format, startOfDay } from 'date-fns';
+} from 'recharts';
+import { format, addMonths, isBefore } from 'date-fns';
 
 // Import UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,13 +46,24 @@ import { acTypesApi } from '../../pages/api/types/acTypesApi';
 import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
 
 // Import types
-import { Client, ClientLocation, Appointment, Device,  Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
+import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
 
 interface ClientDashboardTabProps {
   clientId: string;
-onBookNewCleaningClick: () => void; // Add this prop
-onReferClick: () => void;
+  onBookNewCleaningClick: () => void;
+  onReferClick: () => void;
 }
+
+// Helper function to format the full address
+const formatAddress = (location: ClientLocation) => {
+  const parts = [
+    location.address_line1,
+    location.street,
+    location.barangay,
+    location.city
+  ].filter(Boolean);
+  return parts.join(', ');
+};
 
 export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferClick }: ClientDashboardTabProps) {
   const [client, setClient] = useState<Client | null>(null);
@@ -62,29 +73,24 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // You can adjust this value
-
-  // Lookup data for displaying names instead of IDs
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allACTypes, setAllACTypes] = useState<ACType[]>([]);
   const [allHorsepowerOptions, setAllHorsepowerOptions] = useState<HorsepowerOption[]>([]);
-  const [activeTab, setActiveTab] = useState('dashboard'); // Assuming this state exists in your parent component
 
-   const handleBookNewCleaning = () => {
-    setActiveTab('bookService'); // Set the active tab to show the booking component
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const handleBookNewCleaning = () => {
+    setActiveTab('bookService');
   };
 
-
-  // Fetch all lookup data (cities, barangays, services, brands, AC types, HP options)
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
         const [servicesData, brandsData, acTypesData, hpOptionsData] = await Promise.all([
-
           servicesApi.getServices(),
           brandsApi.getBrands(),
           acTypesApi.getACTypes(),
@@ -101,7 +107,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     fetchLookupData();
   }, []);
 
-  // Fetch client-specific data
   useEffect(() => {
     const fetchClientData = async () => {
       setIsLoading(true);
@@ -115,7 +120,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         }
         setClient(fetchedClient);
 
-        // Fetch all client-specific data
         const [fetchedLocations, fetchedDevices, fetchedAppointments] = await Promise.all([
           clientLocationApi.getByClientId(clientId),
           deviceApi.getByClientId(clientId),
@@ -138,55 +142,17 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
 
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
-  const getLocationCity = (id: UUID | null) => locations.find(s => s.id === id)?.city || 'N/A';
-  const getBrandName = (id: UUID | null) => allBrands.find(b => b.id === id)?.name || 'N/A';
-  const getACTypeName = (id: UUID | null) => allACTypes.find(t => t.id === id)?.name || 'N/A';
-  const getHorsepowerDisplayName = (id: UUID | null) => allHorsepowerOptions.find(hp => hp.id === id)?.display_name || 'N/A';
+  // Helper to get the location city name
+  const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city || 'N/A';
+  const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
 
-  const getRelevantDueDates = () => {
-    const relevantDevice = devices
-      .filter(device => device.due_3_months && new Date(device.due_3_months) >= startOfDay(new Date()))
-      .sort((a, b) => {
-        const dateA = new Date(a.due_3_months!);
-        const dateB = new Date(b.due_3_months!);
-        return dateA.getTime() - dateB.getTime();
-      })[0];
-
-    let due3Months = 'N/A';
-    let due4Months = 'N/A';
-    let due6Months = 'N/A';
-
-    if (relevantDevice) {
-      if (relevantDevice.due_3_months) {
-        due3Months = format(new Date(relevantDevice.due_3_months), 'MMM d, yyyy');
-      }
-      if (relevantDevice.due_4_months) {
-        due4Months = format(new Date(relevantDevice.due_4_months), 'MMM d, yyyy');
-      }
-      if (relevantDevice.due_6_months) {
-        due6Months = format(new Date(relevantDevice.due_6_months), 'MMM d, yyyy');
-      }
-    }
-    return { due3Months, due4Months, due6Months };
-  };
-
-  const getLastCleaningDate = () => {
-    const cleanedDevices = devices.filter(device => device.last_cleaning_date)
-      .sort((a, b) => {
-        if (!a.last_cleaning_date || !b.last_cleaning_date) return 0;
-        return new Date(b.last_cleaning_date).getTime() - new Date(a.last_cleaning_date).getTime();
-      });
-    if (cleanedDevices.length > 0) {
-      return format(new Date(cleanedDevices[0].last_cleaning_date!), 'MMM d, yyyy');
-    }
-    return 'N/A';
-  };
 
   const calculateDisplayPoints = (): number => {
     let calculatedPoints = 0;
     appointments.forEach(appt => {
       if (appt.status === 'completed') {
         calculatedPoints += 1;
+        // Assuming `total_units` is a property on the Appointment object
         if (appt.total_units && appt.total_units >= 3) {
           calculatedPoints += 1;
         }
@@ -195,6 +161,54 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     return calculatedPoints;
   };
 
+  const getDeviceCleaningStatus = () => {
+    const statusByLocation = new Map<UUID, { location: ClientLocation, dueDevices: number, lastServiceDate: string | null, totalDevices: number, acNames: string[] }>();
+    const today = new Date();
+
+    // Iterate through devices to calculate status
+    devices.forEach(device => {
+      const locationId = device.location_id;
+      if (!locationId) return;
+
+      if (!statusByLocation.has(locationId)) {
+        const location = locations.find(loc => loc.id === locationId);
+        if (location) {
+          statusByLocation.set(locationId, { location, dueDevices: 0, lastServiceDate: null, totalDevices: 0, acNames: [] });
+        } else {
+          return; // Skip if location data is not available
+        }
+      }
+      
+      const status = statusByLocation.get(locationId);
+      if (!status) return; // Should not happen with the check above, but for safety
+
+      status.totalDevices++;
+      status.acNames.push(device.name); // Add the AC name to the list for this location
+
+      if (device.last_cleaning_date) {
+        const lastCleanDate = new Date(device.last_cleaning_date);
+        
+        // Update last service date if this device's date is newer
+        if (!status.lastServiceDate || lastCleanDate > new Date(status.lastServiceDate)) {
+          status.lastServiceDate = device.last_cleaning_date;
+        }
+
+        // Check if the device is due for cleaning (more than 3 months since last cleaning)
+        const due3Months = addMonths(lastCleanDate, 3);
+        if (isBefore(due3Months, today)) {
+          status.dueDevices++;
+        }
+      } else {
+        // If last_cleaning_date is null, consider it due for cleaning
+        status.dueDevices++;
+      }
+    });
+
+    return Array.from(statusByLocation.values());
+  };
+  
+  const cleaningStatuses = getDeviceCleaningStatus();
+  
   // --- Pagination Logic ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -208,7 +222,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const handlePreviousPage = () => {
     setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
   };
-
 
   if (isLoading) {
     return (
@@ -245,31 +258,31 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     );
   }
 
-  const { due3Months, due4Months, due6Months } = getRelevantDueDates();
   const displayPoints = calculateDisplayPoints();
+  const primaryLocation = locations.find(loc => loc.is_primary) || locations[0];
+
 
   return (
     <div className="space-y-8">
-       {/* Welcome Card */}
-       <Card className="rounded-xl shadow-lg overflow-hidden text-white relative p-6 md:p-8" style={{ backgroundColor: '#99BCC0' }}>
-         <div className="absolute inset-0 opacity-10" style={{ backgroundColor: '#99BCC0' }}></div>
-         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
-           <div className="text-center md:text-left mb-4 md:mb-0">
-             <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-             <p className="text-lg opacity-90">{getLocationCity(locations[0]?.city) || 'Your City'}, Philippines</p>
-           </div>
-           <div className="flex-shrink-0">
-             {/* Replaced img with Next.js Image component for optimization */}
-             <Image
-               src={`/assets/images/icon.jpg`}
-               alt="Welcome Illustration"
-               width={150} // Specify width
-               height={150} // Specify height
-               className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
-             />
-           </div>
-         </div>
-       </Card>
+      {/* Welcome Card */}
+      <Card className="rounded-xl shadow-lg overflow-hidden text-white relative p-6 md:p-8" style={{ backgroundColor: '#99BCC0' }}>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundColor: '#99BCC0' }}></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
+          <div className="text-center md:text-left mb-4 md:mb-0">
+            <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
+            <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city}, Philippines` : 'Philippines'}</p>
+          </div>
+          <div className="flex-shrink-0">
+            <Image
+              src={`/assets/images/icon.jpg`}
+              alt="Welcome Illustration"
+              width={150}
+              height={150}
+              className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
+            />
+          </div>
+        </div>
+      </Card>
 
       {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -298,62 +311,81 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         </Card>
       </div>
 
-      {/* Transactions & Points Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="rounded-xl shadow-lg p-6 bg-white">
-          <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-xl font-bold flex items-center">
-              <Clock className="w-5 h-5 mr-2 text-gray-700" />
-              Next Cleaning & Last Service
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 space-y-4">
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="font-medium">Last Service Date:</p>
-              <span className="text-gray-800">{getLastCleaningDate()}</span>
-            </div>
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="font-medium">Next Cleaning Due (3 Months):</p>
-              <span className="text-blue-600 font-semibold">{due3Months}</span>
-            </div>
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="font-medium">4 Months:</p>
-              <span className="text-green-600 font-semibold">{due4Months}</span>
-            </div>
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="font-medium">6 Months:</p>
-              <span className="text-red-600 font-semibold">{due6Months}</span>
-            </div>
+      {/* NEW: Cleaning Status by Location */}
+      <Card className="rounded-xl shadow-lg p-6 bg-white">
+        <CardHeader className="p-0 mb-4">
+          <CardTitle className="text-xl font-bold flex items-center">
+            <Clock className="w-5 h-5 mr-2 text-gray-700" />
+            Cleaning Status by Location
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 space-y-4">
+          {cleaningStatuses.length > 0 ? (
+            cleaningStatuses.map(status => (
+              <div key={status.location.id} className="border-b last:border-b-0 py-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{status.location.name}</p>
+                    <p className="text-sm text-gray-600">{formatAddress(status.location)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-700">
+                      AC Units: <span className="text-gray-600 font-normal">{status.acNames.join(', ')}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm">
+                  <p>Last Service Date: <span className="font-medium text-gray-800">{status.lastServiceDate ? format(new Date(status.lastServiceDate), 'MMM d, yyyy') : 'No status yet, we will update once it\'s completed'}</span></p>
+                  <div className="flex items-center mt-1">
+                    <span className="font-medium">Status:</span>
+                    {status.dueDevices > 0 ? (
+                      <span className="ml-2 text-red-600 font-semibold">
+                        {status.dueDevices} of {status.totalDevices} AC unit{status.dueDevices > 1 || status.totalDevices > 1 ? 's' : ''} due for cleaning
+                      </span>
+                    ) : (
+                      <span className="ml-2 text-green-600 font-semibold">
+                        All devices are well maintained
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
+          )}
+          <Button className="w-full bg-blue-600 hover:bg-blue-700 mt-4" onClick={onBookNewCleaningClick}>
+            <Plus className="w-4 h-4 mr-2" /> Book New Service
+          </Button>
+        </CardContent>
+      </Card>
 
-           <Button className="w-full bg-blue-600 hover:bg-blue-700 mt-4" onClick={onBookNewCleaningClick}>
-              <Plus className="w-4 h-4 mr-2" /> Book New Service
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow-lg p-6 bg-white">
-          <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-xl font-bold flex items-center">
-              <Star className="w-5 h-5 mr-2 text-yellow-500" />
-              Your Points
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 space-y-4">
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="text-2xl font-bold text-blue-600">{displayPoints}</p>
+      {/* Your Points Section */}
+      <Card className="rounded-xl shadow-lg p-6 bg-white">
+        <CardHeader className="p-0 mb-4">
+          <CardTitle className="text-xl font-bold flex items-center">
+            <Star className="w-5 h-5 mr-2 text-yellow-500" />
+            Your Points
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 space-y-4">
+          <div className="flex justify-between items-center text-gray-700">
+            <p className="text-2xl font-bold text-blue-600">{displayPoints}</p>
+            {/* Conditional rendering for the badge */}
+            {displayPoints > 0 && (
               <Badge variant="outline" className="text-sm border-yellow-500 text-yellow-700">
                 Expires on: {format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), 'MMM d, yyyy')}
               </Badge>
-            </div>
-            <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
-              Refer A Friend
-            </Button>
-            <p className="text-xs text-gray-500 mt-2">
-              Note: Points will be credited after the completion of your booking or referral&apos;s booking.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            )}
+          </div>
+          <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
+            Refer A Friend
+          </Button>
+          <p className="text-xs text-gray-500 mt-2">
+            Note: Points will be credited after the completion of your booking or referrals booking.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Recent Appointments Table with Pagination */}
       <Card className="rounded-xl shadow-lg p-6 bg-white">
@@ -399,7 +431,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                         {getServiceName(appointment.service_id)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {locations.find(loc => loc.id === appointment.location_id)?.name || 'N/A'}
+                        {getLocation(appointment.location_id)?.name || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ₱{appointment.amount.toLocaleString()}

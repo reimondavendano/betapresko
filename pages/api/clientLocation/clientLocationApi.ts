@@ -8,7 +8,7 @@ export const clientLocationApi = {
    * @param newLocationData The data for the new client location.
    * @returns The created ClientLocation object.
    */
-  createClientLocation: async (newLocationData: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at' | 'is_primary'>): Promise<ClientLocation> => {
+  createClientLocation: async (newLocationData: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at'>): Promise<ClientLocation> => {
     // Supabase will automatically generate 'id', 'created_at', 'updated_at'
     // 'is_primary' defaults to false as per your database schema
     const { data, error } = await supabase
@@ -22,7 +22,7 @@ export const clientLocationApi = {
           barangay: newLocationData.barangay,
           city: newLocationData.city,
           landmark: newLocationData.landmark,
-          is_primary: false, // Default as per your database schema
+          is_primary: newLocationData.is_primary ? newLocationData.is_primary : false, // Default as per your database schema
         }
       ])
       .select()
@@ -54,6 +54,24 @@ export const clientLocationApi = {
     return data as ClientLocation[];
   },
 
-  // You can add more API functions related to client locations here, e.g.:
-  // getById: async (id: UUID): Promise<ClientLocation...
+  /**
+   * Updates an existing client location.
+   * @param id The UUID of the location to update.
+   * @param data The data to update.
+   * @returns The updated ClientLocation object.
+   */
+  updateClientLocation: async (id: UUID, data: Partial<ClientLocation>): Promise<ClientLocation> => {
+    const { data: updatedData, error } = await supabase
+      .from('client_locations')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating client location:', error);
+      throw new Error(error.message);
+    }
+    return updatedData as ClientLocation;
+  }
 };

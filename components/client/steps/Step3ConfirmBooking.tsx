@@ -143,11 +143,19 @@ export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingPro
     setModalBlockedInfo(null);
   };
   const getDeviceDetails = (device: any) => {
+    // Check if it's an existing device
+    const existingDevice = allDevices.find(d => d.id === device.id);
+    if (existingDevice) {
+      const brand = availableBrands.find(b => b.id === existingDevice.brand_id)?.name;
+      const acType = availableACTypes.find(t => t.id === existingDevice.ac_type_id)?.name;
+      const horsepower = availableHorsepowerOptions.find(hp => hp.id === existingDevice.horsepower_id)?.display_name;
+      return { name: existingDevice.name, brand, acType, horsepower, quantity: 1 };
+    }
+    // It's a new device
     const brand = availableBrands.find(b => b.id === device.brand_id)?.name;
     const acType = availableACTypes.find(t => t.id === device.ac_type_id)?.name;
     const horsepower = availableHorsepowerOptions.find(hp => hp.id === device.horsepower_id)?.display_name;
-    const existingDevice = allDevices.find(d => d.id === device.id);
-    const name = existingDevice ? existingDevice.name : 'New Unit';
+    const name = brand ? `${brand} ${acType}` : 'New Unit';
     const quantity = device.quantity || 1;
     return { name, brand, acType, horsepower, quantity };
   };
@@ -199,7 +207,7 @@ export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingPro
                   {selectedDevices.map((device, index) => {
                     const details = getDeviceDetails(device);
                     return (
-                      <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                      <li key={device.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
                         <span>{details.name} ({details.horsepower})</span>
                         <span>1 unit</span>
                       </li>
@@ -209,7 +217,7 @@ export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingPro
                     const details = getDeviceDetails(device);
                     return (
                       <li key={`new-${index}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>{details.brand}, {details.acType}, {details.horsepower}</span>
+                        <span>{details.name} ({details.horsepower})</span>
                         <span>{details.quantity} unit(s)</span>
                       </li>
                     );

@@ -1,3 +1,4 @@
+// clientSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { Client, ClientLocation, Device, Appointment, UUID, Service, DateString, BlockedDate, ParsedCustomSettings, Brand, ACType, HorsepowerOption } from '../../../types/database' // Adjusted import path
 
@@ -6,6 +7,12 @@ export interface BookingDevice {
   ac_type_id: UUID | null; // Changed to allow null
   horsepower_id: UUID | null; // Changed to allow null
   quantity: number;
+  location_id?: UUID | null;
+}
+
+// Define a new type for a device to be booked, which includes its assigned location
+interface BookedClientDevice extends Device {
+  location_id: UUID;
 }
 
 interface ClientState {
@@ -19,10 +26,12 @@ interface ClientState {
   // New booking flow state for the client panel
   booking: {
     selectedService: Service | null;
-    selectedDevices: Device[]; // Existing devices selected for service
+    selectedDevices: BookedClientDevice[]; // Existing devices selected for service
     newDevices: BookingDevice[]; // New devices to be added
     appointmentDate: DateString | null;
+    
     totalAmount: number;
+    totalUnits: number; // Added new property for total units
     availableServices: Service[];
     availableBrands: Brand[];
     availableACTypes: ACType[];
@@ -46,6 +55,7 @@ const initialState: ClientState = {
     newDevices: [],
     appointmentDate: null,
     totalAmount: 0,
+    totalUnits: 0, // Initialized new property
     availableServices: [],
     availableBrands: [],
     availableACTypes: [],
@@ -70,6 +80,7 @@ const clientSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload
     },
+    
     setCurrentClient: (state, action: PayloadAction<Client | null>) => {
       state.currentClient = action.payload
     },
@@ -106,6 +117,13 @@ const clientSlice = createSlice({
     removeDevice: (state, action: PayloadAction<UUID>) => {
       state.devices = state.devices.filter(device => device.id !== action.payload)
     },
+    setTotalUnits: (state, action: PayloadAction<number>) => {
+      state.booking.totalUnits = action.payload;
+    },
+    setBookingDevices: (state, action: PayloadAction<{ selectedDevices: BookedClientDevice[]; newDevices: BookingDevice[] }>) => {
+      state.booking.selectedDevices = action.payload.selectedDevices;
+      state.booking.newDevices = action.payload.newDevices;
+    },
     clearClientData: (state) => {
       state.currentClient = null;
       state.locations = [];
@@ -122,19 +140,40 @@ const clientSlice = createSlice({
     setSelectedBookingService: (state, action: PayloadAction<Service | null>) => {
       state.booking.selectedService = action.payload;
     },
-    toggleSelectedDevice: (state, action: PayloadAction<Device>) => {
-      const index = state.booking.selectedDevices.findIndex(d => d.id === action.payload.id);
+    toggleSelectedDevice: (state, action: PayloadAction<{ device: Device; locationId: UUID }>) => {
+      const { device, locationId } = action.payload;
+      const index = state.booking.selectedDevices.findIndex(d => d.id === device.id);
       if (index !== -1) {
+        // If the device is already selected, remove it.
         state.booking.selectedDevices.splice(index, 1);
       } else {
-        state.booking.selectedDevices.push(action.payload);
+        // If the device is not selected, add it with the locationId.
+        state.booking.selectedDevices.push({
+          ...device,
+          location_id: locationId,
+        });
+      }
+    },
+    updateSelectedDeviceLocation: (state, action: PayloadAction<{ deviceId: UUID; locationId: UUID }>) => {
+      const { deviceId, locationId } = action.payload;
+      const device = state.booking.selectedDevices.find(d => d.id === deviceId);
+      if (device) {
+        device.location_id = locationId;
       }
     },
     // New action to select/deselect all existing devices
     toggleSelectAllExistingDevices: (state, action: PayloadAction<boolean>) => {
       if (action.payload) {
-        // Select all devices
-        state.booking.selectedDevices = [...state.devices];
+        // Select all devices and assign the first available location
+        const defaultLocationId = state.locations[0]?.id || null;
+        if (defaultLocationId) {
+          state.booking.selectedDevices = state.devices.map(device => ({
+            ...device,
+            location_id: defaultLocationId,
+          }));
+        } else {
+          state.booking.selectedDevices = [];
+        }
       } else {
         // Deselect all devices
         state.booking.selectedDevices = [];
@@ -200,8 +239,11 @@ export const {
   setAvailableServices,
   setSelectedBookingService,
   toggleSelectedDevice,
+  updateSelectedDeviceLocation,
   toggleSelectAllExistingDevices, // Export the new action
   addNewDevice,
+  setTotalUnits,
+  setBookingDevices,
   removeNewDevice,
   updateNewDeviceProperty,
   setBookingAppointmentDate,

@@ -159,6 +159,7 @@ export function ConfirmStep() {
         amount: totalAmount,
         total_units: selectedDevices.reduce((sum, device) => sum + device.quantity, 0),
         notes: null,
+        status: 'confirmed', // Assume initial status is 'pending'
       };
       const createdAppointment: Appointment = await appointmentApi.createAppointment(newAppointmentData);
 
@@ -166,6 +167,9 @@ export function ConfirmStep() {
         const brandName = getBrandName(device.brand_id);
         for (let i = 0; i < device.quantity; i++) {
           const deviceName = `${brandName}-${i + 1}`;
+
+          const lastCleaningDate = createdAppointment.status === 'completed' ? appointmentDate : '';
+
           const newDeviceData = {
             client_id: currentClientId,
             location_id: currentLocationId,
@@ -174,7 +178,7 @@ export function ConfirmStep() {
             brand_id: device.brand_id,
             ac_type_id: device.ac_type_id,
             horsepower_id: device.horsepower_id,
-            last_cleaning_date: appointmentDate,
+            last_cleaning_date: lastCleaningDate,
           };
           await deviceApi.createDevice(newDeviceData);
         }

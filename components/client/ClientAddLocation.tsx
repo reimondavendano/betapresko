@@ -131,7 +131,7 @@ export function ClientAddLocationTab({ clientId }: ClientAddLocationTabProps) {
                 <Plus className="w-4 h-4 mr-2" /> Add New Location
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center">
                   <Home className="w-5 h-5 mr-2" /> Add New Location

@@ -18,6 +18,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   
   return {
     // The metadataBase property is not needed here as we are using a direct import
+    metadataBase: new URL(`https://betapresko.vercel.app/`),
     title: pageTitle,
     description: pageDescription,
     // Add Open Graph tags for social media sharing

@@ -2,6 +2,8 @@
 
 import type { Metadata } from 'next';
 import SignUpPage from '../../components/client/steps/SignUpPage';
+// Import the static image file. Next.js will automatically provide its metadata.
+import ogImage from '../../public/assets/images/cover.png';
 
 type Props = {
   searchParams: {
@@ -14,11 +16,8 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const pageTitle = referralId ? `You've been referred to Presko AC by a friend!` : 'Presko AC | Sign Up & Book a Service';
   const pageDescription = 'Book an AC cleaning service with Presko AC and get a special discount!';
   
-  // The imageUrl now points to the static file path you provided
-  const imageUrl = `/assets/images/cover.png`;
-
   return {
-    metadataBase: new URL("https://betapresko.vercel.app/"),
+    // The metadataBase property is not needed here as we are using a direct import
     title: pageTitle,
     description: pageDescription,
     // Add Open Graph tags for social media sharing
@@ -28,14 +27,14 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
       url: `/signup${referralId ? `?ref=${referralId}` : ''}`,
       images: [
         {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
+          url: ogImage.src,
+          width: ogImage.width,
+          height: ogImage.height,
           alt: 'Presko AC Referral Link Cover',
         },
       ],
       type: 'website',
-    },
+    }
   };
 }
 

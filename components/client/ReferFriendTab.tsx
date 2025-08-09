@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gift, Link, Check, X, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image'; // Import the Next.js Image component
 
 interface ReferFriendTabProps {
   clientId: string; // Passed from ClientPanel
@@ -15,7 +16,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
   const [isError, setIsError] = useState(false);
 
   // Mock referral link
-   const referralLink = typeof window !== 'undefined'
+  const referralLink = typeof window !== 'undefined'
     ? `${window.location.origin}/signup?ref=${clientId}`
     : `https://betapresko.vercel.app//signup?ref=${clientId}`;
   
@@ -68,18 +69,31 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* The image is added here */}
+        <div className="w-full flex justify-center py-4">
+          <Image
+            src="/assets/images/cover.png"
+            alt="Presko AC Referral Cover"
+            width={600}
+            height={300}
+            className="rounded-lg shadow-md"
+          />
+        </div>
         <p className="text-gray-700 text-lg">
           Share the love for clean air! Refer your friends and earn points for every successful booking they make.
         </p>
         
         {/* Referral Link and Copy Button */}
-        <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 flex items-center justify-between flex-wrap gap-2">
-          <p className="font-mono text-gray-800 text-sm break-all">{referralLink}</p>
+        {/* The layout for this div is updated to be responsive */}
+        <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="font-mono text-gray-800 text-sm break-all w-full sm:w-auto text-left">
+            {referralLink}
+          </p>
           <Button
             onClick={handleCopyLink}
             variant="outline"
             size="sm"
-            className="flex-shrink-0"
+            className="flex-shrink-0 w-full sm:w-auto"
           >
             <Link className="w-4 h-4 mr-2" />
             Copy Link
@@ -88,6 +102,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
 
         {/* Share Buttons */}
         <p className="text-gray-600 text-base">Or, share directly:</p>
+        {/* The share buttons are already in a responsive column/row layout */}
         <div className="flex flex-col sm:flex-row gap-4 w-full">
             <a href={facebookShareLink} target="_blank" rel="noopener noreferrer" className="w-full">
                 <Button

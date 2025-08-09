@@ -322,11 +322,11 @@ export function ScheduleStep() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-between mt-8 max-w-4xl mx-auto w-full">
+      <div className="flex flex-col-reverse sm:flex-row justify-between mt-8 max-w-4xl mx-auto w-full gap-4 px-4 sm:px-0">
         <Button
           onClick={handleBack}
           variant="outline"
-          className="px-6 py-3"
+          className="px-6 py-3 w-full sm:w-auto"
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Units
@@ -334,8 +334,8 @@ export function ScheduleStep() {
         
         <Button
           onClick={handleNext}
-          disabled={!selectedDate || isDateActuallyUnavailable(selectedDate)} // Use for disabling the button (all blocked scenarios)
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
+          disabled={!selectedDate || isDateActuallyUnavailable(selectedDate)}
+          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
         >
           Continue to Confirmation
           <ChevronRight className="w-4 h-4 ml-2" />

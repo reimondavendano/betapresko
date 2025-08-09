@@ -394,11 +394,11 @@ export function UnitsStep() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-between">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
         <Button
           onClick={handleBack}
           variant="outline"
-          className="px-6 py-3"
+          className="px-6 py-3 w-full md:w-auto"
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Services
@@ -407,7 +407,7 @@ export function UnitsStep() {
         <Button
           onClick={handleNext}
           disabled={!isFormValid()}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
+          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 w-full md:w-auto"
         >
           Continue to Schedule
           <ChevronRight className="w-4 h-4 ml-2" />

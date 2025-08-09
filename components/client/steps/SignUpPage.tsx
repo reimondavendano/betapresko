@@ -17,9 +17,9 @@ const SignUpPage = () => {
 
     setRedirecting(true);
     setTimeout(() => {
-      window.location.href =   window.location.href = typeof window !== 'undefined'
-    ? `${window.location.origin}/booking`
-    : `https://betapresko.vercel.app/booking`;
+      window.location.href = typeof window !== 'undefined'
+        ? `${window.location.origin}/booking`
+        : `https://betapresko.vercel.app/booking`;
     }, 1000);
 
   }, []); // The dependency array is now empty since we don't need 'onRedirect'
@@ -30,8 +30,9 @@ const SignUpPage = () => {
       <h3 className="text-2xl font-bold text-gray-800">
         {redirecting ? 'Redirecting to booking...' : 'Loading...'}
       </h3>
-      <p className="mt-2 text-gray-600">Please wait while we prepare your booking form.</p>
+      <p className="mt-2 text-gray-600">Please wait while we prepare your booking experience.</p>
     </div>
   );
 };
+
 export default SignUpPage;

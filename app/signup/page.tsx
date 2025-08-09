@@ -3,7 +3,7 @@
 import type { Metadata } from 'next';
 import SignUpPage from '../../components/client/steps/SignUpPage';
 // Import the static image file. Next.js will automatically provide its metadata.
-import ogImage from '../../public/cover.png';
+import ogImage from '../../public/images/presko_logo.png';
 
 type Props = {
   searchParams: {

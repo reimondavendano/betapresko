@@ -18,7 +18,7 @@ type Props = {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const referralId = searchParams.ref;
   const pageTitle = referralId ? `You've been referred to Presko AC by a friend!` : 'Presko AC | Sign Up & Book a Service';
-  const pageDescription = 'Book an AC cleaning service with Presko AC and get a special discount!';
+  const pageDescription = 'Book an AC cleaning service with Presko AC and get a special discount.';
   const imageUrl = `/assets/images/cover.png`; 
 
   return {

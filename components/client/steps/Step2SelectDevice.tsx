@@ -1,21 +1,17 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store';
 import {
-  toggleSelectedDevice,
   addNewDevice,
   removeNewDevice,
   setBookingTotalAmount,
   BookingDevice,
   updateNewDeviceProperty,
-  toggleSelectAllExistingDevices,
-  updateSelectedDeviceLocation,
 } from '@/lib/features/client/clientSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Plus, Minus, Trash2, MapPin, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,7 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ACType, Brand, Device, HorsepowerOption, UUID } from '@/types/database';
+import { ACType, Brand, HorsepowerOption, UUID } from '@/types/database';
 
 interface Step2SelectDevicesProps {
   onNext: () => void;
@@ -38,9 +34,8 @@ interface Step2SelectDevicesProps {
 
 export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) {
   const dispatch = useDispatch();
-  const { devices, locations } = useSelector((state: RootState) => state.client);
+  const { locations } = useSelector((state: RootState) => state.client);
   const {
-    selectedDevices,
     newDevices,
     selectedService,
     customPricingSettings,
@@ -51,11 +46,26 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
   
   const [subtotal, setSubtotal] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [deviceToUpdateId, setDeviceToUpdateId] = useState<UUID | null>(null);
   const [newDeviceIndexToUpdate, setNewDeviceIndexToUpdate] = useState<number | null>(null);
   const [tempSelectedLocationId, setTempSelectedLocationId] = useState<UUID | null>(null);
 
-  const areAllExistingDevicesSelected = devices.length > 0 && selectedDevices.length === devices.length;
+  const isInitialLoad = useRef(true);
+
+  // This logic runs at the start of every render.
+  // We use a ref to ensure it only dispatches the initial device once.
+  if (isInitialLoad.current && newDevices.length === 0) {
+    if (availableBrands.length > 0 && availableACTypes.length > 0 && availableHorsepowerOptions.length > 0) {
+      dispatch(addNewDevice({
+        brand_id:  null,
+        ac_type_id:  null,
+        horsepower_id: null,
+        quantity: 1,
+        location_id: null,
+      }));
+    }
+    isInitialLoad.current = false;
+  }
+
   const primaryLocation = locations.find(loc => loc.is_primary);
 
   const calculateDevicePrice = (acTypeId: UUID | null, horsepowerId: UUID | null, quantity: number = 1): number => {
@@ -90,25 +100,22 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
     if (!selectedService) return 0;
 
     let total = 0;
-    selectedDevices.forEach(device => {
-      total += calculateDevicePrice(device.ac_type_id, device.horsepower_id, 1);
-    });
-
     newDevices.forEach(device => {
       total += calculateDevicePrice(device.ac_type_id, device.horsepower_id, device.quantity);
     });
     return total;
   };
 
-  const totalUnits = selectedDevices.length + newDevices.reduce((sum, d) => sum + d.quantity, 0);
+  const totalUnits = newDevices.reduce((sum, d) => sum + d.quantity, 0);
 
+  // This useEffect will run whenever newDevices changes to update the totals
   useEffect(() => {
     const newSubtotal = calculateSubtotal();
     const discountAmount = newSubtotal * (customPricingSettings.discount / 100);
     const newTotal = newSubtotal - discountAmount;
     setSubtotal(newSubtotal);
     dispatch(setBookingTotalAmount(newTotal));
-  }, [selectedDevices, newDevices, selectedService, customPricingSettings, availableACTypes, availableHorsepowerOptions, dispatch]);
+  }, [newDevices, selectedService, customPricingSettings, availableACTypes, availableHorsepowerOptions, dispatch]);
 
   const handleAddDevice = () => {
     dispatch(addNewDevice({
@@ -130,21 +137,18 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
     dispatch(updateNewDeviceProperty({ index, field: 'quantity', value: newQuantity }));
   };
 
-  const handleOpenDialog = (deviceId: UUID | null, newDeviceIndex: number | null, currentLocationId: UUID | null) => {
-    setDeviceToUpdateId(deviceId);
+  const handleOpenDialog = (newDeviceIndex: number, currentLocationId: UUID | null) => {
     setNewDeviceIndexToUpdate(newDeviceIndex);
     setTempSelectedLocationId(currentLocationId);
     setIsDialogOpen(true);
   };
 
-  const handleSaveLocation = () => {
-    if (deviceToUpdateId && tempSelectedLocationId) {
-      dispatch(updateSelectedDeviceLocation({ deviceId: deviceToUpdateId, locationId: tempSelectedLocationId }));
-    } else if (newDeviceIndexToUpdate !== null && tempSelectedLocationId) {
+  const handleSaveLocation = async () => {
+    if (newDeviceIndexToUpdate !== null && tempSelectedLocationId) {
+      // For new devices, only update Redux state (no database persistence needed yet)
       dispatch(updateNewDeviceProperty({ index: newDeviceIndexToUpdate, field: 'location_id' as keyof BookingDevice, value: tempSelectedLocationId }));
     }
     setIsDialogOpen(false);
-    setDeviceToUpdateId(null);
     setNewDeviceIndexToUpdate(null);
     setTempSelectedLocationId(null);
   };
@@ -157,77 +161,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
         </h2>
         <p className="text-gray-600 text-lg">Add details for each aircon unit you want serviced</p>
       </div>
-
-      {/* Existing Devices Section */}
-      {devices.length > 0 && (
-        <Card className="rounded-xl shadow-md p-2 sm:p-4 mb-6">
-          <CardHeader className="p-0 pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-xl font-semibold text-gray-800">My Existing Devices</CardTitle>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="select-all-existing"
-                checked={areAllExistingDevicesSelected}
-                onCheckedChange={(checked) => dispatch(toggleSelectAllExistingDevices(checked as boolean))}
-              />
-              <Label htmlFor="select-all-existing" className="text-sm font-medium text-gray-700">Select All</Label>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 max-h-48 overflow-y-auto space-y-2">
-            {devices.map((device: Device) => {
-              const acTypeName = availableACTypes.find(t => t.id === device.ac_type_id)?.name;
-              const horsepowerDisplayName = availableHorsepowerOptions.find(hp => hp.id === device.horsepower_id)?.display_name;
-              
-              const selectedDevice = selectedDevices.find(d => d.id === device.id);
-              const isSelected = !!selectedDevice;
-              const currentSelectedLocationId = selectedDevice?.location_id || primaryLocation?.id || '';
-              const currentSelectedLocation = locations.find(loc => loc.id === currentSelectedLocationId);
-              
-              const locationDisplayString = currentSelectedLocation
-                ? `${currentSelectedLocation.name} - ${currentSelectedLocation.barangay}, ${currentSelectedLocation.city}`
-                : 'No location selected';
-
-              return (
-                <div key={device.id} className="flex items-center space-x-3 p-2 border rounded-md bg-gray-50">
-                  <Checkbox
-                    id={`device-${device.id}`}
-                    checked={isSelected}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        dispatch(toggleSelectedDevice({ device, locationId: currentSelectedLocationId }));
-                      } else {
-                        dispatch(toggleSelectedDevice({ device, locationId: currentSelectedLocationId }));
-                      }
-                    }}
-                  />
-                  <Label htmlFor={`device-${device.id}`} className="flex-1 cursor-pointer text-gray-700 font-medium overflow-hidden">
-                    <span className="md:hidden">{device.name}</span>
-                    <span className="hidden md:inline">
-                      {device.name}
-                      {acTypeName && ` (${acTypeName}`}
-                      {horsepowerDisplayName && acTypeName && ` - ${horsepowerDisplayName})`}
-                      {!acTypeName && horsepowerDisplayName && ` (${horsepowerDisplayName})`}
-                    </span>
-                  </Label>
-
-                  <div className="flex items-center space-x-2">
-                    {/* Hide on mobile */}
-                    <span className="hidden md:inline-block text-sm text-gray-500 truncate">{locationDisplayString}</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleOpenDialog(device.id, null, currentSelectedLocationId)}
-                      disabled={!isSelected}
-                    >
-                      <MapPin className="h-4 w-4 mr-1" />
-                      <span className="hidden md:inline-block">Update location</span>
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
 
       {/* New Units Section */}
       <div className="space-y-4">
@@ -251,8 +184,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
             ? `${displayLocation.name} - ${displayLocation.barangay}, ${displayLocation.city}`
             : 'No location selected';
           
-          const brandName = availableBrands.find(b => b.id === newDevice.brand_id)?.name;
-
           return (
             <Card key={index} className="rounded-xl shadow-md p-2 sm:p-4">
               <CardHeader className="flex flex-row items-center justify-between p-0 pb-4">
@@ -264,7 +195,7 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleOpenDialog(null, index, newDevice.location_id || null)}
+                      onClick={() => handleOpenDialog(index, newDevice.location_id || null)}
                     >
                       <MapPin className="h-4 w-4 mr-1" />
                       <span className="hidden md:inline-block">{displayLocation ? 'Update location' : 'Add location'}</span>

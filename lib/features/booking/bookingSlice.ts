@@ -22,11 +22,13 @@ interface BookingState {
   };
   locationInfo: {
     name: string;
-    address_line1: string;
-    street: string;
-    landmark: string;
-    city: string;
-    barangay: string;
+    address_line1: string | null;
+    street: string | null;
+    landmark: string | null;
+    city_id: UUID | null; // Changed to UUID
+    city_name: string | null; // Added city name for display
+    barangay_id: UUID | null; // Changed to UUID
+    barangay_name: string | null; // Added barangay name for display
     is_primary: boolean;
   };
   locationMethod: 'manual' | 'current';
@@ -56,12 +58,14 @@ const initialState: BookingState = {
     ref_id: '',
   },
   locationInfo: {
-    name: 'My House',
-    address_line1: '',
-    street: '',
-    landmark: '',
-    city: '',
-    barangay: '',
+    name: '',
+    address_line1: null,
+    street: null,
+    landmark: null,
+    city_id: null,
+    city_name: null,
+    barangay_id: null,
+    barangay_name: null,
     is_primary: false,
   },
   locationMethod: 'manual',

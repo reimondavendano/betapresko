@@ -101,27 +101,10 @@ export const clientPanelBooking = {
       const newAppointmentId: UUID = newAppointment.id;
       const deviceHistoryRecords: Omit<DeviceHistory, 'id'>[] = [];
 
-      // 2. Update existing selected devices with the new appointment and location
-      if (selectedDevices && selectedDevices.length > 0) {
-        const updates = selectedDevices.map(device => ({
-          id: device.id,
-          appointment_id: newAppointmentId,
-          last_cleaning_date: appointmentDate,
-          updated_at: new Date().toISOString(),
-          location_id: device.location_id, // Update with the selected location
-        }));
-        
-        const { error: updateError } = await supabase
-          .from('devices')
-          .upsert(updates, { onConflict: 'id' });
+      // Note: No existing devices to update - only handling new devices
 
-        if (updateError) {
-          console.error('Supabase Error updating existing devices:', updateError);
-          throw new Error(`Failed to update existing devices: ${updateError.message}`);
-        }
-      }
-
-      // 3. Insert new devices
+      // 2. Insert new devices
+      // Note: Don't set last_cleaning_date until appointment status becomes 'completed'
       if (newDevices && newDevices.length > 0) {
         const devicesToInsert = newDevices.map((deviceData: NewBookingDeviceData) => ({
           client_id: clientId,
@@ -131,7 +114,7 @@ export const clientPanelBooking = {
           brand_id: deviceData.brand_id,
           ac_type_id: deviceData.ac_type_id,
           horsepower_id: deviceData.horsepower_id,
-          last_cleaning_date: appointmentDate,
+          last_cleaning_date: null, // Only set when appointment is completed
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }));
@@ -150,6 +133,54 @@ export const clientPanelBooking = {
       return newAppointment;
     } catch (error) {
       console.error('Error during client booking process:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Completes an appointment and updates all associated device cleaning dates
+   * This should be called by admin when the service is actually completed
+   */
+  completeAppointment: async (appointmentId: UUID): Promise<{ appointment: Appointment; updatedDevicesCount: number }> => {
+    try {
+      // 1. Update appointment status to 'completed'
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', appointmentId)
+        .select()
+        .single();
+
+      if (appointmentError) {
+        console.error(`Error updating appointment status ${appointmentId}:`, appointmentError);
+        throw new Error(appointmentError.message);
+      }
+
+      // 2. Update all devices associated with this appointment to set last_cleaning_date
+      // This will automatically update due_3_months, due_4_months, and due_6_months via database triggers
+      const { data: updatedDevices, error: deviceUpdateError } = await supabase
+        .from('devices')
+        .update({ 
+          last_cleaning_date: appointment.appointment_date,
+          updated_at: new Date().toISOString()
+        })
+        .eq('appointment_id', appointmentId)
+        .select();
+
+      if (deviceUpdateError) {
+        console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
+        throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+      }
+
+      return {
+        appointment: appointment as Appointment,
+        updatedDevicesCount: updatedDevices?.length || 0
+      };
+    } catch (error) {
+      console.error('Error during appointment completion process:', error);
       throw error;
     }
   },

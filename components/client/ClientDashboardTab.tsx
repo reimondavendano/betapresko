@@ -22,18 +22,31 @@ import {
   Phone,
   Home,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  X,
+  Save,
+  Ban,
+  Check
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
-import { format, addMonths, isBefore, addYears } from 'date-fns';
+import { format, addMonths, isBefore, addYears, differenceInDays } from 'date-fns';
 
 // Import UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// Import the new components
+import { CleaningStatus } from '@/components/client/device_status/CleaningStatus';
+import { ClientStatusDash } from '@/components/client/device_status/ClientStatusDash';
 
 // --- CORRECTED API IMPORTS ---
 import { clientApi } from '../../pages/api/clients/clientApi';
@@ -83,8 +96,209 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const handleBookNewCleaning = () => {
-    setActiveTab('bookService');
+  // --- Booking Modal State and Handlers ---
+  const [isBookingModalOpen, setIsBookingModal] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<UUID | null>(null);
+  const [selectedDevices, setSelectedDevices] = useState<UUID[]>([]);
+  
+  // --- Details Modal State and Handlers ---
+  const [isDetailsModalOpen, setIsDetailsModal] = useState(false);
+  const [modalLocation, setModalLocation] = useState<ClientLocation | null>(null);
+  const [modalStatusType, setModalStatusType] = useState<'scheduled' | 'due' | 'well-maintained' | 'no-service' | null>(null);
+  const [modalDevices, setModalDevices] = useState<Device[]>([]);
+  
+  // --- Edit Device State ---
+  const [editingDeviceId, setEditingDeviceId] = useState<UUID | null>(null);
+  const [editedDeviceData, setEditedDeviceData] = useState<Partial<Device>>({});
+    // --- NEW: Success Modal State and Handlers ---
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+
+  const handleOpenBookingModal = (locationId: UUID) => {
+    setSelectedLocationId(locationId);
+    setIsBookingModal(true);
+    setSelectedDevices([]);
+  };
+
+  const handleCloseBookingModal = () => {
+    setIsBookingModal(false);
+    setSelectedLocationId(null);
+  };
+
+  const handleCloseSuccessModal = () => {
+    setIsSuccessModalOpen(false);
+  };
+  
+  const handleToggleDevice = (deviceId: UUID) => {
+    setSelectedDevices(prev => 
+      prev.includes(deviceId)
+        ? prev.filter(id => id !== deviceId)
+        : [...prev, deviceId]
+    );
+  };
+  
+  const handleSelectAllDevices = (checked: boolean) => {
+    const devicesToSelect = devicesForSelectedLocation.map(device => device.id);
+    if (checked) {
+      setSelectedDevices(devicesToSelect);
+    } else {
+      setSelectedDevices([]);
+    }
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!client || !selectedLocationId || selectedDevices.length === 0) {
+      handleCloseBookingModal();
+      return;
+    }
+
+    try {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const appointmentDate = `${yyyy}-${mm}-${dd}`;
+
+      // Pick a service to associate with the appointment (fallback to first available)
+      const selectedService = allServices[0];
+      const serviceId = selectedService ? selectedService.id : (null as any);
+
+      const totalUnits = selectedDevices.length;
+      const amount = 0; // Pricing is handled elsewhere; keep 0 for now
+
+      const newAppointment = await appointmentApi.createAppointment({
+        client_id: client.id,
+        location_id: selectedLocationId,
+        service_id: serviceId,
+        appointment_date: appointmentDate,
+        appointment_time: null,
+        amount,
+        total_units: totalUnits,
+        notes: 'Client panel booking',
+      });
+
+      // Update each selected device to reference the new appointment and reset cleaning dates
+      const updates = selectedDevices.map(async (deviceId) => {
+        const device = devices.find(d => d.id === deviceId);
+        if (!device) return Promise.resolve();
+        // We cannot pass due_* fields through the typed API; they will be recalculated by DB on completion.
+        return deviceApi.updateDevice(deviceId, {
+          appointment_id: newAppointment.id,
+          location_id: device.location_id || selectedLocationId,
+          ac_type_id: device.ac_type_id,
+          horsepower_id: device.horsepower_id,
+          brand_id: device.brand_id,
+          last_cleaning_date: null,
+        });
+      });
+      await Promise.all(updates);
+
+      // Refresh local state
+      const [fetchedDevices, fetchedAppointments] = await Promise.all([
+        deviceApi.getByClientId(client.id),
+        appointmentApi.getByClientId(client.id),
+      ]);
+      setDevices(fetchedDevices);
+      setAppointments(fetchedAppointments);
+
+    } catch (err) {
+      console.error('Failed to confirm booking:', err);
+    } finally {
+      handleCloseBookingModal();
+      // Show success modal/toast
+      setTimeout(() => {
+        setIsSuccessModalOpen(true);
+      }, 10);
+    }
+  };
+  
+  // --- Edit Device Handlers ---
+  const handleEditDevice = (device: Device) => {
+    setEditingDeviceId(device.id);
+    setEditedDeviceData(device);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDeviceId(null);
+    setEditedDeviceData({});
+  };
+
+  const handleUpdateDevice = async () => {
+    if (!editingDeviceId) return;
+    
+    // Create a clean object with only the editable fields
+    const updatePayload = {
+      name: editedDeviceData.name,
+      location_id: editedDeviceData.location_id,
+      horsepower_id: editedDeviceData.horsepower_id,
+    };
+    
+    try {
+      const updatedDevice = await deviceApi.updateDevice(editingDeviceId, updatePayload);
+      setDevices(prevDevices => 
+        prevDevices.map(d => (d.id === updatedDevice.id ? updatedDevice : d))
+      );
+      handleCancelEdit();
+    } catch (err) {
+      console.error('Failed to update device:', err);
+    }
+  };
+  
+  // --- Details Modal Handlers ---
+  const handleOpenDetailsModal = (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained') => {
+    const location = locations.find(loc => loc.id === locationId);
+    if (!location) return;
+    
+    setModalLocation(location);
+    setModalStatusType(statusType);
+    
+    // Filter devices based on the requested status rules (device-level appointment linkage)
+    const filteredDevices = devices.filter(device => {
+      if (device.location_id !== locationId) return false;
+
+      const today = new Date();
+      // Link only the appointment referenced by this device
+      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
+
+      const hasLastCleaning = !!device.last_cleaning_date;
+      const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
+      const lastCleaningDate = hasLastCleaning ? new Date(device.last_cleaning_date as string) : null;
+      const due3 = device.due_3_months ? new Date(device.due_3_months) : null;
+      const due4 = device.due_4_months ? new Date(device.due_4_months) : null;
+      const due6 = device.due_6_months ? new Date(device.due_6_months) : null;
+
+      const isDue = [due3, due4, due6].filter(Boolean).some(d => (d as Date) <= today);
+
+      // Scheduled
+      if (statusType === 'scheduled') {
+        // booked: any confirmed appointment for this device, regardless of device dates
+        return deviceAppointment?.status === 'confirmed';
+      }
+
+      // Due
+      if (statusType === 'due') {
+        const isCompleted = deviceAppointment?.status === 'completed';
+        return isCompleted && hasLastCleaning && hasDueDates && isDue;
+      }
+
+      // Well Maintained
+      if (statusType === 'well-maintained') {
+        const isCompleted = deviceAppointment?.status === 'completed';
+        return isCompleted && hasLastCleaning && hasDueDates && !isDue;
+      }
+
+      return false;
+    });
+
+    setModalDevices(filteredDevices);
+    setIsDetailsModal(true);
+  };
+
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModal(false);
+    setModalLocation(null);
+    setModalStatusType(null);
+    setModalDevices([]);
   };
 
   useEffect(() => {
@@ -125,7 +339,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           appointmentApi.getByClientId(clientId),
         ]);
         
-        // Calculate points
         let calculatedPoints = 0;
         fetchedAppointments.forEach(appt => {
           if (appt.status === 'completed') {
@@ -136,7 +349,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           }
         });
         
-        // Calculate points expiry date (1 year from the last completed appointment)
         let pointsExpiry = null;
         if (calculatedPoints > 0) {
           const lastCompletedAppointment = fetchedAppointments.reduce((latest, current) => {
@@ -153,7 +365,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           }
         }
         
-        // Check if points or expiry need to be updated in the database
         if (fetchedClient.points !== calculatedPoints || fetchedClient.points_expiry !== pointsExpiry) {
           const updatedClient = await clientApi.updateClient(clientId, {
             points: calculatedPoints,
@@ -181,15 +392,21 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
 
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
-  // Helper to get the location city name
   const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city || 'N/A';
   const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
 
   const getDeviceCleaningStatus = () => {
-    const statusByLocation = new Map<UUID, { location: ClientLocation, dueDevices: number, lastServiceDate: string | null, totalDevices: number, acNames: string[] }>();
-    const today = new Date();
+    const statusByLocation = new Map<UUID, {
+      location: ClientLocation,
+      dueDevices: number,
+      scheduledDevices: number,
+      wellMaintainedDevices: number,
+      totalDevices: number,
+      lastServiceDate: string | null,
+    }>();
 
-    // Iterate through devices to calculate status
+    const today = new Date();
+    
     devices.forEach(device => {
       const locationId = device.location_id;
       if (!locationId) return;
@@ -197,34 +414,55 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       if (!statusByLocation.has(locationId)) {
         const location = locations.find(loc => loc.id === locationId);
         if (location) {
-          statusByLocation.set(locationId, { location, dueDevices: 0, lastServiceDate: null, totalDevices: 0, acNames: [] });
+          statusByLocation.set(locationId, {
+            location,
+            dueDevices: 0,
+            scheduledDevices: 0,
+            wellMaintainedDevices: 0,
+            totalDevices: 0,
+            lastServiceDate: null,
+          });
         } else {
-          return; // Skip if location data is not available
+          return;
         }
       }
       
       const status = statusByLocation.get(locationId);
-      if (!status) return; // Should not happen with the check above, but for safety
+      if (!status) return;
 
       status.totalDevices++;
-      status.acNames.push(device.name); // Add the AC name to the list for this location
-
+      
+      // Update last service date for the location if applicable
       if (device.last_cleaning_date) {
         const lastCleanDate = new Date(device.last_cleaning_date);
-        
-        // Update last service date if this device's date is newer
         if (!status.lastServiceDate || lastCleanDate > new Date(status.lastServiceDate)) {
           status.lastServiceDate = device.last_cleaning_date;
         }
+      }
+      
+      // Link only the appointment referenced by this device
+      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
 
-        // Check if the device is due for cleaning (more than 3 months since last cleaning)
-        const due3Months = addMonths(lastCleanDate, 3);
-        if (isBefore(due3Months, today)) {
+      const hasLastCleaning = !!device.last_cleaning_date;
+      const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
+      const isDue = [device.due_3_months, device.due_4_months, device.due_6_months]
+        .filter(Boolean)
+        .some((d) => new Date(d as string) <= today);
+
+      // Booked (confirmed) devices are exclusive
+      if (deviceAppointment?.status === 'confirmed') {
+        status.scheduledDevices++;
+        return;
+      }
+
+      // Due / Well Maintained (only if there's a completed appointment)
+      if (deviceAppointment?.status === 'completed' && hasLastCleaning && hasDueDates) {
+        if (isDue) {
           status.dueDevices++;
+        } else {
+          status.wellMaintainedDevices++;
         }
-      } else {
-        // If last_cleaning_date is null, consider it due for cleaning
-        status.dueDevices++;
+        return;
       }
     });
 
@@ -233,7 +471,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   
   const cleaningStatuses = getDeviceCleaningStatus();
   
-  // --- Pagination Logic ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentAppointments = appointments.slice(indexOfFirstItem, indexOfLastItem);
@@ -283,236 +520,494 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   }
 
   const primaryLocation = locations.find(loc => loc.is_primary) || locations[0];
+  
+  const devicesForSelectedLocation = selectedLocationId 
+    ? devices.filter(device => device.location_id === selectedLocationId && device.last_cleaning_date !== null) 
+    : [];
+    
+  const getDeviceDetails = (device: Device) => {
+    const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+    const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+    const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+    return { brand, acType, horsepower };
+  };
 
+  const getProgressBarValue = (device: Device, dueInMonths: number) => {
+    if (!device.last_cleaning_date) return 0;
+    
+    const lastCleaningDate = new Date(device.last_cleaning_date);
+    const today = new Date();
+    const daysSinceLastCleaning = differenceInDays(today, lastCleaningDate);
+    const dueInDays = dueInMonths * 30; // Approximation for months
+    
+    if (dueInDays === 0) return 0;
+    
+    const progress = (daysSinceLastCleaning / dueInDays) * 100;
+    
+    // Ensure the value is not negative
+    return Math.max(0, Math.min(progress, 100));
+  };
+  
+  const getProgressColorClass = (value: number) => {
+    if (value > 75) return 'bg-red-500';
+    if (value > 40) return 'bg-orange-500';
+    return 'bg-green-500';
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Card */}
-      <Card className="rounded-xl shadow-lg overflow-hidden text-white relative p-6 md:p-8" style={{ backgroundColor: '#99BCC0' }}>
-        <div className="absolute inset-0 opacity-10" style={{ backgroundColor: '#99BCC0' }}></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
-          <div className="text-center md:text-left mb-4 md:mb-0">
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-            <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city}, Philippines` : 'Philippines'}</p>
+    <>
+      <div className="space-y-8">
+        <Card className="rounded-xl shadow-lg overflow-hidden text-white relative p-6 md:p-8" style={{ backgroundColor: '#99BCC0' }}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundColor: '#99BCC0' }}></div>
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
+            <div className="text-center md:text-left mb-4 md:mb-0">
+              <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
+              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city}, Philippines` : 'Philippines'}</p>
+            </div>
+            <div className="flex-shrink-0">
+              <Image
+                src={`/assets/images/icon.jpg`}
+                alt="Welcome Illustration"
+                width={150}
+                height={150}
+                className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
+              />
+            </div>
           </div>
-          <div className="flex-shrink-0">
-            <Image
-              src={`/assets/images/icon.jpg`}
-              alt="Welcome Illustration"
-              width={150}
-              height={150}
-              className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
-            />
-          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Points</p>
+              <p className="text-3xl font-bold text-blue-600">{client.points}</p>
+            </div>
+            <Star className="w-10 h-10 text-yellow-500" />
+          </Card>
+
+          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Bookings</p>
+              <p className="text-3xl font-bold text-green-600">{appointments.length}</p>
+            </div>
+            <Calendar className="w-10 h-10 text-green-600" />
+          </Card>
+
+          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Registered AC Units</p>
+              <p className="text-3xl font-bold text-purple-600">{devices.length}</p>
+            </div>
+            <AirVent className="w-10 h-10 text-purple-600" />
+          </Card>
         </div>
-      </Card>
 
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-          <div>
-            <p className="text-sm font-medium text-gray-600">Total Points</p>
-            <p className="text-3xl font-bold text-blue-600">{client.points}</p>
-          </div>
-          <Star className="w-10 h-10 text-yellow-500" />
+        <ClientStatusDash 
+          cleaningStatuses={cleaningStatuses} 
+          handleOpenBookingModal={handleOpenBookingModal}
+          handleOpenDetailsModal={handleOpenDetailsModal}
+        />
+
+        <Card className="rounded-xl shadow-lg p-6 bg-white">
+          <CardHeader className="p-0 mb-4">
+            <CardTitle className="text-xl font-bold flex items-center">
+              <Star className="w-5 h-5 mr-2 text-yellow-500" />
+              Your Points
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 space-y-4">
+            <div className="flex justify-between items-center text-gray-700">
+              <p className="text-2xl font-bold text-blue-600">{client.points}</p>
+              {client.points > 0 && client.points_expiry && (
+                <Badge variant="outline" className="text-sm border-yellow-500 text-yellow-700">
+                  Expires on: {format(new Date(client.points_expiry), 'MMM d, yyyy')}
+                </Badge>
+              )}
+            </div>
+            <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
+              Refer A Friend
+            </Button>
+            <p className="text-xs text-gray-500 mt-2">
+              Note: Points will be credited after the completion of your booking or referrals booking.
+            </p>
+          </CardContent>
         </Card>
 
-        <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-          <div>
-            <p className="text-sm font-medium text-gray-600">Total Bookings</p>
-            <p className="text-3xl font-bold text-green-600">{appointments.length}</p>
-          </div>
-          <Calendar className="w-10 h-10 text-green-600" />
-        </Card>
-
-        <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-          <div>
-            <p className="text-sm font-medium text-gray-600">Registered AC Units</p>
-            <p className="text-3xl font-bold text-purple-600">{devices.length}</p>
-          </div>
-          <AirVent className="w-10 h-10 text-purple-600" />
-        </Card>
-      </div>
-
-      {/* NEW: Cleaning Status by Location */}
-      <Card className="rounded-xl shadow-lg p-6 bg-white">
-        <CardHeader className="p-0 mb-4">
-          <CardTitle className="text-xl font-bold flex items-center">
-            <Clock className="w-5 h-5 mr-2 text-gray-700" />
-            Cleaning Status by Location
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 space-y-4">
-          {cleaningStatuses.length > 0 ? (
-            cleaningStatuses.map(status => (
-              <div key={status.location.id} className="border-b last:border-b-0 py-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{status.location.name}</p>
-                    <p className="text-sm text-gray-600">{formatAddress(status.location)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-700">
-                      AC Units: <span className="text-gray-600 font-normal">{status.acNames.join(', ')}</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2 text-sm">
-                  <p>Last Service Date: <span className="font-medium text-gray-800">{status.lastServiceDate ? format(new Date(status.lastServiceDate), 'MMM d, yyyy') : 'No status yet, we will update once it\'s completed'}</span></p>
-                  <div className="flex items-center mt-1">
-                    <span className="font-medium">Status:</span>
-                    {status.dueDevices > 0 ? (
-                      <span className="ml-2 text-red-600 font-semibold">
-                        {status.dueDevices} of {status.totalDevices} AC unit{status.dueDevices > 1 || status.totalDevices > 1 ? 's' : ''} due for cleaning
-                      </span>
-                    ) : (
-                      <span className="ml-2 text-green-600 font-semibold">
-                        All devices are well maintained
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
-          )}
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 mt-4" onClick={onBookNewCleaningClick}>
-            <Plus className="w-4 h-4 mr-2" /> Book New Service
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Your Points Section */}
-      <Card className="rounded-xl shadow-lg p-6 bg-white">
-        <CardHeader className="p-0 mb-4">
-          <CardTitle className="text-xl font-bold flex items-center">
-            <Star className="w-5 h-5 mr-2 text-yellow-500" />
-            Your Points
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 space-y-4">
-          <div className="flex justify-between items-center text-gray-700">
-            <p className="text-2xl font-bold text-blue-600">{client.points}</p>
-            {/* Conditional rendering for the badge */}
-            {client.points > 0 && client.points_expiry && (
-              <Badge variant="outline" className="text-sm border-yellow-500 text-yellow-700">
-                Expires on: {format(new Date(client.points_expiry), 'MMM d, yyyy')}
-              </Badge>
-            )}
-          </div>
-          <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
-            Refer A Friend
-          </Button>
-          <p className="text-xs text-gray-500 mt-2">
-            Note: Points will be credited after the completion of your booking or referrals booking.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Recent Appointments Table with Pagination */}
-      <Card className="rounded-xl shadow-lg p-6 bg-white">
-        <CardHeader className="p-0 mb-4">
-          <CardTitle className="text-xl font-bold flex items-center">
-            <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-            Recent Appointments
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Service
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Location
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Notes
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentAppointments.length > 0 ? (
-                  currentAppointments.map((appointment) => (
-                    <tr key={appointment.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {format(new Date(appointment.appointment_date), 'MMM d, yyyy')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getServiceName(appointment.service_id)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getLocation(appointment.location_id)?.name || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ₱{appointment.amount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Badge
-                          className={
-                            appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }
-                        >
-                          {appointment.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {appointment.notes || '-'}
+        <Card className="rounded-xl shadow-lg p-6 bg-white">
+          <CardHeader className="p-0 mb-4">
+            <CardTitle className="text-xl font-bold flex items-center">
+              <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+              Recent Appointments
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Service
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Notes
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {currentAppointments.length > 0 ? (
+                    currentAppointments.map((appointment) => (
+                      <tr key={appointment.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {format(new Date(appointment.appointment_date), 'MMM d, yyyy')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {getServiceName(appointment.service_id)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {getLocation(appointment.location_id)?.name || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₱{appointment.amount.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <Badge
+                            className={
+                              appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }
+                          >
+                            {appointment.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {appointment.notes || '-'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                        No recent appointments found.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No recent appointments found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {/* Pagination Controls */}
-          {appointments.length > itemsPerPage && (
-            <div className="flex justify-between items-center mt-4 px-6">
-              <Button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Previous</span>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {appointments.length > itemsPerPage && (
+              <div className="flex justify-between items-center mt-4 px-6">
+                <Button
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </Button>
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {isBookingModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
+            <button 
+              onClick={handleCloseBookingModal} 
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-2xl font-bold mb-4">List of All AC under Location</h2>
+            
+            <div className="mb-4 flex items-center space-x-2">
+              <Checkbox
+                id="selectAll"
+                checked={selectedDevices.length === devicesForSelectedLocation.length && devicesForSelectedLocation.length > 0}
+                onCheckedChange={handleSelectAllDevices}
+              />
+              <label htmlFor="selectAll" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Select All
+              </label>
+            </div>
+
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+              {devicesForSelectedLocation.length > 0 ? (
+                devicesForSelectedLocation.map(device => {
+                  const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                  const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                  const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                  const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
+
+                  const progressBar3Month = getProgressBarValue(device, 3);
+                  const progressBar4Month = getProgressBarValue(device, 4);
+                  const progressBar6Month = getProgressBarValue(device, 6);
+
+                  return (
+                    <div key={device.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox 
+                            id={`device-${device.id}`} 
+                            checked={selectedDevices.includes(device.id)}
+                            onCheckedChange={() => handleToggleDevice(device.id)}
+                          />
+                          <label 
+                            htmlFor={`device-${device.id}`} 
+                            className="text-sm font-medium leading-none"
+                          >
+                            {acName}
+                          </label>
+                        </div>
+                      </div>
+
+                      {device.last_cleaning_date && (
+                        <div className="mt-2 space-y-2">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
+                            <div className="flex items-center space-x-2">
+                              <Progress value={progressBar3Month} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                              <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                {Math.round(progressBar3Month)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
+                            <div className="flex items-center space-x-2">
+                              <Progress value={progressBar4Month} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                              <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                {Math.round(progressBar4Month)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
+                            <div className="flex items-center space-x-2">
+                              <Progress value={progressBar6Month} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                              <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                {Math.round(progressBar6Month)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-gray-500">No devices found for this location.</p>
+              )}
+            </div>
+            
+            <div className="flex justify-end mt-6 space-x-4">
+              <Button onClick={handleCloseBookingModal} variant="outline">
+                Cancel
               </Button>
-              <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <span>Next</span>
-                <ChevronRight className="w-4 h-4" />
+              <Button onClick={handleConfirmBooking} disabled={selectedDevices.length === 0} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Confirm Booking
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        </div>
+      )}
+
+      {isDetailsModalOpen && modalLocation && modalStatusType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl p-8 relative">
+            <button 
+              onClick={handleCloseDetailsModal} 
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-2xl font-bold mb-2 text-gray-800">{modalLocation.name}</h2>
+            <p className="text-lg text-gray-600 mb-6">{modalStatusType.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')} Units</p>
+
+            <Card className="p-4 rounded-xl shadow-md">
+                <CardTitle className="text-lg font-semibold mb-4 text-gray-700">Devices ({modalDevices.length})</CardTitle>
+                <CardContent className="space-y-4 p-0 max-h-96 overflow-y-auto">
+                  {modalDevices.length > 0 ? (
+                    modalDevices.map(device => {
+                      const { brand, acType, horsepower } = getDeviceDetails(device);
+                      const progressBar3Month = getProgressBarValue(device, 3);
+                      const progressBar4Month = getProgressBarValue(device, 4);
+                      const progressBar6Month = getProgressBarValue(device, 6);
+                      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
+                      const disableEdit = modalStatusType === 'no-service';
+
+                      return (
+                        <div key={device.id} className="border-b last:border-b-0 pb-3">
+                          {editingDeviceId === device.id ? (
+                            // Edit Form
+                            <div className="space-y-3">
+                              <div>
+                                <Label htmlFor={`name-${device.id}`}>Name</Label>
+                                <Input
+                                  id={`name-${device.id}`}
+                                  value={editedDeviceData.name || ''}
+                                  onChange={(e) => setEditedDeviceData({ ...editedDeviceData, name: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`location-${device.id}`}>Location</Label>
+                                <Select
+                                  value={editedDeviceData.location_id || ''}
+                                  onValueChange={(value) => setEditedDeviceData({ ...editedDeviceData, location_id: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a location" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {locations.map(loc => (
+                                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor={`horsepower-${device.id}`}>Horsepower</Label>
+                                <Select
+                                  value={editedDeviceData.horsepower_id || ''}
+                                  onValueChange={(value) => setEditedDeviceData({ ...editedDeviceData, horsepower_id: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select horsepower" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {allHorsepowerOptions.map(hp => (
+                                      <SelectItem key={hp.id} value={hp.id}>{hp.display_name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {/* Removed Last Cleaning Date input from edit form */}
+                              <div className="flex justify-end space-x-2 mt-4">
+                                <Button onClick={handleCancelEdit} variant="outline" size="sm">
+                                  <Ban className="w-4 h-4 mr-2" />
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleUpdateDevice} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                  <Save className="w-4 h-4 mr-2" />
+                                  Update
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            // Default View
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium text-gray-900">{device.name}</p>
+                                {!disableEdit && (
+                                  <Button onClick={() => handleEditDevice(device)} variant="ghost" size="icon">
+                                    <Edit className="w-4 h-4 text-blue-500" />
+                                  </Button>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">{brand} | {acType} | {horsepower}</p>
+                              
+                              {device.last_cleaning_date && (
+                                <div className="mt-2 space-y-3">
+                                  <p className="text-xs text-gray-500">
+                                    Last serviced: {format(new Date(device.last_cleaning_date), 'MMM d, yyyy')}
+                                  </p>
+
+                                  {/* 3-month Progress Bar */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
+                                    <div className="flex items-center space-x-2">
+                                      <Progress value={progressBar3Month} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                                      <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                        {Math.round(progressBar3Month)}%
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* 4-month Progress Bar */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
+                                    <div className="flex items-center space-x-2">
+                                      <Progress value={progressBar4Month} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                                      <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                        {Math.round(progressBar4Month)}%
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* 6-month Progress Bar */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
+                                    <div className="flex items-center space-x-2">
+                                      <Progress value={progressBar6Month} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                                      <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
+                                        {Math.round(progressBar6Month)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-center text-gray-500">No devices in this category for this location.</p>
+                  )}
+                </CardContent>
+              </Card>
+            
+            <div className="flex justify-end mt-8">
+              <Button onClick={handleCloseDetailsModal} variant="outline">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Success Modal */}
+      {isSuccessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 transition-opacity duration-300">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm transform scale-100 transition-transform duration-300">
+            <div className="flex flex-col items-center p-6 space-y-4">
+              <Check className="w-16 h-16 text-green-500" />
+              <h2 className="text-2xl font-bold text-gray-800">Booking Confirmed!</h2>
+              <p className="text-center text-gray-700">Your booking has been placed successfully. We'll send you an update shortly.</p>
+              <Button onClick={handleCloseSuccessModal} className="w-full">
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

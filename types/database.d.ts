@@ -54,6 +54,23 @@ export interface Client {
   updated_at: Timestamp;
 }
 
+// New: Interface for the 'cities' table
+export interface City {
+  id: UUID;
+  name: string;
+  province: string;
+  created_at: Timestamp;
+}
+
+// New: Interface for the 'barangays' table
+export interface Barangay {
+  id: UUID;
+  city_id: UUID; // Foreign key to the cities table
+  name: string;
+  is_set: boolean; // Indicates if this barangay is part of the service area
+  created_at: Timestamp;
+}
+
 export interface ClientLocation {
   id: UUID;
   client_id: UUID;
@@ -188,6 +205,16 @@ export type Database = {
         Row: Client
         Insert: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'qr_code'> // Omit generated fields
         Update: Partial<Omit<Client, 'id' | 'created_at' | 'updated_at' | 'qr_code'>>
+      }
+      cities: {
+        Row: City
+        Insert: Omit<City, 'id' | 'created_at'>
+        Update: Partial<Omit<City, 'id' | 'created_at'>>
+      }
+      barangays: {
+        Row: Barangay
+        Insert: Omit<Barangay, 'id' | 'created_at'>
+        Update: Partial<Omit<Barangay, 'id' | 'created_at'>>
       }
       client_locations: { // Assuming your table name is 'client_locations'
         Row: ClientLocation

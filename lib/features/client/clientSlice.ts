@@ -114,6 +114,21 @@ const clientSlice = createSlice({
         state.devices[index] = action.payload
       }
     },
+    updateDeviceLocation: (state, action: PayloadAction<{ deviceId: UUID; locationId: UUID }>) => {
+      const { deviceId, locationId } = action.payload;
+      const deviceIndex = state.devices.findIndex(device => device.id === deviceId);
+      if (deviceIndex !== -1) {
+        state.devices[deviceIndex].location_id = locationId;
+        state.devices[deviceIndex].updated_at = new Date().toISOString();
+      }
+    },
+        // New reducer to update the location of multiple devices
+    updateDevicesLocations: (state, action: PayloadAction<{ deviceIds: UUID[], locationId: UUID }>) => {
+      const { deviceIds, locationId } = action.payload;
+      state.devices = state.devices.map(device => 
+        deviceIds.includes(device.id) ? { ...device, location_id: locationId } : device
+      );
+    },
     removeDevice: (state, action: PayloadAction<UUID>) => {
       state.devices = state.devices.filter(device => device.id !== action.payload)
     },
@@ -164,13 +179,17 @@ const clientSlice = createSlice({
     // New action to select/deselect all existing devices
     toggleSelectAllExistingDevices: (state, action: PayloadAction<boolean>) => {
       if (action.payload) {
-        // Select all devices and assign the first available location
-        const defaultLocationId = state.locations[0]?.id || null;
-        if (defaultLocationId) {
-          state.booking.selectedDevices = state.devices.map(device => ({
-            ...device,
-            location_id: defaultLocationId,
-          }));
+        // Select all devices and use each device's actual location or fall back to primary location
+        const primaryLocation = state.locations.find(loc => loc.is_primary);
+        const primaryLocationId = primaryLocation?.id || state.locations[0]?.id || null;
+        
+        if (primaryLocationId || state.devices.some(device => device.location_id)) {
+          state.booking.selectedDevices = state.devices
+            .filter(device => device.location_id || primaryLocationId) // Only include devices with valid location
+            .map(device => ({
+              ...device,
+              location_id: device.location_id || primaryLocationId!,
+            }));
         } else {
           state.booking.selectedDevices = [];
         }
@@ -233,6 +252,8 @@ export const {
   removeLocation,
   addDevice,
   updateDevice,
+  updateDeviceLocation,
+  updateDevicesLocations,
   removeDevice,
   clearClientData,
   // New booking flow actions

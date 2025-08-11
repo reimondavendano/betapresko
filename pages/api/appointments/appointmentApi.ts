@@ -50,4 +50,63 @@ export const appointmentApi = {
     }
     return data as Appointment[];
   },
+
+  /**
+   * Updates appointment status and sets device cleaning dates when status becomes 'completed'
+   */
+  updateAppointmentStatus: async (appointmentId: UUID, status: 'pending' | 'confirmed' | 'completed' | 'voided'): Promise<Appointment> => {
+    const { data: appointment, error: appointmentError } = await supabase
+      .from('appointments')
+      .update({ 
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', appointmentId)
+      .select()
+      .single();
+
+    if (appointmentError) {
+      console.error(`Error updating appointment status ${appointmentId}:`, appointmentError);
+      throw new Error(appointmentError.message);
+    }
+
+    // If appointment is marked as completed, update all associated devices' last_cleaning_date
+    if (status === 'completed') {
+      const { error: deviceUpdateError } = await supabase
+        .from('devices')
+        .update({ 
+          last_cleaning_date: appointment.appointment_date,
+          updated_at: new Date().toISOString()
+        })
+        .eq('appointment_id', appointmentId);
+
+      if (deviceUpdateError) {
+        console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
+        throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+      }
+    }
+
+    return appointment as Appointment;
+  },
+
+  /**
+   * Fetches all appointments (for admin use)
+   */
+  getAllAppointments: async (): Promise<Appointment[]> => {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        clients:client_id(name, mobile),
+        client_locations:location_id(name, address_line1, barangay, city),
+        services:service_id(name)
+      `)
+      .order('appointment_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all appointments:', error);
+      throw new Error(error.message);
+    }
+    return data as Appointment[];
+  },
 };

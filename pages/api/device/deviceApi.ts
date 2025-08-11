@@ -69,6 +69,27 @@ export const deviceApi = {
   },
 
   /**
+   * Updates the location of a specific device.
+   */
+  updateDeviceLocation: async (deviceId: UUID, locationId: UUID): Promise<Device> => {
+    const { data, error } = await supabase
+      .from('devices')
+      .update({ 
+        location_id: locationId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', deviceId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating device location ${deviceId}:`, error);
+      throw new Error(error.message);
+    }
+    return data as Device;
+  },
+
+  /**
    * Deletes a device.
    */
   deleteDevice: async (id: UUID): Promise<boolean> => {

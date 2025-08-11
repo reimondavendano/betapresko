@@ -7,7 +7,6 @@ import {
   setAvailableServices,
   setBookingResources,
   resetClientBooking,
-  setDevices,
   setCurrentClient,
   setLocations,
 } from '@/lib/features/client/clientSlice';
@@ -20,7 +19,6 @@ import { Step3ConfirmBooking } from './../../components/client/steps/Step3Confir
 
 import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
-import { deviceApi } from '../../pages/api/device/deviceApi';
 import { servicesApi } from '../../pages/api/service/servicesApi';
 import { brandsApi } from '../../pages/api/brands/brandsApi';
 import { acTypesApi } from '../../pages/api/types/acTypesApi';
@@ -45,7 +43,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
   const clientBookingState = useSelector((state: RootState) => state.client.booking);
   const currentClient = useSelector((state: RootState) => state.client.currentClient);
   const clientLocations = useSelector((state: RootState) => state.client.locations);
-  const allDevices = useSelector((state: RootState) => state.client.devices);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +52,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
         const [
           client,
           fetchedLocations,
-          fetchedDevices,
           services,
           brands,
           acTypes,
@@ -65,7 +61,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
         ] = await Promise.all([
           clientApi.getClientById(clientId), // Corrected API method
           clientLocationApi.getByClientId(clientId),
-          deviceApi.getByClientId(clientId),
           servicesApi.getServices(),
           brandsApi.getBrands(),
           acTypesApi.getACTypes(),
@@ -78,7 +73,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
           dispatch(setCurrentClient(client));
         }
         dispatch(setLocations(fetchedLocations)); // Corrected action
-        dispatch(setDevices(fetchedDevices));
 
         dispatch(setAvailableServices(services));
         dispatch(
@@ -117,8 +111,8 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       setError('Please select an appointment date.');
       return;
     }
-    if (clientBookingState.selectedDevices.length === 0 && clientBookingState.newDevices.length === 0) {
-      setError('Please select at least one existing device or add a new unit.');
+    if (clientBookingState.newDevices.length === 0) {
+      setError('Please add at least one new unit.');
       return;
     }
     
@@ -145,11 +139,9 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       appointmentDate: clientBookingState.appointmentDate,
       appointmentTime: '09:00 AM',
       totalAmount: clientBookingState.totalAmount,
-      totalUnits:
-        clientBookingState.selectedDevices.length +
-        clientBookingState.newDevices.reduce((sum, d) => sum + d.quantity, 0),
+      totalUnits: clientBookingState.newDevices.reduce((sum, d) => sum + d.quantity, 0),
       notes: null,
-      selectedDevices: clientBookingState.selectedDevices, // Pass the full objects
+      selectedDevices: [], // No existing devices - only new devices
       newDevices: newDevicesWithLocation, // Pass the new units with default location
     };
 

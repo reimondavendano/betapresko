@@ -78,8 +78,10 @@ export interface ClientLocation {
   is_primary: boolean;
   address_line1: string | null;
   street: string | null;
-  barangay: UUID | null; // Updated to reference barangays(id)
-  city: UUID | null;     // Updated to reference cities(id)
+  barangay_id: UUID | null; // Updated to reference barangays(id)
+  barangay_name: string | null; // Added for front-end convenience
+  city_id: UUID | null; // Updated to reference cities(id)
+  city_name: string | null; // Added for front-end convenience
   landmark: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;

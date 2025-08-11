@@ -55,14 +55,12 @@ const getGeocodedAddress = async (lat: number, lng: number): Promise<Partial<Cli
     const data = await response.json();
     const address = data.address;
 
-    console.log(address);
-
     return {
       address_line1: address.house_number ? `${address.house_number} ${address.residential}` : address.road,
       street: address.road,
       // Try to get a barangay name from common Nominatim keys
-      barangay: address.quarter,
-      city: address.city,
+      barangay_name: address.quarter,
+      city_name: address.city,
       landmark: address.amenity || address.shop || address.historic,
     };
   } catch (error) {
@@ -194,8 +192,8 @@ export function LocationStep() {
       setIsGettingLocation(true);
       try {
         const address = await getGeocodedAddress(pos.lat, pos.lng);
-        const cityFromAPI = address.city;
-        const barangayFromAPI = address.barangay;
+        const cityFromAPI = address.city_name;
+        const barangayFromAPI = address.barangay_name;
 
         const city = allCitiesRef.current.find(c => c.name.toLowerCase() === cityFromAPI?.toLowerCase());
 
@@ -251,8 +249,8 @@ export function LocationStep() {
       async (position) => {
         try {
           const address = await getGeocodedAddress(position.coords.latitude, position.coords.longitude);
-          const cityFromAPI = address.city;
-          const barangayFromAPI = address.barangay;
+          const cityFromAPI = address.city_name;
+          const barangayFromAPI = address.barangay_name;
 
           const city = allCitiesRef.current.find(c => c.name.toLowerCase() === cityFromAPI?.toLowerCase());
 
@@ -282,7 +280,7 @@ export function LocationStep() {
             
             // Check if map and marker exist before trying to use them
             if (L && mapRef.current && markerRef.current) {
-               const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
+             const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
               mapRef.current.setView(latlng, 18);
               markerRef.current.setLatLng(latlng);
             }
@@ -306,7 +304,12 @@ export function LocationStep() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    dispatch(setLocationInfo({ ...locationInfo, [name]: type === 'checkbox' ? toBoolean(checked) : value }));
+    // This part is crucial, ensure we are not overwriting city_name with an empty string if the user is not editing that field
+    if (name === 'city_name' && value === '') {
+        dispatch(setLocationInfo({ ...locationInfo, city_id: null, city_name: null, barangay_id: null, barangay_name: null }));
+    } else {
+        dispatch(setLocationInfo({ ...locationInfo, [name]: type === 'checkbox' ? toBoolean(checked) : value }));
+    }
   };
 
   // New handler for the city search input
@@ -535,7 +538,7 @@ export function LocationStep() {
               <Frown className="mr-2" /> Location Not in Range
             </DialogTitle>
             <DialogDescription>
-              We couldn't find your current city in our service area. Please select your location manually from the dropdowns.
+              We couldn`t find your current city in our service area. Please select your location manually from the dropdowns.
             </DialogDescription>
           </DialogHeader>
           <Button onClick={() => setIsModalOpen(false)}>Okay</Button>

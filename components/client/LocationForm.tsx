@@ -27,8 +27,8 @@ const getGeocodedAddress = async (lat: number, lng: number): Promise<Partial<Cli
     return {
       address_line1: address.house_number ? `${address.house_number} ${address.residential}` : address.road,
       street: address.road,
-      barangay: address.quarter || address.neighbourhood,
-      city: address.city || address.town || address.village,
+      barangay_name: address.quarter || address.neighbourhood,
+      city_name: address.city || address.town || address.village,
       landmark: address.amenity || address.shop || address.historic,
     };
   } catch (error) {
@@ -54,8 +54,8 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
     name: '',
     address_line1: '',
     street: '',
-    barangay: '',
-    city: '',
+    barangay_name: '',
+    city_name: '',
     landmark: '',
   });
   const [locationMethod, setLocationMethod] = useState<'manual' | 'current'>('manual');
@@ -170,8 +170,8 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
         name: locationInfo.name || 'My Home',
         address_line1: locationInfo.address_line1!,
         street: locationInfo.street!,
-        barangay: locationInfo.barangay!,
-        city: locationInfo.city!,
+        barangay_id: locationInfo.barangay_id!,
+        city_id: locationInfo.city_id!,
         landmark: locationInfo.landmark || null,
         is_primary: isPrimary,
       };
@@ -186,7 +186,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
     }
   };
 
-  const isFormValid = locationInfo.address_line1 && locationInfo.barangay && locationInfo.city;
+  const isFormValid = locationInfo.address_line1 && locationInfo.barangay_name && locationInfo.city_name;
 
   return (
     <div className="space-y-6">
@@ -270,7 +270,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
               id="barangay"
               name="barangay"
               placeholder="Ex: Caingin"
-              value={locationInfo.barangay || ''}
+              value={locationInfo.barangay_name || ''}
               onChange={handleInputChange}
               disabled={isGettingLocation}
             />
@@ -281,7 +281,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
               id="city"
               name="city"
               placeholder="Ex: Malolos"
-              value={locationInfo.city || ''}
+              value={locationInfo.city_name || ''}
               onChange={handleInputChange}
               disabled={isGettingLocation}
             />

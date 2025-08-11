@@ -27,9 +27,6 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
   const [error, setError] = useState<string | null>(null);
 
 
-
-
-
   // Fetch client-specific data
   useEffect(() => {
     const fetchClientData = async () => {
@@ -164,7 +161,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
                   </div> */}
                 </div>
                 <p className="text-gray-600 text-sm">
-                  {location.address_line1}, {location.street}, {location.barangay}, {location.city}
+                  {location.address_line1}, {location.street}, {location.barangay_name}, {location.city_name}
                 </p>
                 {location.landmark && (
                   <p className="text-gray-500 text-sm">Landmark: {location.landmark}</p>

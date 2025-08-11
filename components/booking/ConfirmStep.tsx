@@ -152,12 +152,12 @@ export function ConfirmStep() {
         const newLocationData = {
           client_id: currentClientId,
           name: locationInfo.name || 'My Home',
-          is_primary: locationInfo.is_primary,
+          is_primary: locationInfo.is_primary ?? false,
           address_line1: locationInfo.address_line1,
           street: locationInfo.street,
           landmark: locationInfo.landmark || null,
-          city: locationInfo.city,
-          barangay: locationInfo.barangay // Use the selected barangay ID from Redux state
+          city_id: locationInfo.city_id,
+          barangay_id: locationInfo.barangay_id // Use the selected barangay ID from Redux state
         };
         const createdLocation: ClientLocation = await clientLocationApi.createClientLocation(newLocationData);
         currentLocationId = createdLocation.id;
@@ -388,7 +388,7 @@ export function ConfirmStep() {
                   <Label htmlFor="addressLine1">Address Line 1 *</Label>
                   <Input
                     id="addressLine1"
-                    value={locationInfo.address_line1}
+                    value={locationInfo.address_line1 || ''}
                     readOnly
                     disabled
                     className="cursor-not-allowed bg-gray-100"
@@ -398,7 +398,7 @@ export function ConfirmStep() {
                   <Label htmlFor="street">Street *</Label>
                   <Input
                     id="street"
-                    value={locationInfo.street}
+                    value={locationInfo.street || ''}
                     readOnly
                     disabled
                     className="cursor-not-allowed bg-gray-100"
@@ -410,7 +410,7 @@ export function ConfirmStep() {
                     <Label htmlFor="barangay">Barangay</Label>
                     <Input
                       id="barangay"
-                      value={locationInfo.barangay || ''}
+                      value={locationInfo.barangay_name || ''}
                       readOnly
                       disabled
                       placeholder="Barangay"
@@ -421,7 +421,7 @@ export function ConfirmStep() {
                     <Label htmlFor="city">City</Label>
                     <Input
                       id="city"
-                      value={locationInfo.city || ''}
+                      value={locationInfo.city_name || ''}
                       readOnly
                       disabled
                       placeholder="City"
@@ -433,7 +433,7 @@ export function ConfirmStep() {
                   <Label htmlFor="landmark">Landmark</Label>
                   <Textarea
                     id="landmark"
-                    value={locationInfo.landmark}
+                    value={locationInfo.landmark || ''}
                     readOnly
                     disabled
                     className="cursor-not-allowed bg-gray-100"

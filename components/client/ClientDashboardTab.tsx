@@ -72,8 +72,8 @@ const formatAddress = (location: ClientLocation) => {
   const parts = [
     location.address_line1,
     location.street,
-    location.barangay,
-    location.city
+    location.barangay_name,
+    location.city_name
   ].filter(Boolean);
   return parts.join(', ');
 };
@@ -392,7 +392,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
 
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
-  const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city || 'N/A';
+  const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city_name || 'N/A';
   const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
 
   const getDeviceCleaningStatus = () => {
@@ -562,7 +562,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
             <div className="text-center md:text-left mb-4 md:mb-0">
               <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city}, Philippines` : 'Philippines'}</p>
+              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city_id}, Philippines` : 'Philippines'}</p>
             </div>
             <div className="flex-shrink-0">
               <Image
@@ -793,7 +793,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={progressBar3Month} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                              <Progress value={Number(progressBar3Month)} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar3Month)}%
                               </span>
@@ -802,7 +802,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={progressBar4Month} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                              <Progress value={Number(progressBar4Month)} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar4Month)}%
                               </span>
@@ -811,7 +811,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={progressBar6Month} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                              <Progress value={Number(progressBar6Month)} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar6Month)}%
                               </span>
@@ -943,7 +943,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={progressBar3Month} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                                      <Progress value={Number(progressBar3Month)} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar3Month)}%
                                       </span>
@@ -954,7 +954,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={progressBar4Month} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                                      <Progress value={Number(progressBar4Month)} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar4Month)}%
                                       </span>
@@ -965,7 +965,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={progressBar6Month} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                                      <Progress value={Number(progressBar6Month)} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar6Month)}%
                                       </span>
@@ -1000,7 +1000,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             <div className="flex flex-col items-center p-6 space-y-4">
               <Check className="w-16 h-16 text-green-500" />
               <h2 className="text-2xl font-bold text-gray-800">Booking Confirmed!</h2>
-              <p className="text-center text-gray-700">Your booking has been placed successfully. We'll send you an update shortly.</p>
+              <p className="text-center text-gray-700">Your booking has been placed successfully. We`ll send you an update shortly.</p>
               <Button onClick={handleCloseSuccessModal} className="w-full">
                 OK
               </Button>

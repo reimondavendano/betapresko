@@ -8,7 +8,7 @@ export const clientLocationApi = {
    * @param newLocationData The data for the new client location.
    * @returns The created ClientLocation object.
    */
-  createClientLocation: async (newLocationData: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at'>): Promise<ClientLocation> => {
+  createClientLocation: async (newLocationData: Omit<ClientLocation, 'id' | 'created_at' | 'updated_at' | 'barangay_name' | 'city_name'>): Promise<ClientLocation> => {
     // Supabase will automatically generate 'id', 'created_at', 'updated_at'
     // 'is_primary' defaults to false as per your database schema
     const { data, error } = await supabase
@@ -19,8 +19,8 @@ export const clientLocationApi = {
           name: newLocationData.name,
           address_line1: newLocationData.address_line1,
           street: newLocationData.street,
-          barangay: newLocationData.barangay,
-          city: newLocationData.city,
+          barangay: newLocationData.barangay_id,
+          city: newLocationData.city_id,
           landmark: newLocationData.landmark,
           is_primary: newLocationData.is_primary ? newLocationData.is_primary : false, // Default as per your database schema
         }

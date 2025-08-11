@@ -22,8 +22,8 @@ const formatAddress = (location: ClientLocation) => {
   const parts = [
     location.address_line1,
     location.street,
-    location.barangay,
-    location.city
+    location.barangay_name,
+    location.city_name
   ].filter(Boolean);
   return parts.join(', ');
 };

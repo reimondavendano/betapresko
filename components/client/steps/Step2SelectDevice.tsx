@@ -172,7 +172,7 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
                 <Info className="h-4 w-4 cursor-pointer" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs text-sm">
-                <p>If you do not set a location, the device will be assigned to your primary location: <span className="font-semibold">{primaryLocation ? `${primaryLocation.name} - ${primaryLocation.barangay}, ${primaryLocation.city}` : 'No primary location set.'}</span></p>
+                <p>If you do not set a location, the device will be assigned to your primary location: <span className="font-semibold">{primaryLocation ? `${primaryLocation.name} - ${primaryLocation.barangay_name}, ${primaryLocation.city_name}` : 'No primary location set.'}</span></p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -181,7 +181,7 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
           // Use the selected location or fall back to the primary location for display
           const displayLocation = locations.find(loc => loc.id === newDevice.location_id) || primaryLocation;
           const newDeviceLocationDisplayString = displayLocation
-            ? `${displayLocation.name} - ${displayLocation.barangay}, ${displayLocation.city}`
+            ? `${displayLocation.name} - ${displayLocation.barangay_name}, ${displayLocation.city_name}`
             : 'No location selected';
           
           return (
@@ -363,7 +363,7 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
               <div key={loc.id} className="flex items-center space-x-2 border rounded-md p-3 hover:bg-gray-50">
                 <RadioGroupItem value={loc.id} id={`loc-${loc.id}`} />
                 <Label htmlFor={`loc-${loc.id}`} className="font-normal cursor-pointer">
-                  {`${loc.name}, ${loc.address_line1}, ${loc.barangay}, ${loc.city}`}
+                  {`${loc.name}, ${loc.address_line1}, ${loc.barangay_name}, ${loc.city_name}`}
                 </Label>
               </div>
             ))}

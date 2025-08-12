@@ -596,7 +596,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
               Location Not in Range
             </DialogTitle>
             <DialogDescription>
-              We couldn't find your current city in our service area. Please select your location manually from the dropdowns.
+              We couldn`t find your current city in our service area. Please select your location manually from the dropdowns.
             </DialogDescription>
           </DialogHeader>
           <Button onClick={() => setIsModalOpen(false)}>Okay</Button>

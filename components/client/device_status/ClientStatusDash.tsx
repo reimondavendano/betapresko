@@ -47,7 +47,7 @@ export function ClientStatusDash({ cleaningStatuses, handleOpenBookingModal, han
           cleaningStatuses.map(status => (
             <div key={status.location.id} className="border-b last:border-b-0 py-2">
               <div className="flex justify-between items-start">
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="font-bold">
                     {status.location.name}{' '}
                     {status.lastServiceDate ? (
@@ -64,31 +64,44 @@ export function ClientStatusDash({ cleaningStatuses, handleOpenBookingModal, han
 
                   {/* Scheduled Units */}
                   {status.scheduledDevices > 0 && (
-                    <div className="flex items-center text-sm mt-1">
-                      <span className="text-gray-700">Booked: {status.scheduledDevices} unit{status.scheduledDevices > 1 && 's'}</span>
-                      <Button variant="link" size="sm" className="ml-2 p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'scheduled')}>
-                        [View Details]
-                      </Button>
+                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
+                      <span className="text-gray-700 break-words">
+                        <span className="font-medium">Booked:</span> {status.scheduledDevices} unit{status.scheduledDevices > 1 && 's'}
+                      </span>
+                      <div className="justify-self-end">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto text-blue-600"
+                          onClick={() => handleOpenDetailsModal(status.location.id, 'scheduled')}
+                        >
+                          [View Details]
+                        </Button>
+                      </div>
                     </div>
                   )}
 
                   {/* Due Units */}
                   {status.dueDevices > 0 && (
-                    <div className="flex items-center text-sm mt-1">
-                      <span className="text-red-600">Due for Cleaning: {status.dueDevices} unit{status.dueDevices > 1 && 's'}</span>
-                      <Button variant="link" size="sm" className="ml-2 p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'due')}>
-                        [View Details]
-                      </Button>
+                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
+                      <span className="text-red-600 break-words">Due for Cleaning: {status.dueDevices} unit{status.dueDevices > 1 && 's'}</span>
+                      <div className="justify-self-end">
+                        <Button variant="link" size="sm" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'due')}>
+                          [View Details]
+                        </Button>
+                      </div>
                     </div>
                   )}
 
                   {/* Well Maintained Units */}
                   {status.wellMaintainedDevices > 0 && (
-                    <div className="flex items-center text-sm mt-1">
-                      <span className="text-green-600">Up to date: {status.wellMaintainedDevices} unit{status.wellMaintainedDevices > 1 && 's'}</span>
-                      <Button variant="link" size="sm" className="ml-2 p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'well-maintained')}>
-                        [View Details]
-                      </Button>
+                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
+                      <span className="text-green-600 break-words">Up to date: {status.wellMaintainedDevices} unit{status.wellMaintainedDevices > 1 && 's'}</span>
+                      <div className="justify-self-end">
+                        <Button variant="link" size="sm" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'well-maintained')}>
+                          [View Details]
+                        </Button>
+                      </div>
                     </div>
                   )}
                   

@@ -124,14 +124,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
     fetchAllCities();
   }, []);
 
-  // Default location name to Home if not set
-  useEffect(() => {
-    if (!locationInfo.name) {
-      setLocationInfo(prev => ({ ...prev, name: 'Home' }));
-    }
-    // run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Require explicit location name (no default)
 
   // Keep ref in sync with latest cities
   useEffect(() => {
@@ -390,7 +383,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
     }
   };
 
-  const isFormValid = !!(locationInfo.address_line1 && locationInfo.barangay_id && locationInfo.city_id);
+  const isFormValid = !!(locationInfo.name && locationInfo.address_line1 && locationInfo.barangay_id && locationInfo.city_id && locationInfo.landmark);
 
   return (
     <div className="space-y-6">
@@ -421,40 +414,14 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="location-name">Location Name</Label>
-            <div className="space-y-2">
-              <Select
-                value={(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? (locationInfo.name || 'Home') : ((locationInfo.name !== undefined) ? 'Others' : 'Home')) as string}
-                onValueChange={(val) => {
-                  if (val === 'Others') {
-                    if (!locationInfo.name || ['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].includes(locationInfo.name)) {
-                      setLocationInfo(prev => ({ ...prev, name: '' }));
-                    }
-                  } else {
-                    setLocationInfo(prev => ({ ...prev, name: val }));
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a location type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Home">Home</SelectItem>
-                  <SelectItem value="Office/Workplace">Office/Workplace</SelectItem>
-                  <SelectItem value="Apartment">Apartment</SelectItem>
-                  <SelectItem value="Parent/Sibling/Cousin House">Parent/Sibling/Cousin House</SelectItem>
-                  <SelectItem value="Others">Others</SelectItem>
-                </SelectContent>
-              </Select>
-              {(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? false : true) && (
-                <Input
-                  id="location-name"
-                  name="name"
-                  placeholder="Specify location name"
-                  value={locationInfo.name || ''}
-                  onChange={handleInputChange}
-                />
-              )}
-            </div>
+            <Input
+              id="location-name"
+              name="name"
+              placeholder="Ex: My House"
+              value={locationInfo.name || ''}
+              onChange={handleInputChange}
+              required
+            />
           </div>
           <div className="flex items-center space-x-2 mt-4">
             <Checkbox
@@ -464,7 +431,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
               onCheckedChange={(checked: boolean) => setIsPrimary(checked)}
             />
             <Label htmlFor="is-primary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              Set as Primary (can be changed later)
+              Set as Primary
             </Label>
           </div>
         </div>
@@ -567,6 +534,7 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
             value={locationInfo.landmark || ''}
             onChange={handleInputChange}
             disabled={isGettingLocation}
+            required
           />
         </div>
       </div>

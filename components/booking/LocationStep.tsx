@@ -404,42 +404,15 @@ export function LocationStep() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                 <div className="space-y-2">
                   <Label htmlFor="location-name">Location Name</Label>
-                  <div className="space-y-2">
-                    <Select
-                      value={(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? (locationInfo.name || 'Home') : ((locationInfo.name !== undefined) ? 'Others' : 'Home')) as string}
-                      onValueChange={(val) => {
-                        if (val === 'Others') {
-                          // keep current name; user will specify below
-                          if (!locationInfo.name || ['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].includes(locationInfo.name)) {
-                            dispatch(setLocationInfo({ ...locationInfo, name: '' }));
-                          }
-                        } else {
-                          dispatch(setLocationInfo({ ...locationInfo, name: val }));
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a location type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Home">Home</SelectItem>
-                        <SelectItem value="Office/Workplace">Office/Workplace</SelectItem>
-                        <SelectItem value="Apartment">Apartment</SelectItem>
-                        <SelectItem value="Parent/Sibling/Cousin House">Parent/Sibling/Cousin House</SelectItem>
-                        <SelectItem value="Others">Others</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? false : true) && (
-                      <Input
-                        id="location-name"
-                        name="name"
-                        placeholder="Specify location name"
-                        value={locationInfo.name ?? ''}
-                        onChange={handleInputChange}
-                        disabled={isGettingLocation}
-                      />
-                    )}
-                  </div>
+                  <Input
+                    id="location-name"
+                    name="name"
+                    placeholder="Ex: My House"
+                    value={locationInfo.name ?? ''}
+                    onChange={handleInputChange}
+                    disabled={isGettingLocation}
+                    required
+                  />
                 </div>
                 <div className="flex items-center space-x-2 mt-auto">
                    <Checkbox
@@ -449,7 +422,7 @@ export function LocationStep() {
                     disabled={true}
                   />
                   <Label htmlFor="is-primary" className="text-sm font-medium leading-none">
-                    Set as Primary (can be changed later)
+                    Set as Primary
                   </Label>
                 </div>
               </div>
@@ -545,13 +518,14 @@ export function LocationStep() {
 
               <div className="space-y-2">
                 <Label htmlFor="landmark">Landmark</Label>
-                <Input
+                  <Input
                   id="landmark"
                   name="landmark"
                   placeholder="Ex: Beside Alfamart"
                   value={locationInfo.landmark ?? ''}
                   onChange={handleInputChange}
-                  disabled={isGettingLocation}
+                    disabled={isGettingLocation}
+                    required
                 />
               </div>
             </div>

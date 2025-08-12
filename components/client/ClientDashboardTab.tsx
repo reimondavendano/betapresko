@@ -893,7 +893,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                       const progressBar6Month = getProgressBarValue(device, 6);
                       const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
                       const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
-                      const disableEdit = modalStatusType === 'no-service';
+                      const disableEdit = modalStatusType === 'scheduled';
 
                       return (
                         <div key={device.id} className="border-b last:border-b-0 pb-3">

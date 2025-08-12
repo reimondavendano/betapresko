@@ -7,14 +7,13 @@ export const deviceApi = {
    * Creates a new device.
    * The 'due_X_months' fields are now GENERATED ALWAYS in the database.
    */
-  createDevice: async (newDeviceData: Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months'>): Promise<Device> => {
+  createDevice: async (newDeviceData: Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months' | 'appointment_id'>): Promise<Device> => {
     const { data, error } = await supabase
       .from('devices')
       .insert([
         {
           client_id: newDeviceData.client_id,
           location_id: newDeviceData.location_id,
-          appointment_id: newDeviceData.appointment_id || null, // Can be null initially
           name: newDeviceData.name,
           brand_id: newDeviceData.brand_id || null,
           ac_type_id: newDeviceData.ac_type_id || null,

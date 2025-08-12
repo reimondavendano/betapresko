@@ -29,6 +29,7 @@ import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
 import { appointmentApi } from '../../pages/api/appointments/appointmentApi';
 import { deviceApi } from '../../pages/api/device/deviceApi';
+import { appointmentDevicesApi } from '../../pages/api/appointment_devices/appointmentDevicesApi';
 import { Client, ClientLocation, Appointment, Device, UUID } from '../../types/database';
 
 interface ClientExistsModalProps {
@@ -94,6 +95,11 @@ export function ConfirmStep() {
   const [existingClientId, setExistingClientId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Local validation state for mobile/email
+  const [mobileDigits, setMobileDigits] = useState<string>(''); // 10-digit, no prefix
+  const [mobileError, setMobileError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const getServiceName = () => selectedService?.name || '';
   const getBrandName = (id: string | null) => {
     const brand = availableBrands.find(brand => brand.id === id);
@@ -109,6 +115,27 @@ export function ConfirmStep() {
   };
 
   const handleClientInfoChange = (field: string, value: string) => {
+    if (field === 'mobile') {
+      // Keep Redux untouched for mobile; manage locally with digits only
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+      setMobileDigits(digitsOnly);
+      if (digitsOnly.length !== 10) {
+        setMobileError('Mobile number must be 10 digits.');
+      } else {
+        setMobileError(null);
+      }
+      return;
+    }
+    if (field === 'email') {
+      dispatch(setClientInfo({ ...clientInfo, email: value }));
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+      if (value && !emailRegex.test(value)) {
+        setEmailError('Enter a valid email address.');
+      } else {
+        setEmailError(null);
+      }
+      return;
+    }
     dispatch(setClientInfo({ ...clientInfo, [field]: value }));
   };
 
@@ -117,7 +144,9 @@ export function ConfirmStep() {
     setError(null);
 
     try {
-      const existingClient = await clientApi.getClientByMobile(clientInfo.mobile);
+      // Build mobile number for DB: 0 + 10 digits
+      const finalMobile = mobileDigits.length === 10 ? `0${mobileDigits}` : '';
+      const existingClient = await clientApi.getClientByMobile(finalMobile);
 
       let currentClientId: UUID;
       let currentLocationId: UUID;
@@ -133,7 +162,7 @@ export function ConfirmStep() {
 
         const newClientData = {
           name: clientInfo.name,
-          mobile: clientInfo.mobile,
+          mobile: finalMobile,
           email: clientInfo.email || null,
           sms_opt_in: true,
           ref_id: referralId || null, // Add the ref_id here
@@ -152,7 +181,7 @@ export function ConfirmStep() {
         const newLocationData = {
           client_id: currentClientId,
           name: locationInfo.name || 'My Home',
-          is_primary: locationInfo.is_primary ?? false,
+          is_primary: true,
           address_line1: locationInfo.address_line1,
           street: locationInfo.street,
           landmark: locationInfo.landmark || null,
@@ -176,30 +205,36 @@ export function ConfirmStep() {
         amount: totalAmount,
         total_units: selectedDevices.reduce((sum, device) => sum + device.quantity, 0),
         notes: null,
-        status: 'confirmed', // Assume initial status is 'pending'
+        status: 'confirmed',
       };
       const createdAppointment: Appointment = await appointmentApi.createAppointment(newAppointmentData);
 
+      const createdDeviceIds: UUID[] = [];
       for (const device of selectedDevices) {
         const brandName = getBrandName(device.brand_id);
         for (let i = 0; i < device.quantity; i++) {
           const deviceName = `${brandName}-${i + 1}`;
-
           const lastCleaningDate = createdAppointment.status === 'completed' ? appointmentDate : '';
-
           const newDeviceData = {
             client_id: currentClientId,
             location_id: currentLocationId,
-            appointment_id: createdAppointment.id,
             name: deviceName,
             brand_id: device.brand_id,
             ac_type_id: device.ac_type_id,
             horsepower_id: device.horsepower_id,
             last_cleaning_date: lastCleaningDate,
           };
-          await deviceApi.createDevice(newDeviceData);
+          const createdDevice = await deviceApi.createDevice(newDeviceData as any);
+          createdDeviceIds.push(createdDevice.id);
         }
       }
+
+      // Create appointment_devices entries for all created devices
+      const appointmentDeviceRows = createdDeviceIds.map((deviceId) => ({
+        appointment_id: createdAppointment.id,
+        device_id: deviceId,
+      }));
+      await appointmentDevicesApi.createMany(appointmentDeviceRows as any);
 
       const dashboardUrl = `/client/${currentClientId}`;
       setClientDashboardUrl(dashboardUrl);
@@ -228,7 +263,8 @@ export function ConfirmStep() {
 
   const isFormValid =
     clientInfo.name.trim() !== '' &&
-    clientInfo.mobile.trim() !== '';
+    mobileDigits.length === 10 &&
+    (!clientInfo.email || !emailError);
 
   if (isCompleted) {
     return (
@@ -335,7 +371,7 @@ export function ConfirmStep() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="name">Full Name *</Label>
                     <Input
@@ -348,13 +384,23 @@ export function ConfirmStep() {
                   </div>
                   <div>
                     <Label htmlFor="mobile">Mobile Number *</Label>
-                    <Input
-                      id="mobile"
-                      value={clientInfo.mobile}
-                      onChange={(e) => handleClientInfoChange('mobile', e.target.value)}
-                      placeholder="+63 912 345 6789"
-                      required
-                    />
+                    <div className="flex">
+                      <Input
+                        className="w-20 mr-2 cursor-not-allowed bg-gray-100"
+                        value={'+63'}
+                        disabled
+                      />
+                      <Input
+                        id="mobile"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={mobileDigits}
+                        onChange={(e) => handleClientInfoChange('mobile', e.target.value)}
+                        placeholder="9123456789"
+                        required
+                      />
+                    </div>
+                    {mobileError && <p className="text-xs text-red-600 mt-1">{mobileError}</p>}
                   </div>
                 </div>
                 <div>
@@ -366,6 +412,7 @@ export function ConfirmStep() {
                     onChange={(e) => handleClientInfoChange('email', e.target.value)}
                     placeholder="you@example.com"
                   />
+                  {emailError && <p className="text-xs text-red-600 mt-1">{emailError}</p>}
                 </div>
               </div>
 

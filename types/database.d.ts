@@ -108,7 +108,6 @@ export interface Device {
   id: UUID;
   client_id: UUID;
   location_id: UUID;
-  appointment_id: UUID | null;
   name: string; // Added 'name' field for unique identifier
   brand_id: UUID | null;
   ac_type_id: UUID | null;
@@ -119,6 +118,13 @@ export interface Device {
   due_6_months: DateString | null; // GENERATED ALWAYS AS date
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+// New: appointment_devices join table
+export interface AppointmentDevice {
+  id: UUID;
+  appointment_id: UUID;
+  device_id: UUID;
 }
 
 // New: Interface for device_history table
@@ -232,6 +238,11 @@ export type Database = {
         Row: Device
         Insert: Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months'>
         Update: Partial<Omit<Device, 'id' | 'created_at' | 'updated_at' | 'due_3_months' | 'due_4_months' | 'due_6_months'>>
+      }
+      appointment_devices: {
+        Row: AppointmentDevice;
+        Insert: Omit<AppointmentDevice, 'id'>;
+        Update: Partial<Omit<AppointmentDevice, 'id'>>;
       }
       device_history: { // New: Table for device history
         Row: DeviceHistory;

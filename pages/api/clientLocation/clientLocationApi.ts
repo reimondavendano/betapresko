@@ -19,8 +19,8 @@ export const clientLocationApi = {
           name: newLocationData.name,
           address_line1: newLocationData.address_line1,
           street: newLocationData.street,
-          barangay: newLocationData.barangay_id,
-          city: newLocationData.city_id,
+          barangay_id: newLocationData.barangay_id,
+          city_id: newLocationData.city_id,
           landmark: newLocationData.landmark,
           is_primary: newLocationData.is_primary ? newLocationData.is_primary : false, // Default as per your database schema
         }
@@ -44,14 +44,37 @@ export const clientLocationApi = {
   getByClientId: async (clientId: UUID): Promise<ClientLocation[]> => {
     const { data, error } = await supabase
       .from('client_locations')
-      .select('*')
-      .eq('client_id', clientId); // Filter by the client_id
+      .select(`
+        id, client_id, name, is_primary, address_line1, street, landmark,
+        barangay_id, city_id, created_at, updated_at,
+        cities:city_id(name),
+        barangays:barangay_id(name)
+      `)
+      .eq('client_id', clientId);
 
     if (error) {
       console.error('Error fetching client locations:', error);
       throw new Error(error.message);
     }
-    return data as ClientLocation[];
+
+    // Enrich with human-readable names for viewing
+    const enriched = (data || []).map((row: any) => ({
+      id: row.id,
+      client_id: row.client_id,
+      name: row.name,
+      is_primary: row.is_primary,
+      address_line1: row.address_line1,
+      street: row.street,
+      landmark: row.landmark,
+      barangay_id: row.barangay_id,
+      barangay_name: row.barangays?.name ?? null,
+      city_id: row.city_id,
+      city_name: row.cities?.name ?? null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    })) as ClientLocation[];
+
+    return enriched;
   },
 
   /**

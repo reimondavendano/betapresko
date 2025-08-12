@@ -140,6 +140,14 @@ export function LocationStep() {
       setFilteredCities(allCities);
     }
   }, [citySearchTerm, allCities]);
+
+  // Default location name to Home if not set
+  useEffect(() => {
+    if (!locationInfo.name) {
+      dispatch(setLocationInfo({ ...locationInfo, name: 'Home' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Fetch barangays when a city is selected manually
   useEffect(() => {
@@ -220,10 +228,13 @@ export function LocationStep() {
           setCitySearchTerm(city.name);
           setBarangays(fetchedBarangays); // Update local state for the manual dropdown
           setLocationError(null);
+          // City valid: ensure user can pick barangay immediately
+          setIsGettingLocation(false);
         }
       } catch (error) {
         setLocationError('Could not get address.');
       } finally {
+        // no-op; already handled when city matched, but keep for safety
         setIsGettingLocation(false);
       }
     };
@@ -393,14 +404,42 @@ export function LocationStep() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                 <div className="space-y-2">
                   <Label htmlFor="location-name">Location Name</Label>
-                  <Input
-                    id="location-name"
-                    name="name"
-                    placeholder="e.g., My Home, Office"
-                    value={locationInfo.name ?? ''}
-                    onChange={handleInputChange}
-                    disabled={isGettingLocation}
-                  />
+                  <div className="space-y-2">
+                    <Select
+                      value={(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? (locationInfo.name || 'Home') : ((locationInfo.name !== undefined) ? 'Others' : 'Home')) as string}
+                      onValueChange={(val) => {
+                        if (val === 'Others') {
+                          // keep current name; user will specify below
+                          if (!locationInfo.name || ['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].includes(locationInfo.name)) {
+                            dispatch(setLocationInfo({ ...locationInfo, name: '' }));
+                          }
+                        } else {
+                          dispatch(setLocationInfo({ ...locationInfo, name: val }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a location type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Home">Home</SelectItem>
+                        <SelectItem value="Office/Workplace">Office/Workplace</SelectItem>
+                        <SelectItem value="Apartment">Apartment</SelectItem>
+                        <SelectItem value="Parent/Sibling/Cousin House">Parent/Sibling/Cousin House</SelectItem>
+                        <SelectItem value="Others">Others</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(['Home','Office/Workplace','Apartment','Parent/Sibling/Cousin House'].some(o => o.toLowerCase() === (locationInfo.name||'').toLowerCase()) ? false : true) && (
+                      <Input
+                        id="location-name"
+                        name="name"
+                        placeholder="Specify location name"
+                        value={locationInfo.name ?? ''}
+                        onChange={handleInputChange}
+                        disabled={isGettingLocation}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2 mt-auto">
                    <Checkbox
@@ -532,16 +571,16 @@ export function LocationStep() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center text-red-500">
-              <Frown className="mr-2" /> Location Not in Range
-            </DialogTitle>
-            <DialogDescription>
-              We couldn`t find your current city in our service area. Please select your location manually from the dropdowns.
-            </DialogDescription>
-          </DialogHeader>
-          <Button onClick={() => setIsModalOpen(false)}>Okay</Button>
+        <DialogContent className="sm:max-w-[425px] z-[9999]">
+            <DialogHeader>
+                <DialogTitle className="flex items-center text-red-500">
+                    <Frown className="mr-2" /> Location Not in Range
+                </DialogTitle>
+                <DialogDescription>
+                    We couldn`t find your current city in our service area. Please select your location manually from the dropdowns.
+                </DialogDescription>
+            </DialogHeader>
+            <Button onClick={() => setIsModalOpen(false)}>Okay</Button>
         </DialogContent>
       </Dialog>
     </div>

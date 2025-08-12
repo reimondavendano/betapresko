@@ -21,7 +21,7 @@ export const appointmentApi = {
           amount: newAppointmentData.amount,
           total_units: newAppointmentData.total_units,
           notes: newAppointmentData.notes || null, // Allow null
-          status: 'confirmed', // Explicitly set status to 'pending'
+          status: 'confirmed',
         }
       ])
       .select()
@@ -72,17 +72,28 @@ export const appointmentApi = {
 
     // If appointment is marked as completed, update all associated devices' last_cleaning_date
     if (status === 'completed') {
-      const { error: deviceUpdateError } = await supabase
-        .from('devices')
-        .update({ 
-          last_cleaning_date: appointment.appointment_date,
-          updated_at: new Date().toISOString()
-        })
+      // fetch device ids from appointment_devices join table
+      const { data: joins, error: joinError } = await supabase
+        .from('appointment_devices')
+        .select('device_id')
         .eq('appointment_id', appointmentId);
-
-      if (deviceUpdateError) {
-        console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
-        throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+      if (joinError) {
+        console.error(`Error fetching appointment_devices for appointment ${appointmentId}:`, joinError);
+        throw new Error(joinError.message);
+      }
+      const deviceIds = (joins ?? []).map((j: any) => j.device_id);
+      if (deviceIds.length > 0) {
+        const { error: deviceUpdateError } = await supabase
+          .from('devices')
+          .update({
+            last_cleaning_date: appointment.appointment_date,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', deviceIds);
+        if (deviceUpdateError) {
+          console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
+          throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+        }
       }
     }
 
@@ -98,7 +109,10 @@ export const appointmentApi = {
       .select(`
         *,
         clients:client_id(name, mobile),
-        client_locations:location_id(name, address_line1, barangay, city),
+        client_locations:location_id(name, address_line1, barangay_id, city_id,
+          cities:city_id(name),
+          barangays:barangay_id(name)
+        ),
         services:service_id(name)
       `)
       .order('appointment_date', { ascending: false });

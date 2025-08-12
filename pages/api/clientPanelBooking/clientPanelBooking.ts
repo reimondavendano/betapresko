@@ -25,9 +25,9 @@ export const clientPanelBooking = {
   /**
    * Handles the complete client booking process, including:
    * 1. Creating a new appointment.
-   * 2. Updating existing selected devices with the new appointment ID and last cleaning date.
-   * 3. Inserting any newly added devices.
-   * 4. Recording service history for all serviced (existing and new) devices.
+    * 2. Inserting any newly added devices (one row per unit, expanding quantity).
+    * 3. Creating join rows in appointment_devices linking the new appointment to each created device.
+    * 4. Recording service history for all serviced devices (future enhancement).
    *
    * @param bookingData The data required to create a new booking.
    * @returns The newly created Appointment object.
@@ -101,32 +101,52 @@ export const clientPanelBooking = {
       const newAppointmentId: UUID = newAppointment.id;
       const deviceHistoryRecords: Omit<DeviceHistory, 'id'>[] = [];
 
-      // Note: No existing devices to update - only handling new devices
-
-      // 2. Insert new devices
+      // 2. Insert new devices (expand quantity)
       // Note: Don't set last_cleaning_date until appointment status becomes 'completed'
+      let insertedDevices: Device[] = [];
       if (newDevices && newDevices.length > 0) {
-        const devicesToInsert = newDevices.map((deviceData: NewBookingDeviceData) => ({
-          client_id: clientId,
-          location_id: deviceData.location_id,
-          appointment_id: newAppointmentId, // Link to the new appointment
-          name: deviceData.name || 'New AC Unit',
-          brand_id: deviceData.brand_id,
-          ac_type_id: deviceData.ac_type_id,
-          horsepower_id: deviceData.horsepower_id,
-          last_cleaning_date: null, // Only set when appointment is completed
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
+        const nowIso = new Date().toISOString();
+        const devicesToInsert: any[] = [];
+        for (const deviceData of newDevices) {
+          const qty = Math.max(1, Number(deviceData.quantity || 1));
+          for (let i = 0; i < qty; i++) {
+            devicesToInsert.push({
+              client_id: clientId,
+              location_id: deviceData.location_id,
+              name: deviceData.name || 'New AC Unit',
+              brand_id: deviceData.brand_id,
+              ac_type_id: deviceData.ac_type_id,
+              horsepower_id: deviceData.horsepower_id,
+              last_cleaning_date: null,
+              created_at: nowIso,
+              updated_at: nowIso,
+            });
+          }
+        }
 
-        const { data: insertedDevices, error: insertNewError } = await supabase
-          .from('devices')
-          .insert(devicesToInsert)
-          .select();
+        if (devicesToInsert.length > 0) {
+          const { data, error: insertNewError } = await supabase
+            .from('devices')
+            .insert(devicesToInsert)
+            .select();
 
-        if (insertNewError) {
-          console.error('Supabase Error inserting new devices:', insertNewError);
-          throw new Error(`Failed to insert new devices: ${insertNewError.message}`);
+          if (insertNewError) {
+            console.error('Supabase Error inserting new devices:', insertNewError);
+            throw new Error(`Failed to insert new devices: ${insertNewError.message}`);
+          }
+          insertedDevices = (data || []) as Device[];
+        }
+      }
+
+      // 3. Create appointment_devices join rows for all inserted devices
+      if (insertedDevices.length > 0) {
+        const joins = insertedDevices.map((d) => ({ appointment_id: newAppointmentId, device_id: d.id }));
+        const { error: joinError } = await supabase
+          .from('appointment_devices')
+          .insert(joins);
+        if (joinError) {
+          console.error('Supabase Error inserting appointment_devices:', joinError);
+          throw new Error(`Failed to link devices to appointment: ${joinError.message}`);
         }
       }
 
@@ -159,25 +179,38 @@ export const clientPanelBooking = {
         throw new Error(appointmentError.message);
       }
 
-      // 2. Update all devices associated with this appointment to set last_cleaning_date
+      // 2. Update all devices linked via appointment_devices to set last_cleaning_date
       // This will automatically update due_3_months, due_4_months, and due_6_months via database triggers
-      const { data: updatedDevices, error: deviceUpdateError } = await supabase
-        .from('devices')
-        .update({ 
-          last_cleaning_date: appointment.appointment_date,
-          updated_at: new Date().toISOString()
-        })
-        .eq('appointment_id', appointmentId)
-        .select();
+      const { data: joins, error: joinError } = await supabase
+        .from('appointment_devices')
+        .select('device_id')
+        .eq('appointment_id', appointmentId);
+      if (joinError) {
+        console.error('Error fetching appointment_devices for completion:', joinError);
+        throw new Error(joinError.message);
+      }
+      const deviceIds = (joins ?? []).map((j: any) => j.device_id);
+      let updatedDevicesCount = 0;
+      if (deviceIds.length > 0) {
+        const { data: updatedDevices, error: deviceUpdateError } = await supabase
+          .from('devices')
+          .update({ 
+            last_cleaning_date: appointment.appointment_date,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', deviceIds)
+          .select();
 
-      if (deviceUpdateError) {
-        console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
-        throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+        if (deviceUpdateError) {
+          console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
+          throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+        }
+        updatedDevicesCount = updatedDevices?.length || 0;
       }
 
       return {
         appointment: appointment as Appointment,
-        updatedDevicesCount: updatedDevices?.length || 0
+        updatedDevicesCount
       };
     } catch (error) {
       console.error('Error during appointment completion process:', error);

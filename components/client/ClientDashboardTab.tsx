@@ -53,6 +53,7 @@ import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
 import { appointmentApi } from '../../pages/api/appointments/appointmentApi';
 import { deviceApi } from '../../pages/api/device/deviceApi';
+import { appointmentDevicesApi } from '../../pages/api/appointment_devices/appointmentDevicesApi';
 import { servicesApi } from '../../pages/api/service/servicesApi';
 import { brandsApi } from '../../pages/api/brands/brandsApi';
 import { acTypesApi } from '../../pages/api/types/acTypesApi';
@@ -176,21 +177,26 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         notes: 'Client panel booking',
       });
 
-      // Update each selected device to reference the new appointment and reset cleaning dates
-      const updates = selectedDevices.map(async (deviceId) => {
+      // Create join rows in appointment_devices for each selected device
+      const joinRows = selectedDevices.map((deviceId) => ({ appointment_id: newAppointment.id, device_id: deviceId }));
+      await appointmentDevicesApi.createMany(joinRows as any);
+
+      // Update device fields if needed (location/name/horsepower)
+      const deviceUpdatePromises = selectedDevices.map(async (deviceId) => {
         const device = devices.find(d => d.id === deviceId);
         if (!device) return Promise.resolve();
-        // We cannot pass due_* fields through the typed API; they will be recalculated by DB on completion.
-        return deviceApi.updateDevice(deviceId, {
-          appointment_id: newAppointment.id,
-          location_id: device.location_id || selectedLocationId,
-          ac_type_id: device.ac_type_id,
-          horsepower_id: device.horsepower_id,
-          brand_id: device.brand_id,
-          last_cleaning_date: null,
-        });
+        const updatePayload: Partial<Device> = {};
+        // Sync location to the selected location for this booking
+        if (selectedLocationId && device.location_id !== selectedLocationId) {
+          updatePayload.location_id = selectedLocationId;
+        }
+        // If there are other editable fields you want to sync on booking, include them here
+        // We keep name and horsepower as their current values (no change) unless you have a UI to edit in this flow
+        if (Object.keys(updatePayload).length > 0) {
+          await deviceApi.updateDevice(deviceId, updatePayload);
+        }
       });
-      await Promise.all(updates);
+      await Promise.all(deviceUpdatePromises);
 
       // Refresh local state
       const [fetchedDevices, fetchedAppointments] = await Promise.all([
@@ -256,8 +262,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       if (device.location_id !== locationId) return false;
 
       const today = new Date();
-      // Link only the appointment referenced by this device
-      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
+      const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
+      const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
 
       const hasLastCleaning = !!device.last_cleaning_date;
       const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
@@ -395,6 +401,27 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city_name || 'N/A';
   const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
 
+  // Build and cache device->appointment mapping from appointment_devices joins
+  const [deviceIdToAppointmentId, setDeviceIdToAppointmentId] = useState<Map<UUID, UUID>>(new Map());
+  useEffect(() => {
+    const buildLinks = async () => {
+      try {
+        if (devices.length === 0) {
+          setDeviceIdToAppointmentId(new Map());
+          return;
+        }
+        const links = await appointmentDevicesApi.getByDeviceIds(devices.map(d => d.id));
+        const map = new Map<UUID, UUID>();
+        (links || []).forEach((l: any) => map.set(l.device_id, l.appointment_id));
+        setDeviceIdToAppointmentId(map);
+      } catch (e) {
+        console.error('Failed to fetch appointment_devices links:', e);
+        setDeviceIdToAppointmentId(new Map());
+      }
+    };
+    buildLinks();
+  }, [devices]);
+
   const getDeviceCleaningStatus = () => {
     const statusByLocation = new Map<UUID, {
       location: ClientLocation,
@@ -440,8 +467,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         }
       }
       
-      // Link only the appointment referenced by this device
-      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
+      // Resolve appointment via appointment_devices map
+      const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
+      const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
 
       const hasLastCleaning = !!device.last_cleaning_date;
       const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
@@ -793,7 +821,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={Number(progressBar3Month)} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                              {/* FIX: Ensure a valid number is passed */}
+                              <Progress value={Number(progressBar3Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar3Month)}%
                               </span>
@@ -802,7 +831,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={Number(progressBar4Month)} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                              {/* FIX: Ensure a valid number is passed */}
+                              <Progress value={Number(progressBar4Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar4Month)}%
                               </span>
@@ -811,7 +841,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
                             <div className="flex items-center space-x-2">
-                              <Progress value={Number(progressBar6Month)} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                              {/* FIX: Ensure a valid number is passed */}
+                              <Progress value={Number(progressBar6Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
                               <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {Math.round(progressBar6Month)}%
                               </span>
@@ -860,7 +891,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                       const progressBar3Month = getProgressBarValue(device, 3);
                       const progressBar4Month = getProgressBarValue(device, 4);
                       const progressBar6Month = getProgressBarValue(device, 6);
-                      const deviceAppointment = appointments.find(appt => appt.id === device.appointment_id);
+                      const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
+                      const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
                       const disableEdit = modalStatusType === 'no-service';
 
                       return (
@@ -943,7 +975,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar3Month)} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
+                                      {/* FIX: Ensure a valid number is passed */}
+                                      <Progress value={Number(progressBar3Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar3Month)}%
                                       </span>
@@ -954,7 +987,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar4Month)} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
+                                      {/* FIX: Ensure a valid number is passed */}
+                                      <Progress value={Number(progressBar4Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar4Month)}%
                                       </span>
@@ -965,7 +999,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                                   <div>
                                     <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar6Month)} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
+                                      {/* FIX: Ensure a valid number is passed */}
+                                      <Progress value={Number(progressBar6Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
                                       <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
                                         {Math.round(progressBar6Month)}%
                                       </span>

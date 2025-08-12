@@ -590,7 +590,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
             <div className="text-center md:text-left mb-4 md:mb-0">
               <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city_id}, Philippines` : 'Philippines'}</p>
+              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city_name}, Philippines` : 'Philippines'}</p>
             </div>
             <div className="flex-shrink-0">
               <Image

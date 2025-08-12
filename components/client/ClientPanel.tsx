@@ -115,7 +115,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${activeTab === 'bookService' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'hover:bg-gray-100'}`}
               >
                 <Briefcase className="w-5 h-5 mr-3" />
-                Book A Service
+                Book Another Service 
               </Button>
               <Button
                 variant={activeTab === 'referFriend' ? 'default' : 'ghost'}

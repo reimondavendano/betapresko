@@ -1,5 +1,18 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
+export type AdminView =
+  | 'dashboard'
+  | 'bookings'
+  | 'custom_settings'
+  | 'brands'
+  | 'horsepower'
+  | 'types'
+  | 'cities'
+  | 'barangays'
+  | 'services'
+  | 'blocked_dates'
+  | 'clients'
+
 interface AdminState {
   isAuthenticated: boolean
   currentAdmin: {
@@ -7,6 +20,8 @@ interface AdminState {
     username: string
     email: string
     role: string
+    name?: string | null
+    address?: string | null
   } | null
   dashboardStats: {
     totalClients: number
@@ -17,6 +32,7 @@ interface AdminState {
   }
   loading: boolean
   error: string | null
+  activeView: AdminView
 }
 
 const initialState: AdminState = {
@@ -31,6 +47,7 @@ const initialState: AdminState = {
   },
   loading: false,
   error: null,
+  activeView: 'dashboard',
 }
 
 const adminSlice = createSlice({
@@ -52,9 +69,13 @@ const adminSlice = createSlice({
     setDashboardStats: (state, action: PayloadAction<AdminState['dashboardStats']>) => {
       state.dashboardStats = action.payload
     },
+    setActiveView: (state, action: PayloadAction<AdminView>) => {
+      state.activeView = action.payload
+    },
     logout: (state) => {
       state.isAuthenticated = false
       state.currentAdmin = null
+      state.activeView = 'dashboard'
     },
   },
 })
@@ -65,6 +86,7 @@ export const {
   setAuthenticated,
   setCurrentAdmin,
   setDashboardStats,
+  setActiveView,
   logout,
 } = adminSlice.actions
 

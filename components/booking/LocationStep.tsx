@@ -535,7 +535,7 @@ export function LocationStep() {
         <div className="flex justify-center mt-8">
           <Button
             onClick={handleNext}
-            disabled={!locationInfo.address_line1 || !locationInfo.barangay_id || !locationInfo.city_id}
+            disabled={!locationInfo.address_line1 || !locationInfo.barangay_id || !locationInfo.city_id || !locationInfo.name || !locationInfo.landmark}
             className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
           >
             Continue to Services

@@ -80,3 +80,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* react-big-calendar overrides */
+.rbc-time-view .rbc-timeslot-group {
+  min-height: 80px !important;
+}

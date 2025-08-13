@@ -39,7 +39,7 @@ export default function AdminBookings() {
   const [rawAppointments, setRawAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed'>('all')
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('all')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('today')
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 5
 

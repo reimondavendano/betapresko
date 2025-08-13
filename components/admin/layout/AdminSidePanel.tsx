@@ -19,7 +19,7 @@ const items: Array<{ key: AdminView; label: string; icon: React.ComponentType<an
   { key: 'bookings', label: 'Bookings', icon: CalendarCheck2 },
   { key: 'clients', label: 'Client Info', icon: Users2 },
   { key: 'master_data', label: 'Master Data', icon: Database },
-  { key: 'custom_settings', label: 'Custom Settings', icon: Settings },
+  { key: 'custom_settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AdminSidePanel() {

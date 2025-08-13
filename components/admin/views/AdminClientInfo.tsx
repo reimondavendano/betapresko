@@ -301,7 +301,7 @@ export default function AdminClientInfo() {
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-600">
-                          {client.discounted ? 'Enabled' : 'Disabled'}
+                          {client.discounted ? 'Yes' : 'No'}
                         </span>
                       </div>
                     </td>
@@ -332,7 +332,7 @@ export default function AdminClientInfo() {
                           <p className="font-semibold">Email: <span className="font-normal">{client.email}</span></p>
                           <p className="font-semibold">Phone: <span className="font-normal">{client.mobile}</span></p>
                           <p className="font-semibold">Points: <span className="font-normal">{client.points}</span></p>
-                          <p className="font-semibold">Discounted: <span className="font-normal">{client.discounted ? 'Enabled' : 'Disabled'}</span></p>
+                          <p className="font-semibold">Discounted: <span className="font-normal">{client.discounted ? 'Yes' : 'No'}</span></p>
                         </div>
                         
                         {/* Locations Section */}
@@ -434,7 +434,7 @@ export default function AdminClientInfo() {
                  <p><strong>Email:</strong> {selectedClient.email}</p>
                  <p><strong>Mobile:</strong> {selectedClient.mobile}</p>
                  <p><strong>Points:</strong> {selectedClient.points}</p>
-                 <p><strong>Discount Status:</strong> {selectedClient.discounted ? 'Enabled' : 'Disabled'}</p>
+                 <p><strong>Discount Status:</strong> {selectedClient.discounted ? 'Yes' : 'No'}</p>
                </div>
              </div>
            )}

@@ -39,6 +39,7 @@ export default function AdminBookings() {
   const [rawAppointments, setRawAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed'>('all')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 5
 
@@ -66,37 +67,6 @@ export default function AdminBookings() {
       if (!res.ok) throw new Error(json?.error || 'Failed to load appointments')
       const apptsAll = json.data as any[]
       setRawAppointments(apptsAll)
-
-      // Map to sidebar list + calendar events
-      const mapped: BookingEvent[] = []
-      let hourCursor = 9
-      apptsAll.forEach((a, idx) => {
-        const baseDate = new Date(a.appointment_date)
-        const start = new Date(baseDate)
-        start.setHours(hourCursor, 0, 0, 0)
-        const end = new Date(baseDate)
-        end.setHours(hourCursor + 1, 0, 0, 0)
-        hourCursor += 1
-        if (hourCursor >= 17) hourCursor = 9
-
-        const city = a.client_locations?.cities?.name || ''
-        const brgy = a.client_locations?.barangays?.name || ''
-        const date = a.appointment_date || ''
-        const title = `${a.clients?.name || 'Client'}`
-        mapped.push({
-          title,
-          start,
-          end,
-          status: a.status,
-          draggable: a.status === 'confirmed',
-          clientName: a.clients?.name || 'Client',
-          city,
-          barangay: brgy,
-          appointmentDate: date,
-          appointmentId: a.id,
-        })
-      })
-      setEvents(mapped)
       setLoading(false)
     } catch (e) {
       setLoading(false)
@@ -108,10 +78,20 @@ export default function AdminBookings() {
   useEffect(() => { loadAppointments(statusFilter) }, [statusFilter])
 
   // Reset page when filter changes or when data updates
-  useEffect(() => { setCurrentPage(1) }, [statusFilter, rawAppointments.length])
+  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, rawAppointments.length])
 
-  // Derived sorted and paginated appointments
-  const sortedAppointments = [...rawAppointments].sort((a, b) => {
+  // Derived filtered, sorted and paginated appointments
+  const filteredAppointments = rawAppointments.filter((a: any) => {
+    if (dateFilter === 'all') return true
+    const apptDate = moment(a.appointment_date).startOf('day')
+    const today = moment().startOf('day')
+    if (dateFilter === 'today') return apptDate.isSame(today)
+    if (dateFilter === 'incoming') return apptDate.isAfter(today)
+    if (dateFilter === 'previous') return apptDate.isBefore(today)
+    return true
+  })
+
+  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
     const aDate = new Date(a.appointment_date).getTime()
     const bDate = new Date(b.appointment_date).getTime()
     return bDate - aDate
@@ -119,6 +99,39 @@ export default function AdminBookings() {
   const totalPages = Math.max(1, Math.ceil(sortedAppointments.length / pageSize))
   const startIndex = (currentPage - 1) * pageSize
   const paginatedAppointments = sortedAppointments.slice(startIndex, startIndex + pageSize)
+
+  // Build calendar events from filtered appointments
+  useEffect(() => {
+    const mapped: BookingEvent[] = []
+    let hourCursor = 9
+    filteredAppointments.forEach((a: any) => {
+      const baseDate = new Date(a.appointment_date)
+      const start = new Date(baseDate)
+      start.setHours(hourCursor, 0, 0, 0)
+      const end = new Date(baseDate)
+      end.setHours(hourCursor + 1, 0, 0, 0)
+      hourCursor += 1
+      if (hourCursor >= 17) hourCursor = 9
+
+      const city = a.client_locations?.cities?.name || ''
+      const brgy = a.client_locations?.barangays?.name || ''
+      const date = a.appointment_date || ''
+      const title = `${a.clients?.name || 'Client'}`
+      mapped.push({
+        title,
+        start,
+        end,
+        status: a.status,
+        draggable: a.status === 'confirmed',
+        clientName: a.clients?.name || 'Client',
+        city,
+        barangay: brgy,
+        appointmentDate: date,
+        appointmentId: a.id,
+      })
+    })
+    setEvents(mapped)
+  }, [filteredAppointments])
 
   return (
     <div className="flex space-x-6 p-4">
@@ -129,18 +142,25 @@ export default function AdminBookings() {
           {/* Calendar navigation controls */}
         </div>
 
-        {/* Mini Calendar */}
+        {/* Status Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm">Filter:</span>
+          <span className="text-sm">Status:</span>
           <Button size="sm" variant={statusFilter==='all'?'default':'outline'} onClick={()=>setStatusFilter('all')}>All</Button>
           <Button size="sm" variant={statusFilter==='confirmed'?'default':'outline'} onClick={()=>setStatusFilter('confirmed')}>Confirmed</Button>
           <Button size="sm" variant={statusFilter==='completed'?'default':'outline'} onClick={()=>setStatusFilter('completed')}>Completed</Button>
+        </div>
+        {/* Date Filter */}
+        <div className="flex items-center gap-2">
           
+          <Button size="sm" variant={dateFilter==='all'?'default':'outline'} onClick={()=>setDateFilter('all')}>All</Button>
+          <Button size="sm" variant={dateFilter==='today'?'default':'outline'} onClick={()=>setDateFilter('today')}>Today</Button>
+          <Button size="sm" variant={dateFilter==='incoming'?'default':'outline'} onClick={()=>setDateFilter('incoming')}>Incoming</Button>
+          <Button size="sm" variant={dateFilter==='previous'?'default':'outline'} onClick={()=>setDateFilter('previous')}>Prev</Button>
         </div>
 
         {/* Appointment List */}
         <div>
-          <h4 className="text-lg font-semibold mb-3">Client Appointment List</h4>
+          {/* <h4 className="text-lg font-semibold mb-3">Client Appointment List</h4> */}
           <div className="space-y-3">
             {sortedAppointments.length === 0 && <div className="text-sm text-gray-500">No appointments</div>}
             {paginatedAppointments.map((a, idx) => {

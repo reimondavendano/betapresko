@@ -85,3 +85,19 @@
 .rbc-time-view .rbc-timeslot-group {
   min-height: 80px !important;
 }
+
+/* Ensure the entire event area can be clicked */
+.rbc-event-content, .rbc-event-label {
+  pointer-events: auto;
+}
+.rbc-event {
+  cursor: pointer;
+}
+
+/* Reduce draggable/resize handle area so side clicks still trigger select */
+.rbc-addons-dnd .rbc-event.rbc-dnd-movable .rbc-addons-dnd-resize-ns-anchor,
+.rbc-addons-dnd .rbc-event.rbc-dnd-movable .rbc-addons-dnd-resize-ew-anchor,
+.rbc-addons-dnd .rbc-event.rbc-dnd-movable .rbc-addons-dnd-resize-ns-anchor:before,
+.rbc-addons-dnd .rbc-event.rbc-dnd-movable .rbc-addons-dnd-resize-ew-anchor:before {
+  width: 4px !important;
+}

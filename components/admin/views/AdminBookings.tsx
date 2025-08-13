@@ -48,6 +48,9 @@ export default function AdminBookings() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null)
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<any | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
 
   const onEventDrop = ({ event, start, end }: any) => {
     const updatedEvents = events.map((existingEvent) => {
@@ -193,13 +196,9 @@ export default function AdminBookings() {
                           <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={async () => {
-                              await fetch('/api/admin/appointments', {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: a.id, status: 'completed' }),
-                              })
-                              loadAppointments('confirmed')
+                            onClick={() => {
+                              setConfirmTarget(a)
+                              setConfirmOpen(true)
                             }}
                           >
                             Mark as completed
@@ -274,6 +273,15 @@ export default function AdminBookings() {
             defaultView={Views.WEEK}
             views={[Views.MONTH, Views.WEEK, Views.DAY]}
             draggableAccessor={(e: any) => !!e.draggable}
+            onSelectEvent={(event: any) => {
+              const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
+              if (appt) {
+                const timeLabel = `${moment(event.start).format('hh:mm A')} - ${moment(event.end).format('hh:mm A')}`
+                setSelectedAppt(appt)
+                setSelectedTimeRange(timeLabel)
+                setDetailsOpen(true)
+              }
+            }}
             eventPropGetter={(event: any) => {
               const base = { className: '', style: {} as React.CSSProperties }
               if (event.status === 'confirmed') {
@@ -291,7 +299,7 @@ export default function AdminBookings() {
                 return (
                   <button
                     type="button"
-                    className="leading-tight text-left cursor-pointer w-full"
+                    className="leading-tight text-left cursor-pointer w-full h-full"
                     onClick={() => {
                       const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
                       if (appt) {
@@ -308,9 +316,16 @@ export default function AdminBookings() {
                 )
               },
             }}
-            resizable
+            onDoubleClickEvent={(event: any) => {
+              const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
+              if (appt) {
+                const timeLabel = `${moment(event.start).format('hh:mm A')} - ${moment(event.end).format('hh:mm A')}`
+                setSelectedAppt(appt)
+                setSelectedTimeRange(timeLabel)
+                setDetailsOpen(true)
+              }
+            }}
             onEventDrop={onEventDrop}
-            onEventResize={onEventDrop}
             // More props for customization
           />
         </div>
@@ -387,16 +402,9 @@ export default function AdminBookings() {
                 <div className="flex justify-end pt-2">
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={async () => {
-                      try {
-                        await fetch('/api/admin/appointments', {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ id: selectedAppt.id, status: 'completed' }),
-                        })
-                        setDetailsOpen(false)
-                        loadAppointments('confirmed')
-                      } catch (e) {}
+                    onClick={() => {
+                      setConfirmTarget(selectedAppt)
+                      setConfirmOpen(true)
                     }}
                   >
                     Mark as completed
@@ -405,6 +413,58 @@ export default function AdminBookings() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Complete Dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Completion</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm">
+            {`Set ${confirmTarget?.clients?.name || 'Client'} appointment to completed?`}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (confirmLoading) return
+                setConfirmOpen(false)
+                setConfirmTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={confirmLoading}
+              onClick={async () => {
+                if (!confirmTarget) return
+                try {
+                  setConfirmLoading(true)
+                  await fetch('/api/admin/appointments', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: confirmTarget.id, status: 'completed' }),
+                  })
+                  // Close dialogs
+                  setConfirmOpen(false)
+                  setConfirmTarget(null)
+                  if (selectedAppt && selectedAppt.id === confirmTarget.id) {
+                    setDetailsOpen(false)
+                  }
+                  // Reload with current status filter
+                  await loadAppointments(statusFilter)
+                } catch (e) {
+                } finally {
+                  setConfirmLoading(false)
+                }
+              }}
+            >
+              {confirmLoading ? 'Please wait...' : 'OK'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

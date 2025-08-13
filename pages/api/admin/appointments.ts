@@ -35,12 +35,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PATCH') {
-      const { id, status } = req.body as { id: string; status: 'completed' | 'confirmed' }
+      const { id, status, appointment_time, appointment_date } = req.body as {
+        id: string
+        status?: 'completed' | 'confirmed'
+        appointment_time?: string | null
+        appointment_date?: string | null
+      }
 
-      // Update appointment status and fetch fields needed for downstream logic
+      const updatePayload: any = { updated_at: new Date().toISOString() }
+      if (typeof status !== 'undefined') updatePayload.status = status
+      if (typeof appointment_time !== 'undefined') updatePayload.appointment_time = appointment_time
+      if (typeof appointment_date !== 'undefined') updatePayload.appointment_date = appointment_date
+
+      // Update appointment fields and fetch needed data for downstream logic
       const { data: appt, error: updateErr } = await supabase
         .from('appointments')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq('id', id)
         .select('id, status, appointment_date, client_id')
         .single()

@@ -298,7 +298,8 @@ INSERT INTO booking_settings (setting_key, setting_value, setting_type, descript
   ('window_type_price', '600', 'number', 'Window type base price'),
   ('split_type_price', '1000', 'number', 'Split type base price'),
   ('surcharge', '200', 'number', 'Additional surcharge'),
-  ('discount', '0', 'number', 'Default discount');
+  ('discount', '10', 'number', 'Default discount'),
+  ('family_discount', '20', 'number', 'Family discount');
 
 INSERT INTO admin_users (username, email, password_hash, role) VALUES 
   ('admin', 'admin@presko.com', '$2b$10$rQZ8kqVZ8qVZ8qVZ8qVZ8O', 'admin');

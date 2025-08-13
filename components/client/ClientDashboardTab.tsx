@@ -58,6 +58,7 @@ import { servicesApi } from '../../pages/api/service/servicesApi';
 import { brandsApi } from '../../pages/api/brands/brandsApi';
 import { acTypesApi } from '../../pages/api/types/acTypesApi';
 import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
+import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi';
 
 // Import types
 import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
@@ -93,6 +94,13 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allACTypes, setAllACTypes] = useState<ACType[]>([]);
   const [allHorsepowerOptions, setAllHorsepowerOptions] = useState<HorsepowerOption[]>([]);
+  const [customSettings, setCustomSettings] = useState<{ splitTypePrice: number; windowTypePrice: number; surcharge: number; discount: number; familyDiscount: number }>({
+    splitTypePrice: 0,
+    windowTypePrice: 0,
+    surcharge: 0,
+    discount: 0,
+    familyDiscount: 0
+  });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -164,7 +172,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       const serviceId = selectedService ? selectedService.id : (null as any);
 
       const totalUnits = selectedDevices.length;
-      const amount = 0; // Pricing is handled elsewhere; keep 0 for now
+      const pricing = calculateTotalPrice();
+      const amount = pricing.total;
 
       const newAppointment = await appointmentApi.createAppointment({
         client_id: client.id,
@@ -310,16 +319,19 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
-        const [servicesData, brandsData, acTypesData, hpOptionsData] = await Promise.all([
+        const [servicesData, brandsData, acTypesData, hpOptionsData, settingsData] = await Promise.all([
           servicesApi.getServices(),
           brandsApi.getBrands(),
           acTypesApi.getACTypes(),
           horsepowerApi.getHorsepowerOptions(),
+          customSettingsApi.getCustomSettings(),
         ]);
+        console.log('Fetched custom settings:', settingsData);
         setAllServices(servicesData);
         setAllBrands(brandsData);
         setAllACTypes(acTypesData);
         setAllHorsepowerOptions(hpOptionsData);
+        setCustomSettings(settingsData);
       } catch (err: any) {
         console.error('Error fetching lookup data:', err);
       }
@@ -582,6 +594,118 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     return 'bg-green-500';
   };
 
+  // Calculate device price based on AC type and horsepower
+  const calculateDevicePrice = (device: Device) => {
+    const acType = allACTypes.find(t => t.id === device.ac_type_id);
+    const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id);
+    
+    if (!acType || !horsepower) {
+      return 0;
+    }
+    
+    let basePrice = 0;
+    
+    // Get base price based on AC type
+    switch (acType.name.toLowerCase()) {
+      case 'split type':
+        basePrice = customSettings.splitTypePrice || 0;
+        break;
+      case 'window type':
+        basePrice = customSettings.windowTypePrice || 0;
+        break;
+      case 'u-shaped':
+        basePrice = customSettings.splitTypePrice || 0; // Using split type price for U-shaped
+        break;
+      default:
+        basePrice = 0;
+    }
+    
+    // Apply surcharge based on horsepower
+    const hpValue = horsepower.value;
+    let surcharge = 0;
+    
+    if (acType.name.toLowerCase() === 'split type' && hpValue > 2.00) {
+      surcharge = customSettings.surcharge || 0;
+    } else if (acType.name.toLowerCase() === 'u-shaped' && hpValue > 2.00) {
+      surcharge = customSettings.surcharge || 0;
+    } else if (acType.name.toLowerCase() === 'window type' && hpValue > 1.50) {
+      surcharge = customSettings.surcharge || 0;
+    }
+    
+    return basePrice + surcharge;
+  };
+
+  // Calculate discount for a client
+  const calculateDiscount = () => {
+    if (!client) return { value: 0, type: 'None' };
+
+    const discountValue = customSettings.discount || 0;
+    const familyDiscountValue = customSettings.familyDiscount || 0;
+
+    console.log('calculateDiscount debug:', {
+      clientDiscounted: client.discounted,
+      discountValue,
+      familyDiscountValue,
+      customSettings
+    });
+
+    if (client.discounted) {
+      // Client has discount enabled - compare discount and family_discount, choose bigger value
+      if (familyDiscountValue > discountValue) {
+        console.log('Using family discount:', familyDiscountValue);
+        return { 
+          value: familyDiscountValue, 
+          type: 'Family/Friends'
+        };
+      } else {
+        console.log('Using standard discount:', discountValue);
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      }
+    } else {
+      // Client has discount disabled - apply standard discount if available
+      if (discountValue > 0) {
+        console.log('Using standard discount (client not discounted):', discountValue);
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      } else {
+        console.log('No discount available');
+        return { value: 0, type: 'None' };
+      }
+    }
+  };
+
+  // Calculate total price for selected devices
+  const calculateTotalPrice = () => {
+    const subtotal = selectedDevices.reduce((total, deviceId) => {
+      const device = devices.find(d => d.id === deviceId);
+      return total + (device ? calculateDevicePrice(device) : 0);
+    }, 0);
+    
+    const discount = calculateDiscount();
+    const discountAmount = (subtotal * discount.value) / 100;
+    const total = subtotal - discountAmount;
+    
+    console.log('calculateTotalPrice debug:', {
+      subtotal,
+      discount,
+      discountAmount,
+      total,
+      clientDiscounted: client?.discounted
+    });
+    
+    return {
+      subtotal,
+      discount: discount.value,
+      discountAmount,
+      total
+    };
+  };
+
   return (
     <>
       <div className="space-y-8">
@@ -793,6 +917,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                   const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
                   const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
                   const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
+                  const devicePrice = calculateDevicePrice(device);
 
                   const progressBar3Month = getProgressBarValue(device, 3);
                   const progressBar4Month = getProgressBarValue(device, 4);
@@ -813,6 +938,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           >
                             {acName}
                           </label>
+                        </div>
+                        <div className="text-sm font-semibold text-blue-600">
+                          ₱{devicePrice.toLocaleString()}
                         </div>
                       </div>
 
@@ -857,6 +985,37 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                 <p className="text-gray-500">No devices found for this location.</p>
               )}
             </div>
+            
+            {/* Pricing Summary */}
+            {selectedDevices.length > 0 && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Pricing Summary</h3>
+                {(() => {
+                  const pricing = calculateTotalPrice();
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>₱{pricing.subtotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Discount ({pricing.discount}% - {(() => {
+                          const discount = calculateDiscount();
+                          return discount.type;
+                        })()}):</span>
+                        <span className="text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between font-bold">
+                          <span>Total Amount:</span>
+                          <span className="text-blue-600">₱{pricing.total.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             
             <div className="flex justify-end mt-6 space-x-4">
               <Button onClick={handleCloseBookingModal} variant="outline">

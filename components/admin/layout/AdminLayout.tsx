@@ -14,6 +14,7 @@ import AdminCity from '../views/AdminCity'
 import AdminBarangay from '../views/AdminBarangay'
 import AdminServices from '../views/AdminServices'
 import AdminBlockedDates from '../views/AdminBlockedDates'
+import AdminMasterData from '../views/AdminMasterData'
 import AdminClientInfo from '../views/AdminClientInfo'
 
 export default function AdminLayout() {
@@ -27,20 +28,8 @@ export default function AdminLayout() {
         return <AdminBookings />
       case 'clients':
           return <AdminClientInfo />
-      case 'brands':
-        return <AdminBrand />
-      case 'horsepower':
-        return <AdminHP />
-      case 'types':
-        return <AdminTypes />
-      case 'cities':
-        return <AdminCity />
-      case 'barangays':
-        return <AdminBarangay />
-      case 'services':
-        return <AdminServices />
-      case 'blocked_dates':
-        return <AdminBlockedDates />
+      case 'master_data':
+        return <AdminMasterData />
       case 'custom_settings':
           return <AdminCustomSettings />
      

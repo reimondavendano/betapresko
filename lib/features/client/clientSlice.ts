@@ -66,6 +66,7 @@ const initialState: ClientState = {
       windowTypePrice: 0,
       surcharge: 0,
       discount: 0,
+      familyDiscount: 0,
     },
   },
 }

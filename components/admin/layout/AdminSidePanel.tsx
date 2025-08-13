@@ -8,14 +8,9 @@ import {
   LayoutDashboard,
   Settings,
   CalendarCheck2,
-  LockKeyhole,
   Blocks,
-  Building2,
-  MapPinHouse,
-  Wrench,
-  Asterisk,
-  Box,
   Users2,
+  Database,
   Power
 } from 'lucide-react'
 
@@ -23,13 +18,7 @@ const items: Array<{ key: AdminView; label: string; icon: React.ComponentType<an
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'bookings', label: 'Bookings', icon: CalendarCheck2 },
   { key: 'clients', label: 'Client Info', icon: Users2 },
-  { key: 'brands', label: 'Brands', icon: Box },
-  { key: 'horsepower', label: 'Horsepower', icon: Wrench },
-  { key: 'types', label: 'Types', icon: Asterisk },
-  { key: 'cities', label: 'Cities', icon: Building2 },
-  { key: 'barangays', label: 'Barangays', icon: MapPinHouse },
-  { key: 'services', label: 'Services', icon: Settings },
-  { key: 'blocked_dates', label: 'Blocked Dates', icon: Blocks },
+  { key: 'master_data', label: 'Master Data', icon: Database },
   { key: 'custom_settings', label: 'Custom Settings', icon: Settings },
 ]
 

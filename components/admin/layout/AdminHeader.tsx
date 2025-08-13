@@ -12,13 +12,7 @@ export default function AdminHeader() {
     dashboard: 'Dashboard',
     bookings: 'Bookings',
     clients: 'Client Info',
-    brands: 'Brands',
-    horsepower: 'Horsepower',
-    types: 'Types',
-    cities: 'Cities',
-    barangays: 'Barangays',
-    services: 'Services',
-    blocked_dates: 'Blocked Dates',
+    master_data: 'Master Data',
     custom_settings: 'Custom Settings',
   }
   const headerTitle = viewLabelMap[activeView] || 'Dashboard'

@@ -34,7 +34,7 @@ interface Step2SelectDevicesProps {
 
 export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) {
   const dispatch = useDispatch();
-  const { locations } = useSelector((state: RootState) => state.client);
+  const { locations, currentClient } = useSelector((state: RootState) => state.client);
   const {
     newDevices,
     selectedService,
@@ -106,16 +106,50 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
     return total;
   };
 
+  // Calculate discount based on client's discounted status
+  const calculateDiscount = () => {
+    if (!currentClient) return { value: 0, type: 'None' };
+
+    const discountValue = customPricingSettings.discount || 0;
+    const familyDiscountValue = customPricingSettings.familyDiscount || 0;
+
+    if (currentClient.discounted) {
+      // Client has discount enabled - compare discount and family_discount, choose bigger value
+      if (familyDiscountValue > discountValue) {
+        return { 
+          value: familyDiscountValue, 
+          type: 'Family/Friends'
+        };
+      } else {
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      }
+    } else {
+      // Client has discount disabled - apply standard discount if available
+      if (discountValue > 0) {
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      } else {
+        return { value: 0, type: 'None' };
+      }
+    }
+  };
+
   const totalUnits = newDevices.reduce((sum, d) => sum + d.quantity, 0);
 
   // This useEffect will run whenever newDevices changes to update the totals
   useEffect(() => {
     const newSubtotal = calculateSubtotal();
-    const discountAmount = newSubtotal * (customPricingSettings.discount / 100);
+    const discount = calculateDiscount();
+    const discountAmount = newSubtotal * (discount.value / 100);
     const newTotal = newSubtotal - discountAmount;
     setSubtotal(newSubtotal);
     dispatch(setBookingTotalAmount(newTotal));
-  }, [newDevices, selectedService, customPricingSettings, availableACTypes, availableHorsepowerOptions, dispatch]);
+  }, [newDevices, selectedService, customPricingSettings, availableACTypes, availableHorsepowerOptions, currentClient, dispatch]);
 
   const handleAddDevice = () => {
     dispatch(addNewDevice({
@@ -317,14 +351,22 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
           <span>Subtotal ({totalUnits} units)</span>
           <span>₱{subtotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between text-green-600 font-medium">
-          <span>Discount ({customPricingSettings.discount}%)</span>
-          <span>-₱{(subtotal * (customPricingSettings.discount / 100)).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-xl sm:text-2xl font-bold text-gray-800 border-t pt-3 mt-3">
-          <span>Total Amount</span>
-          <span>₱{(subtotal - subtotal * (customPricingSettings.discount / 100)).toFixed(2)}</span>
-        </div>
+        {(() => {
+          const discount = calculateDiscount();
+          const discountAmount = subtotal * (discount.value / 100);
+          return (
+            <>
+              <div className="flex justify-between text-green-600 font-medium">
+                <span>Discount ({discount.value}% - {discount.type})</span>
+                <span>-₱{discountAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xl sm:text-2xl font-bold text-gray-800 border-t pt-3 mt-3">
+                <span>Total Amount</span>
+                <span>₱{(subtotal - discountAmount).toFixed(2)}</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Navigation Buttons */}
@@ -363,7 +405,7 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
               <div key={loc.id} className="flex items-center space-x-2 border rounded-md p-3 hover:bg-gray-50">
                 <RadioGroupItem value={loc.id} id={`loc-${loc.id}`} />
                 <Label htmlFor={`loc-${loc.id}`} className="font-normal cursor-pointer">
-                  {`${loc.name}, ${loc.address_line1}, ${loc.barangay_name}, ${loc.city_name}`}
+                  {`${loc.name}, ${loc.address_line1}, ${loc.barangay_id}, ${loc.city_id}`}
                 </Label>
               </div>
             ))}

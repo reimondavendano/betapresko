@@ -164,6 +164,7 @@ export interface ParsedCustomSettings {
   windowTypePrice: number;
   surcharge: number;
   discount: number;
+  familyDiscount: number;
 }
 
 export interface AdminUser {

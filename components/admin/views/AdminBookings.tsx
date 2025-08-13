@@ -57,14 +57,29 @@ export default function AdminBookings() {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([])
 
-  const onEventDrop = ({ event, start, end }: any) => {
-    const updatedEvents = events.map((existingEvent) => {
-      return existingEvent.title === event.title
+  const onEventDrop = async ({ event, start, end }: any) => {
+    // Update UI immediately
+    const updatedEvents = events.map((existingEvent) => (
+      existingEvent === event
         ? { ...existingEvent, start: new Date(start), end: new Date(end) }
-        : existingEvent;
-    });
-    setEvents(updatedEvents);
-    // You would also need to call an API to update the booking on the backend
+        : existingEvent
+    ))
+    setEvents(updatedEvents)
+
+    // Persist to backend: if this is a real appointment, set appointment_date and appointment_time
+    if (event.appointmentId) {
+      const newDate = moment(start).format('YYYY-MM-DD')
+      const newTime = moment(start).format('hh:mm A')
+      try {
+        await fetch('/api/admin/appointments', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: event.appointmentId, appointment_date: newDate, appointment_time: newTime })
+        })
+      } catch (e) {
+        // ignore for now
+      }
+    }
   };
 
   const loadAppointments = async (filter: 'all' | 'confirmed' | 'completed') => {
@@ -123,12 +138,20 @@ export default function AdminBookings() {
     let hourCursor = 9
     filteredAppointments.forEach((a: any) => {
       const baseDate = new Date(a.appointment_date)
-      const start = new Date(baseDate)
-      start.setHours(hourCursor, 0, 0, 0)
-      const end = new Date(baseDate)
-      end.setHours(hourCursor + 1, 0, 0, 0)
-      hourCursor += 1
-      if (hourCursor >= 17) hourCursor = 9
+      let start = new Date(baseDate)
+      let end = new Date(baseDate)
+
+      // If appointment_time exists, honor it; else use rolling 9am + 1h blocks
+      if (a.appointment_time) {
+        const parsed = moment(a.appointment_time, 'hh:mm A')
+        start.setHours(parsed.hour(), parsed.minute(), 0, 0)
+        end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
+      } else {
+        start.setHours(hourCursor, 0, 0, 0)
+        end.setHours(hourCursor + 1, 0, 0, 0)
+        hourCursor += 1
+        if (hourCursor >= 17) hourCursor = 9
+      }
 
       const city = a.client_locations?.cities?.name || ''
       const brgy = a.client_locations?.barangays?.name || ''

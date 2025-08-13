@@ -4,6 +4,7 @@ export type AdminView =
   | 'dashboard'
   | 'bookings'
   | 'custom_settings'
+  | 'master_data'
   | 'brands'
   | 'horsepower'
   | 'types'

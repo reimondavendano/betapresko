@@ -63,7 +63,7 @@ const calculateDevicePrice = (acTypeId: UUID | null, horsepowerId: UUID | null, 
 export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingProps) {
   const dispatch = useDispatch();
   const { appointmentDate, totalAmount, availableBlockedDates, selectedService, selectedDevices, newDevices, customPricingSettings, availableACTypes, availableHorsepowerOptions, availableBrands } = useSelector((state: RootState) => state.client.booking);
-  const allDevices = useSelector((state: RootState) => state.client.devices);
+  const { devices: allDevices, currentClient } = useSelector((state: RootState) => state.client);
   
   // State for managing the blocked date modal
   const [showBlockedModal, setShowBlockedModal] = useState(false);
@@ -85,8 +85,42 @@ export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingPro
     return total;
   };
   
+  // Calculate discount based on client's discounted status
+  const calculateDiscount = () => {
+    if (!currentClient) return { value: 0, type: 'None' };
+
+    const discountValue = customPricingSettings.discount || 0;
+    const familyDiscountValue = customPricingSettings.familyDiscount || 0;
+
+    if (currentClient.discounted) {
+      // Client has discount enabled - compare discount and family_discount, choose bigger value
+      if (familyDiscountValue > discountValue) {
+        return { 
+          value: familyDiscountValue, 
+          type: 'Family/Friends'
+        };
+      } else {
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      }
+    } else {
+      // Client has discount disabled - apply standard discount if available
+      if (discountValue > 0) {
+        return { 
+          value: discountValue, 
+          type: 'Standard'
+        };
+      } else {
+        return { value: 0, type: 'None' };
+      }
+    }
+  };
+
   const subtotal = calculateSubtotal();
-  const discountAmount = subtotal * (customPricingSettings.discount / 100);
+  const discount = calculateDiscount();
+  const discountAmount = subtotal * (discount.value / 100);
   const totalUnits = selectedDevices.length + newDevices.reduce((sum, d) => sum + d.quantity, 0);
 
   // Function to determine if a date is disabled in the calendar (for visual indication, not click prevention)
@@ -234,7 +268,7 @@ export function Step3ConfirmBooking({ onBack, onSubmit }: Step3ConfirmBookingPro
                 <span>₱{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-green-600 font-medium">
-                <span>Discount ({customPricingSettings.discount}%)</span>
+                <span>Discount ({discount.value}% - {discount.type})</span>
                 <span>-₱{discountAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-2xl font-bold text-gray-800 border-t pt-3 mt-3">

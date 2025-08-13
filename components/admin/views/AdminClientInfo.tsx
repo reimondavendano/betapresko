@@ -307,13 +307,13 @@ export default function AdminClientInfo() {
                     </td>
                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                        <div className="flex items-center gap-2">
-                         <button 
+                         {/* <button 
                            className="text-gray-400 hover:text-blue-600 transition-colors"
                            onClick={(e) => handleButtonClick(client, 'edit', e)}
                            title="Edit client"
                          >
                            <Edit size={18} />
-                         </button>
+                         </button> */}
                          <button 
                            className="text-gray-400 hover:text-green-600 transition-colors"
                            onClick={(e) => handleButtonClick(client, 'view', e)}

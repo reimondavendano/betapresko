@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { AirVent } from 'lucide-react';
+import { blockedDatesApi } from '@/pages/api/dates/blockedDatesApi'
+import type { BlockedDate } from '@/types/database'
 
 const localizer = momentLocalizer(moment);
 
@@ -26,13 +28,15 @@ export default function AdminBookings() {
     title: string
     start: Date
     end: Date
-    status: 'confirmed' | 'completed'
+    status: 'confirmed' | 'completed' | 'blocked'
     draggable?: boolean
     clientName?: string
     city?: string
     barangay?: string
     appointmentDate?: string
     appointmentId?: string
+    blockedName?: string
+    blockedReason?: string | null
   }
 
   const [events, setEvents] = useState<BookingEvent[]>([]);
@@ -51,6 +55,7 @@ export default function AdminBookings() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([])
 
   const onEventDrop = ({ event, start, end }: any) => {
     const updatedEvents = events.map((existingEvent) => {
@@ -76,9 +81,18 @@ export default function AdminBookings() {
     }
   }
 
+  const loadBlockedDates = async () => {
+    try {
+      const list = await blockedDatesApi.getBlockedDates()
+      setBlockedDates(list)
+    } catch (e) {
+      // noop
+    }
+  }
+
   // initial load and on filter/view change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAppointments(statusFilter) }, [statusFilter])
+  useEffect(() => { loadAppointments(statusFilter); loadBlockedDates() }, [statusFilter])
 
   // Reset page when filter changes or when data updates
   useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, rawAppointments.length])
@@ -133,8 +147,29 @@ export default function AdminBookings() {
         appointmentId: a.id,
       })
     })
+
+    // Add blocked dates as full-day red events covering 12:00 AM to 11:59 PM
+    blockedDates.forEach((b) => {
+      const from = moment(b.from_date).startOf('day')
+      const to = moment(b.to_date).startOf('day')
+      const day = from.clone()
+      while (day.isSameOrBefore(to)) {
+        const start = day.clone().startOf('day').toDate()
+        const end = day.clone().endOf('day').toDate()
+        mapped.push({
+          title: `Blocked: ${b.name}`,
+          start,
+          end,
+          status: 'blocked',
+          draggable: false,
+          blockedName: b.name,
+          blockedReason: b.reason,
+        })
+        day.add(1, 'day')
+      }
+    })
     setEvents(mapped)
-  }, [filteredAppointments])
+  }, [filteredAppointments, blockedDates])
 
   return (
     <div className="flex space-x-6 p-4">
@@ -288,6 +323,8 @@ export default function AdminBookings() {
                 base.style = { backgroundColor: '#f59e0b', borderColor: '#d97706', color: 'white' }
               } else if (event.status === 'completed') {
                 base.style = { backgroundColor: '#16a34a', borderColor: '#15803d', color: 'white' }
+              } else if (event.status === 'blocked') {
+                base.style = { backgroundColor: '#dc2626', borderColor: '#b91c1c', color: 'white' }
               }
               return base
             }}
@@ -296,6 +333,17 @@ export default function AdminBookings() {
                 const dateLabel = moment(event.appointmentDate || event.start).format('MMMM DD, YYYY')
                 const timeLabel = `${moment(event.start).format('hh:mm A')} - ${moment(event.end).format('hh:mm A')}`
                 const location = [event.city, event.barangay].filter(Boolean).join(', ')
+                if (event.status === 'blocked') {
+                  return (
+                    <div className="leading-tight text-left w-full h-full">
+                      <div className="font-semibold text-[11px]">Blocked: {event.blockedName}</div>
+                      {event.blockedReason && (
+                        <div className="text-[10px] opacity-90">{event.blockedReason}</div>
+                      )}
+                      <div className="text-[10px] opacity-90">{dateLabel} [{timeLabel}]</div>
+                    </div>
+                  )
+                }
                 return (
                   <button
                     type="button"

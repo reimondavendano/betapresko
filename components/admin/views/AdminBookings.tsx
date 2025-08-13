@@ -286,6 +286,7 @@ export default function AdminBookings() {
             <div className="ml-4 flex items-center gap-3 text-xs">
               <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-orange-500 inline-block"></span> Confirmed</span>
               <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-green-600 inline-block"></span> Completed</span>
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-red-600 inline-block"></span> Blocked</span>
             </div>
           </div>
           <div className="flex space-x-2">

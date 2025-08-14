@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { User, LayoutDashboard, Briefcase, Gift, Menu, X, Home } from 'lucide-react'; // Added Home icon
+import { User, LayoutDashboard, Briefcase, Gift, Menu, X, Home, Bell } from 'lucide-react'; // Added Home and Bell icons
 
 // Import UI components
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,54 @@ interface ClientPanelProps {
 export default function ClientPanel({ params }: ClientPanelProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [clientName, setClientName] = useState('');
   const clientId = params?.id;
 
   const handleTabClick = (tabName: string) => {
     setActiveTab(tabName);
     setIsMobileMenuOpen(false);
   };
+
+  // Fetch client name when component mounts
+  useEffect(() => {
+    const fetchClientName = async () => {
+      if (!clientId) return;
+      
+      console.log('Fetching client name for ID:', clientId);
+      
+      try {
+        // Try to get client name from the client API endpoint
+        const response = await fetch(`/api/clients/${clientId}`);
+        console.log('Client API response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Client API data:', data);
+          if (data.name) {
+            setClientName(data.name);
+            console.log('Set client name to:', data.name);
+          }
+        } else {
+          console.log('Client API failed, trying admin endpoint...');
+          // Fallback: try to search by ID in the admin endpoint
+          const searchResponse = await fetch(`/api/admin/client?search=${clientId}&page=1&pageSize=1`);
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            if (searchData.data && searchData.data.length > 0) {
+              setClientName(searchData.data[0].name);
+              console.log('Set client name from admin API to:', searchData.data[0].name);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching client name:', error);
+        // Set a fallback name if both API calls fail
+        setClientName('Unknown Client');
+      }
+    };
+
+    fetchClientName();
+  }, [clientId]);
 
   if (!clientId) {
     return (
@@ -58,7 +100,10 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
             </div>
-            <span className="hidden lg:block text-sm text-gray-500">Client ID: {clientId.substring(0, 8)}...</span>
+            <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500">
+              <Bell className="w-6 h-6 text-blue-500" />
+              <span>Client: {clientName || 'Loading...'}</span>
+            </div>
           </div>
         </div>
       </header>

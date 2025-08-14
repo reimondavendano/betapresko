@@ -12,11 +12,11 @@ import AdminBlockedDates from './AdminBlockedDates'
 
 export default function AdminMasterData() {
   return (
-    <div className="shadow-sm p-4">
+    <div>
       <Tabs defaultValue="brands" className="w-full h-full" orientation="vertical">
         <div className="grid grid-cols-12 gap-4 h-full">
           <div className="col-span-12 md:col-span-3 h-full">
-            <div className="h-full rounded-xl p-2 bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] shadow">
+            <div className="h-full rounded-xl p-2 bg-gradient-to-br from-gray-200 via-[#8FB6BA] to-[#fff] shadow">
             <TabsList className="flex md:flex-col gap-2 w-full bg-transparent p-0 h-full md:h-auto overflow-auto">
               <TabsTrigger value="brands" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
                 <Box size={18} /> Brands

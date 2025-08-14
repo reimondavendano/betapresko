@@ -96,7 +96,7 @@ export default function AdminBlockedDates() {
   return (
     <div className="p-4">
       {/* Header section */}
-      <div className="flex items-center justify-between p-4 bg-blue-600 text-white rounded-t-lg">
+      <div className="flex items-center justify-between p-4 bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg">
         <h1 className="text-2xl font-bold">Manage Blocked Dates</h1>
         <div className="flex space-x-2">
           <button

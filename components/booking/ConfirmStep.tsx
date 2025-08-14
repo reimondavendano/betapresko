@@ -30,6 +30,7 @@ import { clientLocationApi } from '../../pages/api/clientLocation/clientLocation
 import { appointmentApi } from '../../pages/api/appointments/appointmentApi';
 import { deviceApi } from '../../pages/api/device/deviceApi';
 import { appointmentDevicesApi } from '../../pages/api/appointment_devices/appointmentDevicesApi';
+import { notificationApi } from '../../pages/api/notification/notificationApi';
 import { Client, ClientLocation, Appointment, Device, UUID } from '../../types/database';
 
 interface ClientExistsModalProps {
@@ -235,6 +236,37 @@ export function ConfirmStep() {
         device_id: deviceId,
       }));
       await appointmentDevicesApi.createMany(appointmentDeviceRows as any);
+
+      // Create notification entry
+      try {
+        // Check if client has referral (ref_id is not null)
+        // For new clients, check clientInfo.ref_id, for existing clients, we'll need to fetch their data
+        let isReferral = false;
+        
+        if (existingClient) {
+          // For existing clients, we need to check their ref_id from the database
+          // Since we don't have the full client data here, we'll set it to false for now
+          // You can enhance this by fetching the full client data if needed
+          isReferral = false;
+        } else {
+          // For new clients, check if they came through a referral
+          isReferral = Boolean(clientInfo.ref_id && clientInfo.ref_id.trim() !== '');
+        }
+        
+        const notificationData = {
+          client_id: currentClientId,
+          send_to_admin: true,
+          send_to_client: false,
+          is_referral: isReferral,
+          date: appointmentDate,
+        };
+        
+        await notificationApi.createNotification(notificationData);
+        console.log('Notification created successfully');
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Don't fail the entire booking if notification creation fails
+      }
 
       const dashboardUrl = `/client/${currentClientId}`;
       setClientDashboardUrl(dashboardUrl);

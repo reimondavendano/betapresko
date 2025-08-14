@@ -138,6 +138,17 @@ export interface DeviceHistory {
   created_at: Timestamp;
 }
 
+// New: Interface for the notifications table
+export interface Notification {
+  id: UUID;
+  client_id: UUID;
+  send_to_admin: boolean;
+  send_to_client: boolean;
+  is_referral: boolean;
+  date: DateString;
+  created_at: Timestamp;
+}
+
 export interface BlockedDate {
   id: UUID;
   name: string;
@@ -259,6 +270,11 @@ export type Database = {
         Row: CustomSetting
         Insert: Omit<CustomSetting, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<CustomSetting, 'id' | 'created_at' | 'updated_at'>>
+      }
+      notifications: {
+        Row: Notification
+        Insert: Omit<Notification, 'id' | 'created_at'>
+        Update: Partial<Omit<Notification, 'id' | 'created_at'>>
       }
       admin_users: {
         Row: AdminUser

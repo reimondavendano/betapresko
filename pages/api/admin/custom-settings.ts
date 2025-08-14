@@ -4,6 +4,19 @@ import { supabase, handleSupabaseError } from '@/lib/supabase'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
+      // Check for a new query parameter to determine if we should get all settings
+      if (req.query.getAll === 'true') {
+        const { data, error } = await supabase
+          .from('custom_settings')
+          .select('*')
+          .order('setting_category', { ascending: true })
+          .order('setting_key', { ascending: true })
+
+        if (error) return handleSupabaseError(error, res)
+        return res.status(200).json({ data, total: data.length })
+      }
+
+      // Existing paginated GET request logic
       const page = Number(req.query.page || '1')
       const pageSize = Number(req.query.pageSize || '10')
       const search = String(req.query.search || '').trim()

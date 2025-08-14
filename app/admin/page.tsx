@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [hydrating, setHydrating] = useState(true)
 
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('presko_admin') : null
+    const stored = typeof window !== 'undefined' ? sessionStorage.getItem('presko_admin') : null
     if (stored) {
       try {
         const parsed = JSON.parse(stored)

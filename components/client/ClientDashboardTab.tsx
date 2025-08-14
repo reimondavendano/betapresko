@@ -59,6 +59,7 @@ import { brandsApi } from '../../pages/api/brands/brandsApi';
 import { acTypesApi } from '../../pages/api/types/acTypesApi';
 import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
 import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi';
+import { notificationApi } from '../../pages/api/notification/notificationApi';
 
 // Import types
 import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID } from '../../types/database';
@@ -206,6 +207,40 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         }
       });
       await Promise.all(deviceUpdatePromises);
+
+      // Create notification entry
+      try {
+        // Check if client has referral (ref_id is not null)
+        // For new clients, check clientInfo.ref_id, for existing clients, we'll need to fetch their data
+        let isReferral = false;
+        
+       // Check if a referralId exists in sessionStorage
+        const referralId = sessionStorage.getItem('referralId');
+        if (referralId && referralId.trim() !== '') {
+          isReferral = true;
+        }
+        
+        const notificationData = {
+          client_id: client.id,
+          send_to_admin: true,
+          send_to_client: false,
+          is_referral: isReferral,
+          date: appointmentDate,
+        };
+        
+        await notificationApi.createNotification(notificationData);
+        console.log('Notification created successfully');
+
+        // If a referral ID was used, remove it from session storage
+        if (referralId) {
+          sessionStorage.removeItem('referralId');
+          console.log('[SESSION] Referral ID removed from session storage.');
+        }
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Don't fail the entire booking if notification creation fails
+      }
+
 
       // Refresh local state
       const [fetchedDevices, fetchedAppointments] = await Promise.all([

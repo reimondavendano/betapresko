@@ -56,7 +56,7 @@ export default function AdminSidePanel() {
           variant="secondary"
           className="w-full bg-white text-orange-600 hover:bg-white/90"
           onClick={() => {
-            localStorage.removeItem('presko_admin');
+            sessionStorage.removeItem('presko_admin');
             dispatch(logout());
           }}
         >

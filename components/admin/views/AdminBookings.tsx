@@ -498,44 +498,67 @@ export default function AdminBookings() {
             {`Set ${confirmTarget?.clients?.name || 'Client'} appointment to completed?`}
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (confirmLoading) return
-                setConfirmOpen(false)
-                setConfirmTarget(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
+          <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               disabled={confirmLoading}
               onClick={async () => {
                 if (!confirmTarget) return
                 try {
                   setConfirmLoading(true)
+
+                  // 1. Update appointment status
                   await fetch('/api/admin/appointments', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: confirmTarget.id, status: 'completed' }),
                   })
-                  // Close dialogs
+
+                  // 2. Check if client is referral
+                  let isReferral = false
+                  try {
+                    const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`)
+                    if (clientRes.ok) {
+                      const clientData = await clientRes.json()
+                      if (clientData?.ref_id) {
+                        isReferral = true
+                      }
+                    }
+                  } catch (err) {
+                    console.error('Error fetching client ref_id', err)
+                  }
+
+                  console.log(confirmTarget.appointment_date);
+                  // 3. Insert into notifications table
+                  await fetch(`/api/clients/notification-by-id`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      client_id: confirmTarget.clients?.id,
+                      send_to_admin: false,
+                      send_to_client: true,
+                      is_referral: isReferral,
+                      date: confirmTarget.appointment_date,
+                    }),
+                  });
+
+                  // 4. Close dialogs
                   setConfirmOpen(false)
                   setConfirmTarget(null)
                   if (selectedAppt && selectedAppt.id === confirmTarget.id) {
                     setDetailsOpen(false)
                   }
-                  // Reload with current status filter
+
+                  // 5. Reload appointments
                   await loadAppointments(statusFilter)
                 } catch (e) {
+                  console.error('Error completing appointment and adding notification', e)
                 } finally {
                   setConfirmLoading(false)
                 }
               }}
             >
-              {confirmLoading ? 'Please wait...' : 'OK'}
-            </Button>
+            {confirmLoading ? 'Please wait...' : 'OK'}
+          </Button>
           </div>
         </DialogContent>
       </Dialog>

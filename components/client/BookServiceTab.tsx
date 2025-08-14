@@ -26,6 +26,7 @@ import { horsepowerApi } from '../../pages/api/horsepower/horsepowerApi';
 import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi';
 import { clientPanelBooking } from '../../pages/api/clientPanelBooking/clientPanelBooking';
 import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi';
+import { notificationApi } from '../../pages/api/notification/notificationApi';
 
 interface BookServiceTabProps {
   clientId: string;
@@ -144,6 +145,33 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       selectedDevices: [], // No existing devices - only new devices
       newDevices: newDevicesWithLocation, // Pass the new units with default location
     };
+
+    try {
+  
+      // For new clients, check clientInfo.ref_id, for existing clients, we'll need to fetch their data
+      let isReferral = false;
+      
+     // Check if a referralId exists in sessionStorage
+      const referralId = sessionStorage.getItem('referralId');
+      if (referralId && referralId.trim() !== '') {
+        isReferral = true;
+      }
+      
+      const notificationData = {
+        client_id: currentClient.id,
+        send_to_admin: true,
+        send_to_client: false,
+        is_referral: isReferral,
+        date: clientBookingState.appointmentDate,
+      };
+      
+      await notificationApi.createNotification(notificationData);
+      console.log('Notification created successfully');
+
+      } catch (notificationError) {
+      console.error('Error creating notification:', notificationError);
+      // Don't fail the entire booking if notification creation fails
+    }
 
     setIsLoading(true);
     setError(null);

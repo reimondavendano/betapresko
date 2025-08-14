@@ -2,25 +2,24 @@
 
 import { useState, useEffect, JSXElementConstructor, Key, PromiseLikeOfReactNode, ReactElement, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '@/lib/store'; // Use type-only import for RootState
-import { setAppointmentDate, setStep, setAvailableBlockedDates } from '@/lib/features/booking/bookingSlice'; // Import setAvailableBlockedDates
-import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi'; // Import new API
-import { BlockedDate } from '../../types/database'; // Import BlockedDate type
+import type { RootState } from '@/lib/store';
+import { setAppointmentDate, setStep, setAvailableBlockedDates } from '@/lib/features/booking/bookingSlice';
+import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi';
+import { BlockedDate } from '../../types/database';
 import { Calendar as CalendarIcon, ChevronRight, ChevronLeft, AlertCircle, Loader2, XCircle } from 'lucide-react';
-import { format, isAfter, startOfDay, parseISO } from 'date-fns';
+import { format, isAfter, isBefore, startOfDay, parseISO } from 'date-fns';
 
 // --- COMPONENTS ---
-// Assuming these are locally defined or from shadcn/ui
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 
-// Custom Calendar component (simplified for demonstration, replace with shadcn/ui Calendar if available)
+// Custom Calendar component
 interface CalendarProps {
   mode: 'single' | 'multiple' | 'range';
   selected: Date | undefined;
   onSelect: (date: Date | undefined) => void;
-  disabled: (date: Date) => boolean; // Re-added disabled prop
+  disabled: (date: Date) => boolean;
   className?: string;
   classNames?: string;
 }
@@ -36,18 +35,18 @@ const Calendar = ({ mode, selected, onSelect, disabled, className, classNames }:
 
   const renderDay = (day: number, month: number, year: number) => {
     const dayDate = new Date(year, month, day);
-    const isDisabled = disabled(dayDate); // Use disabled prop for visual disabling
+    const isDisabled = disabled(dayDate);
     const isSelected = selected && selected.toDateString() === dayDate.toDateString();
     
     let dayClasses = "h-9 w-9 p-0 font-normal hover:bg-accent hover:text-accent-foreground rounded-md";
-    if (isSelected) dayClasses += " bg-blue-600 text-white hover:bg-blue-700 hover:text-white"; // Highlight selected date
-    if (isDisabled) dayClasses += " text-muted-foreground opacity-50 cursor-not-allowed"; // Visually disable days here
+    if (isSelected) dayClasses += " bg-blue-600 text-white hover:bg-blue-700 hover:text-white";
+    if (isDisabled) dayClasses += " text-muted-foreground opacity-50 cursor-not-allowed";
 
     return (
       <button
         key={day}
         onClick={() => onSelect(dayDate)}
-        disabled={isDisabled} // Apply disabled prop to button
+        disabled={isDisabled}
         className={dayClasses}
       >
         {day}
@@ -62,7 +61,6 @@ const Calendar = ({ mode, selected, onSelect, disabled, className, classNames }:
     const firstDay = firstDayOfMonth(year, month);
     const totalDays = daysInMonth(year, month);
 
-    // Empty cells for padding
     for (let i = 0; i < firstDay; i++) {
       days.push(<span key={`empty-${i}`} className="h-9 w-9"></span>);
     }
@@ -149,7 +147,6 @@ export function ScheduleStep() {
   const [error, setError] = useState<string | null>(null);
   const [showBlockedDateModal, setShowBlockedDateModal] = useState<BlockedDate | null>(null);
 
-  // Fetch blocked dates on component mount
   useEffect(() => {
     const fetchBlockedDates = async () => {
       setIsLoading(true);
@@ -164,67 +161,52 @@ export function ScheduleStep() {
       }
     };
 
-    // Only fetch if blocked dates are not already in Redux
     if (availableBlockedDates.length === 0) {
       fetchBlockedDates();
     } else {
-      setIsLoading(false); // Data already loaded
+      setIsLoading(false);
     }
   }, [dispatch, availableBlockedDates]);
 
 
-  // Parse existing appointment date if available
   useEffect(() => {
     if (appointmentDate) {
       setSelectedDate(parseISO(appointmentDate));
     }
   }, [appointmentDate]);
 
-  // This function visually disables past dates only.
-  // Sundays and blocked dates from Supabase are NOT visually disabled here.
+  // ** UPDATED FUNCTION **
+  // This function visually disables past dates only, leaving today and future dates enabled.
   const isDateVisuallyDisabled = (date: Date) => {
-    // Disable past dates
-    if (!isAfter(date, startOfDay(new Date()))) {
-      return true;
-    }
-    
-    // Allow Sundays to be clickable
-    // Allow blocked dates from Supabase to be clickable (to show prompt)
-    return false; 
+    const today = startOfDay(new Date());
+    // Disable dates that are before today
+    return isBefore(date, today);
   };
 
-  // This function determines if a date is truly unavailable for booking (for the "Continue" button)
-  // It includes past dates, Sundays, AND blocked dates from Supabase.
   const isDateActuallyUnavailable = (date: Date) => {
-    // Check for past dates
-    if (!isAfter(date, startOfDay(new Date()))) {
+    if (isBefore(date, startOfDay(new Date()))) {
       return true;
     }
-    // Check for Sundays
     if (date.getDay() === 0) {
       return true;
     }
-    // Check for blocked dates from Supabase
     return blockedDatesApi.isDateBlocked(format(date, 'yyyy-MM-dd'), availableBlockedDates) !== null;
   };
 
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      // If the date is a past date, prevent selection and clear it
-      if (!isAfter(date, startOfDay(new Date()))) {
+      if (isBefore(date, startOfDay(new Date()))) {
         setSelectedDate(undefined);
         return;
       }
-      // Sundays are now selectable to allow the blocked date check to run on them
       
-      // Convert the selected Date object to a YYYY-MM-DD string
       const dateStr = format(date, 'yyyy-MM-dd');
-      const blockedInfo = blockedDatesApi.isDateBlocked(dateStr, availableBlockedDates); // Pass the string
+      const blockedInfo = blockedDatesApi.isDateBlocked(dateStr, availableBlockedDates);
 
       if (blockedInfo) {
-        setShowBlockedDateModal(blockedInfo); // Show modal with blocked date details
-        setSelectedDate(undefined); // Clear selection if blocked
+        setShowBlockedDateModal(blockedInfo);
+        setSelectedDate(undefined);
       } else {
         setSelectedDate(date);
       }
@@ -234,17 +216,15 @@ export function ScheduleStep() {
   };
 
   const handleNext = () => {
-    // The "Continue" button should be disabled if no date is selected, or if the selected date
-    // is actually unavailable (past, Sunday, or from blocked_dates table).
     if (selectedDate && !isDateActuallyUnavailable(selectedDate)) { 
       const appointmentDateStr = format(selectedDate, 'yyyy-MM-dd');
       dispatch(setAppointmentDate(appointmentDateStr));
-      dispatch(setStep(5)); // Proceed to Confirmation Step
+      dispatch(setStep(5));
     }
   };
 
   const handleBack = () => {
-    dispatch(setStep(3)); // Go back to Units Step
+    dispatch(setStep(3));
   };
 
   if (isLoading) {
@@ -277,7 +257,6 @@ export function ScheduleStep() {
       </div>
 
       <div className="grid justify-center">
-        {/* Date Selection */}
         <Card className="max-w-md w-full rounded-xl">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -290,7 +269,7 @@ export function ScheduleStep() {
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
-              disabled={isDateVisuallyDisabled} // Use for visual disabling (past dates only)
+              disabled={isDateVisuallyDisabled}
               className="rounded-md border"
             />
             {selectedDate && (
@@ -304,7 +283,6 @@ export function ScheduleStep() {
         </Card>
       </div>
 
-      {/* Important Notes */}
       <Card className="mt-6 border-orange-200 bg-orange-50 max-w-4xl w-full rounded-xl">
         <CardContent className="pt-6">
           <div className="flex items-start">
@@ -312,7 +290,6 @@ export function ScheduleStep() {
             <div>
               <h4 className="font-medium text-orange-900 mb-2">Important Notes:</h4>
               <ul className="text-sm text-orange-800 space-y-1">
-  
                 <li>• Please ensure someone is available at the scheduled time</li>
                 <li>• Rescheduling must be done at least 24 hours in advance</li>
                 <li>• Our technicians will arrive within the scheduled time slot</li>
@@ -342,7 +319,6 @@ export function ScheduleStep() {
         </Button>
       </div>
 
-      {/* Blocked Date Modal */}
       {showBlockedDateModal && (
         <BlockedDateModal 
           blockedDate={showBlockedDateModal} 

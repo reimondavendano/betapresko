@@ -3,10 +3,28 @@
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/lib/store'
 import { Bell, Globe, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export default function AdminHeader() {
   const admin = useSelector((s: RootState) => s.admin.currentAdmin)
   const activeView = useSelector((s: RootState) => s.admin.activeView)
+
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [isOpen, setIsOpen] = useState(false)
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('/api/admin/notifications')
+      const json = await res.json()
+      setNotifications(json.data || [])
+    } catch (err) {
+      console.error('Failed to fetch notifications', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchNotifications()
+  }, [])
 
   const viewLabelMap: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -18,7 +36,7 @@ export default function AdminHeader() {
   const headerTitle = viewLabelMap[activeView] || 'Dashboard'
 
   return (
-    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm relative">
       <div className="flex-1 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">{headerTitle}</h1>
       </div>
@@ -33,23 +51,63 @@ export default function AdminHeader() {
       <div className="flex items-center gap-4 text-gray-500">
         <Globe size={24} className="hover:text-orange-500 cursor-pointer" />
         <div className="relative">
-          <Bell size={24} className="hover:text-orange-500 cursor-pointer" />
-          <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+          <button onClick={() => setIsOpen(!isOpen)}>
+            <Bell size={24} className="hover:text-orange-500 cursor-pointer" />
+            {notifications.length > 0 && (
+              <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+          {isOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
+              <div className="p-3 border-b font-semibold">Notifications</div>
+              <ul className="max-h-64 overflow-y-auto">
+                {notifications.length > 0 ? (
+                  notifications.map((n, idx) => (
+                    <li
+                      key={idx}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                    >
+                      <div className="text-sm text-gray-800">
+                        {n.display_message || 'New notification'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="px-3 py-4 text-sm text-gray-500 text-center">
+                    No notifications
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 ml-4 cursor-pointer max-w-xs">
-          <img src="../assets/images/icon.jpg" alt="User Avatar" className="w-9 h-9 rounded-full ring-2 ring-orange-400" />
+          <img
+            src="../assets/images/icon.jpg"
+            alt="User Avatar"
+            className="w-9 h-9 rounded-full ring-2 ring-orange-400"
+          />
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-medium text-gray-800 truncate" title={admin?.name || admin?.username || 'Admin'}>
+            <span
+              className="text-sm font-medium text-gray-800 truncate"
+              title={admin?.name || admin?.username || 'Admin'}
+            >
               {admin?.name || admin?.username || 'Admin'}
             </span>
-            <span className="text-xs text-gray-500 truncate" title={admin?.address || ''}>
+            <span
+              className="text-xs text-gray-500 truncate"
+              title={admin?.address || ''}
+            >
               {admin?.address || ''}
             </span>
           </div>
         </div>
       </div>
     </header>
-  );
+  )
 }
-
-

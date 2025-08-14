@@ -30,7 +30,7 @@ export default function AdminLogin() {
       if (!res.ok) {
         throw new Error(data?.error || 'Login failed')
       }
-      localStorage.setItem('presko_admin', JSON.stringify(data))
+      sessionStorage.setItem('presko_admin', JSON.stringify(data))
       dispatch(setCurrentAdmin(data))
       dispatch(setAuthenticated(true))
     } catch (err: any) {

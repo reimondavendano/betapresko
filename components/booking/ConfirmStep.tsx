@@ -166,17 +166,12 @@ export function ConfirmStep() {
           mobile: finalMobile,
           email: clientInfo.email || null,
           sms_opt_in: true,
-          ref_id: referralId || null, // Add the ref_id here
+          ref_id: referralId || null, 
         };
         const createdClient: Client = await clientApi.createClient(newClientData);
         currentClientId = createdClient.id;
         dispatch(setClientId(currentClientId));
 
-        // If a referral ID was used, remove it from session storage
-        if (referralId) {
-          sessionStorage.removeItem('referralId');
-          console.log('[SESSION] Referral ID removed from session storage.');
-        }
 
         // Create client location for the new client
         const newLocationData = {
@@ -243,14 +238,10 @@ export function ConfirmStep() {
         // For new clients, check clientInfo.ref_id, for existing clients, we'll need to fetch their data
         let isReferral = false;
         
-        if (existingClient) {
-          // For existing clients, we need to check their ref_id from the database
-          // Since we don't have the full client data here, we'll set it to false for now
-          // You can enhance this by fetching the full client data if needed
-          isReferral = false;
-        } else {
-          // For new clients, check if they came through a referral
-          isReferral = Boolean(clientInfo.ref_id && clientInfo.ref_id.trim() !== '');
+       // Check if a referralId exists in sessionStorage
+        const referralId = sessionStorage.getItem('referralId');
+        if (referralId && referralId.trim() !== '') {
+          isReferral = true;
         }
         
         const notificationData = {
@@ -263,6 +254,12 @@ export function ConfirmStep() {
         
         await notificationApi.createNotification(notificationData);
         console.log('Notification created successfully');
+
+        // If a referral ID was used, remove it from session storage
+        if (referralId) {
+          sessionStorage.removeItem('referralId');
+          console.log('[SESSION] Referral ID removed from session storage.');
+        }
       } catch (notificationError) {
         console.error('Error creating notification:', notificationError);
         // Don't fail the entire booking if notification creation fails

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Eye, ChevronDown, MapPin, Monitor } from 'lucide-react';
+import { Search, Plus, Edit, Eye, ChevronDown, MapPin, Monitor, Copy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ interface Client {
   email: string;
   points: number;
   discounted: boolean;
+  referral_link: string;
 }
 
 interface ClientLocation {
@@ -63,13 +64,51 @@ export default function AdminClientInfo() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dialogAction, setDialogAction] = useState<'edit' | 'view' | null>(null);
   const pageSize = 10;
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [siteUrl, setSiteUrl] = useState<string | null>(null);
 
-  // Reset to first page when search query changes
+  // Function to display a temporary notification
+  const showTempNotification = (message: string, error = false) => {
+    setNotificationMessage(message);
+    setIsError(error);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+      setNotificationMessage('');
+    }, 3000); // Hide after 3 seconds
+  };
+
+  // Fetch the site URL from the API on component mount
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+    const fetchSiteUrl = async () => {
+      try {
+        // Use the updated API endpoint with the new 'getAll=true' query parameter
+        const res = await fetch(`/api/admin/custom-settings?getAll=true`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch site URL');
+        }
+        
+        // The API now returns an object with a 'data' array
+        const { data } = await res.json();
 
-  // Fetch all clients on component mount
+        // Assuming the data is an array of settings
+        const urlSetting = data.find((setting: { setting_key: string }) => setting.setting_key === 'site_url');
+        if (urlSetting) {
+          setSiteUrl(urlSetting.setting_value);
+        } else {
+          console.error("Site URL setting not found.");
+          showTempNotification('Site URL setting not found.', true);
+        }
+      } catch (error) {
+        console.error("Error fetching site URL:", error);
+        showTempNotification('Failed to get site URL.', true);
+      }
+    };
+    fetchSiteUrl();
+  }, []);
+
   useEffect(() => {
     const fetchClients = async () => {
       setLoading(true);
@@ -159,11 +198,11 @@ export default function AdminClientInfo() {
       // Here you can implement the actual action
       console.log(`${dialogAction} action for client:`, selectedClient.name);
       
-      // For now, just show an alert
+      // Use your existing notification function instead of alert()
       if (dialogAction === 'edit') {
-        alert(`Edit functionality for ${selectedClient.name} - This would open an edit form`);
+        showTempNotification(`Edit functionality for ${selectedClient.name} - This would open an edit form`);
       } else if (dialogAction === 'view') {
-        alert(`View functionality for ${selectedClient.name} - This would show detailed view`);
+        showTempNotification(`View functionality for ${selectedClient.name} - This would show detailed view`);
       }
     }
     handleDialogClose();
@@ -195,12 +234,38 @@ export default function AdminClientInfo() {
             : client
         )
       );
-
+      // Use notification for success as well
+      showTempNotification(`Updated client ${clientId} discounted status to: ${checked ? 'Yes' : 'No'}`);
       console.log(`Updated client ${clientId} discounted status to: ${checked}`);
     } catch (error) {
       console.error('Error updating client discounted status:', error);
-      alert('Failed to update discounted status. Please try again.');
+      // Use your existing notification function instead of alert()
+      showTempNotification('Failed to update discounted status. Please try again.', true);
     }
+  };
+
+  // --- RECONSTRUCTED `handleCopyLink` ---
+  const handleCopyLink = (client: Client) => {
+    // Check if the site URL is available first.
+    if (!siteUrl) {
+      showTempNotification('Site URL not available. Cannot copy link.', true);
+      return;
+    }
+    
+    // Construct the referral link.
+    const referralLink = `${siteUrl}client/${client.id}`;
+
+    // Use the modern navigator.clipboard API to copy the text.
+    navigator.clipboard.writeText(referralLink)
+      .then(() => {
+        // Show a success notification if the copy was successful.
+        showTempNotification('Client link copied to clipboard!');
+      })
+      .catch(err => {
+        // Show an error notification if the copy failed.
+        console.error('Failed to copy link:', err);
+        showTempNotification('Failed to copy link. Please try again.', true);
+      });
   };
 
   return (
@@ -231,163 +296,161 @@ export default function AdminClientInfo() {
 
         {/* Main Table */}
         <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Customer Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                Mobile
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                Points
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                Discounted
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-100">
               <tr>
-                <td colSpan={6} className="text-center py-4 text-gray-500">Loading clients...</td>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Customer Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                  Mobile
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                  Points
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  Discounted
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Action
+                </th>
               </tr>
-            ) : clients.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-4 text-gray-500">No clients found.</td>
-              </tr>
-            ) : (
-              clients.map((client) => (
-                <React.Fragment key={client.id}>
-                  <tr
-                    className={`hover:bg-gray-50 transition-colors duration-200 cursor-pointer ${
-                      expandedRow === client.id ? 'bg-gray-100' : ''
-                    }`}
-                    onClick={() => toggleRowExpansion(client.id)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        {/* A placeholder avatar. Replace with a real one if available. */}
-                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold">
-                          {client.name.split(' ').map(n => n[0]).join('')}
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4 text-gray-500">Loading clients...</td>
+                </tr>
+              ) : clients.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4 text-gray-500">No clients found.</td>
+                </tr>
+              ) : (
+                clients.map((client) => (
+                  <React.Fragment key={client.id}>
+                    <tr
+                      className={`hover:bg-gray-50 transition-colors duration-200 cursor-pointer ${
+                        expandedRow === client.id ? 'bg-gray-100' : ''
+                      }`}
+                      onClick={() => toggleRowExpansion(client.id)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          {/* A placeholder avatar. Replace with a real one if available. */}
+                          <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold">
+                            {client.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                          <ChevronDown
+                            size={16}
+                            className={`text-gray-400 transform transition-transform duration-200 ${
+                              expandedRow === client.id ? 'rotate-180' : ''
+                            }`}
+                          />
                         </div>
-                        <div className="text-sm font-medium text-gray-900">{client.name}</div>
-                        <ChevronDown
-                          size={16}
-                          className={`text-gray-400 transform transition-transform duration-200 ${
-                            expandedRow === client.id ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
-                      {client.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                      {client.mobile}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
-                      {client.points}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
-                      <div 
-                        className="flex items-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Checkbox
-                          checked={client.discounted}
-                          onCheckedChange={(checked) => handleDiscountedChange(client.id, checked as boolean)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-600">
-                          {client.discounted ? 'Yes' : 'No'}
-                        </span>
-                      </div>
-                    </td>
-                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                       <div className="flex items-center gap-2">
-                         {/* <button 
-                           className="text-gray-400 hover:text-blue-600 transition-colors"
-                           onClick={(e) => handleButtonClick(client, 'edit', e)}
-                           title="Edit client"
-                         >
-                           <Edit size={18} />
-                         </button> */}
-                         <button 
-                           className="text-gray-400 hover:text-green-600 transition-colors"
-                           onClick={(e) => handleButtonClick(client, 'view', e)}
-                           title="View client details"
-                         >
-                           <Eye size={18} />
-                         </button>
-                       </div>
-                     </td>
-                  </tr>
-                  {expandedRow === client.id && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={6} className="p-4 text-sm text-gray-700">
-                        {/* Mobile and smaller screen details */}
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 lg:hidden mb-2">
-                          <p className="font-semibold">Email: <span className="font-normal">{client.email}</span></p>
-                          <p className="font-semibold">Phone: <span className="font-normal">{client.mobile}</span></p>
-                          <p className="font-semibold">Points: <span className="font-normal">{client.points}</span></p>
-                          <p className="font-semibold">Discounted: <span className="font-normal">{client.discounted ? 'Yes' : 'No'}</span></p>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                        {client.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                        {client.mobile}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
+                        {client.points}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                        <div 
+                          className="flex items-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={client.discounted}
+                            onCheckedChange={(checked) => handleDiscountedChange(client.id, checked as boolean)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">
+                            {client.discounted ? 'Yes' : 'No'}
+                          </span>
                         </div>
-                        
-                        {/* Locations Section */}
-                        <div className="mb-4">
-                          <p className="text-sm font-semibold text-gray-900 mb-2">Locations:</p>
-                          {locations[client.id]?.length > 0 ? (
-                            <div className="space-y-2">
-                              {locations[client.id].map(loc => (
-                                <div key={loc.id} className="flex items-start gap-2 text-sm text-gray-600">
-                                  <MapPin size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                                  <span>
-                                    {loc.address_line1}, {loc.street}, {loc.barangays.name}, {loc.cities.name}
-                                    {loc.landmark && ` (${loc.landmark})`}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-600">No location details available for this client.</p>
-                          )}
-                        </div>
-
-                        {/* Devices Section */}
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900 mb-2">Devices:</p>
-                          {devices[client.id]?.length > 0 ? (
-                            <div className="space-y-2">
-                              {devices[client.id].map(device => (
-                                <div key={device.id} className="flex items-start gap-2 text-sm text-gray-600">
-                                  <Monitor size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
-                                  <span>
-                                    {device.name} - {device.ac_types?.name || 'N/A'} ({device.horsepower_options?.display_name || 'N/A'})
-                                    {device.brands?.name && ` - ${device.brands.name}`}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-600">No devices available for this client.</p>
-                          )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyLink(client);
+                            }}
+                            size="sm"
+                            className="flex-shrink-0 w-full sm:w-auto bg-green-500 text-white"
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copy Client Link
+                          </Button>
+                          
                         </div>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
+                    {expandedRow === client.id && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={6} className="p-4 text-sm text-gray-700">
+                          {/* Mobile and smaller screen details */}
+                          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 lg:hidden mb-2">
+                            <p className="font-semibold">Email: <span className="font-normal">{client.email}</span></p>
+                            <p className="font-semibold">Phone: <span className="font-normal">{client.mobile}</span></p>
+                            <p className="font-semibold">Points: <span className="font-normal">{client.points}</span></p>
+                            <p className="font-semibold">Discounted: <span className="font-normal">{client.discounted ? 'Yes' : 'No'}</span></p>
+                          </div>
+                          
+                          {/* Locations Section */}
+                          <div className="mb-4">
+                            <p className="text-sm font-semibold text-gray-900 mb-2">Locations:</p>
+                            {locations[client.id]?.length > 0 ? (
+                              <div className="space-y-2">
+                                {locations[client.id].map(loc => (
+                                  <div key={loc.id} className="flex items-start gap-2 text-sm text-gray-600">
+                                    <MapPin size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                                    <span>
+                                      {loc.address_line1}, {loc.street}, {loc.barangays.name}, {loc.cities.name}
+                                      {loc.landmark && ` (${loc.landmark})`}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-600">No location details available for this client.</p>
+                            )}
+                          </div>
+
+                          {/* Devices Section */}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 mb-2">Devices:</p>
+                            {devices[client.id]?.length > 0 ? (
+                              <div className="space-y-2">
+                                {devices[client.id].map(device => (
+                                  <div key={device.id} className="flex items-start gap-2 text-sm text-gray-600">
+                                    <Monitor size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                    <span>
+                                      {device.name} - {device.ac_types?.name || 'N/A'} ({device.horsepower_options?.display_name || 'N/A'})
+                                      {device.brands?.name && ` - ${device.brands.name}`}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-600">No devices available for this client.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -419,43 +482,54 @@ export default function AdminClientInfo() {
         </div>
       )}
 
-       {/* Confirmation Dialog */}
-       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-         <DialogContent className="sm:max-w-md">
-           <DialogHeader>
-             <DialogTitle>
-               {dialogAction === 'edit' ? 'Edit Client' : 'View Client Details'}
-             </DialogTitle>
-             <DialogDescription>
-               {dialogAction === 'edit' 
-                 ? `Are you sure you want to edit ${selectedClient?.name}? This will open the edit form.`
-                 : `View detailed information for ${selectedClient?.name}?`
-               }
-             </DialogDescription>
-           </DialogHeader>
-           
-           {selectedClient && (
-             <div className="py-4">
-               <div className="space-y-2 text-sm">
-                 <p><strong>Name:</strong> {selectedClient.name}</p>
-                 <p><strong>Email:</strong> {selectedClient.email}</p>
-                 <p><strong>Mobile:</strong> {selectedClient.mobile}</p>
-                 <p><strong>Points:</strong> {selectedClient.points}</p>
-                 <p><strong>Discount Status:</strong> {selectedClient.discounted ? 'Yes' : 'No'}</p>
-               </div>
-             </div>
-           )}
-           
-           <DialogFooter className="flex gap-2">
-             <Button variant="outline" onClick={handleDialogClose}>
-               Cancel
-             </Button>
-             <Button onClick={handleDialogConfirm}>
-               {dialogAction === 'edit' ? 'Edit Client' : 'View Details'}
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
-     </div>
-   );
- }
+      {/* Confirmation Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {dialogAction === 'edit' ? 'Edit Client' : 'View Client Details'}
+            </DialogTitle>
+            <DialogDescription>
+              {dialogAction === 'edit' 
+                ? `Are you sure you want to edit ${selectedClient?.name}? This will open the edit form.`
+                : `View detailed information for ${selectedClient?.name}?`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedClient && (
+            <div className="py-4">
+              <div className="space-y-2 text-sm">
+                <p><strong>Name:</strong> {selectedClient.name}</p>
+                <p><strong>Email:</strong> {selectedClient.email}</p>
+                <p><strong>Mobile:</strong> {selectedClient.mobile}</p>
+                <p><strong>Points:</strong> {selectedClient.points}</p>
+                <p><strong>Discount Status:</strong> {selectedClient.discounted ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleDialogClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleDialogConfirm}>
+              {dialogAction === 'edit' ? 'Edit Client' : 'View Details'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Toast */}
+      {showNotification && (
+        <div 
+          className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white transition-opacity duration-300 ${
+            isError ? 'bg-red-500' : 'bg-green-500'
+          }`}
+        >
+          {notificationMessage}
+        </div>
+      )}
+    </div>
+  );
+}

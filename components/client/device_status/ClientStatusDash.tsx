@@ -7,15 +7,33 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   Clock,
-  Plus
+  Plus,
+  Home,
+  Edit,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   ClientLocation,
   UUID
 } from '../../../types/database';
+
+// Helper function to format the full address
+const formatAddress = (location: ClientLocation) => {
+  const parts = [
+    location.address_line1,
+    location.street,
+    location.barangay_name,
+    location.city_name
+  ].filter(Boolean);
+  return parts.join(', ');
+};
 
 interface CleaningStatusEntry {
   location: ClientLocation;
@@ -24,99 +42,282 @@ interface CleaningStatusEntry {
   scheduledDevices: number;
   totalDevices: number;
   lastServiceDate: string | null;
+  // New: Device details with service information
+  devices: Array<{
+    device: any;
+    appointment: any;
+    service: any;
+    status: 'scheduled' | 'due' | 'well-maintained' | 'no-service';
+    brand: string;
+    acType: string;
+    horsepower: string;
+  }>;
 }
 
 interface ClientStatusDashProps {
   cleaningStatuses: CleaningStatusEntry[];
   handleOpenBookingModal: (locationId: UUID) => void;
-  handleOpenDetailsModal: (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained') => void;
+  handleOpenDetailsModal: (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName?: string) => void;
+  // Primary location editing props
+  locations: ClientLocation[];
+  isEditingPrimaryLocation: boolean;
+  selectedPrimaryLocationId: UUID | null;
+  onStartEditPrimaryLocation: () => void;
+  onCancelEditPrimaryLocation: () => void;
+  onUpdatePrimaryLocation: () => void;
+  onPrimaryLocationChange: (locationId: UUID) => void;
+  // Pagination props
+  currentPage: number;
+  totalPages: number;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
+  
 }
 
 
-export function ClientStatusDash({ cleaningStatuses, handleOpenBookingModal, handleOpenDetailsModal }: ClientStatusDashProps) {
+export function ClientStatusDash({ 
+  cleaningStatuses, 
+  handleOpenBookingModal, 
+  handleOpenDetailsModal,
+  locations,
+  isEditingPrimaryLocation,
+  selectedPrimaryLocationId,
+  onStartEditPrimaryLocation,
+  onCancelEditPrimaryLocation,
+  onUpdatePrimaryLocation,
+  onPrimaryLocationChange,
+  currentPage,
+  totalPages,
+  onNextPage,
+  onPreviousPage
+}: ClientStatusDashProps) {
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-xl font-bold flex items-center">
-          <Clock className="w-5 h-5 mr-2 text-gray-700" />
-          Cleaning Status
-        </CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-xl font-bold flex items-center">
+            <Clock className="w-5 h-5 mr-2 text-gray-700" />
+            Cleaning Status
+          </CardTitle>
+          {locations.length > 1 && (
+            <div className="flex items-center space-x-2">
+              {isEditingPrimaryLocation ? (
+                <>
+                  <Button
+                    onClick={onCancelEditPrimaryLocation}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={onUpdatePrimaryLocation}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-xs"
+                  >
+                    Update Primary
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={onStartEditPrimaryLocation}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                >
+                  <Edit className="w-3 h-3 mr-1" />
+                  Edit Primary Location
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="p-0 space-y-4">
+        {/* Primary Location Selection */}
+        {isEditingPrimaryLocation && (
+          <div className="p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-sm font-semibold mb-3 text-gray-700">Select Primary Location</h3>
+            <RadioGroup
+              value={selectedPrimaryLocationId || ''}
+              onValueChange={onPrimaryLocationChange}
+              className="space-y-3"
+            >
+              {locations.map((location) => (
+                <div key={location.id} className="flex items-center space-x-3">
+                  <RadioGroupItem value={location.id} id={`location-${location.id}`} />
+                  <Label htmlFor={`location-${location.id}`} className="flex flex-col cursor-pointer">
+                    <div className="flex items-center space-x-2">
+                      <Home className="w-4 h-4 text-gray-600" />
+                      <span className="font-medium">{location.name}</span>
+                      {location.is_primary && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                          Primary
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-600 ml-6">{formatAddress(location)}</span>
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        )}
+
         {cleaningStatuses.length > 0 ? (
           cleaningStatuses.map(status => (
-            <div key={status.location.id} className="border-b last:border-b-0 py-2">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold">
-                    {status.location.name}{' '}
-                    {status.lastServiceDate ? (
-                      <span className="text-sm font-normal text-gray-600">
-                        (Last Serviced: {format(new Date(status.lastServiceDate), 'MMM d, yyyy')})
-                      </span>
-                    ) : (
-                      <span className="text-sm font-normal text-gray-600">
-                        (No Service Record Yet)
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-sm text-gray-500 mb-2">Total Devices: {status.totalDevices}</p>
+            <div key={status.location.id} className="border-b last:border-b-0 py-4">
+                             <div className="flex justify-between items-start mb-3">
+                 <div className="flex-1 min-w-0">
+                   <div className="flex items-center space-x-2">
+                     <p className="font-bold text-lg">
+                       {status.location.name}
+                     </p>
+                     {status.location.is_primary && (
+                       <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                         Primary
+                       </Badge>
+                     )}
+                   </div>
+                   <p className="text-sm text-gray-500">Total Devices: {status.totalDevices}</p>
+                 </div>
+                 <Button className="ml-4 bg-blue-600 hover:bg-blue-700" onClick={() => handleOpenBookingModal(status.location.id)}>
+                   <Plus className="w-4 h-4 mr-2" /> Add Booking
+                 </Button>
+               </div>
 
-                  {/* Scheduled Units */}
-                  {status.scheduledDevices > 0 && (
-                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
-                      <span className="text-gray-700 break-words">
-                        <span className="font-medium">Booked:</span> {status.scheduledDevices} unit{status.scheduledDevices > 1 && 's'}
-                      </span>
-                      <div className="justify-self-end">
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="p-0 h-auto text-blue-600"
-                          onClick={() => handleOpenDetailsModal(status.location.id, 'scheduled')}
-                        >
-                          [View Details]
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Due Units */}
-                  {status.dueDevices > 0 && (
-                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
-                      <span className="text-red-600 break-words">Due for Cleaning: {status.dueDevices} unit{status.dueDevices > 1 && 's'}</span>
-                      <div className="justify-self-end">
-                        <Button variant="link" size="sm" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'due')}>
-                          [View Details]
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Well Maintained Units */}
-                  {status.wellMaintainedDevices > 0 && (
-                    <div className="text-sm mt-1 grid grid-cols-[1fr_auto] items-start sm:flex sm:items-center sm:space-x-2">
-                      <span className="text-green-600 break-words">Up to date: {status.wellMaintainedDevices} unit{status.wellMaintainedDevices > 1 && 's'}</span>
-                      <div className="justify-self-end">
-                        <Button variant="link" size="sm" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailsModal(status.location.id, 'well-maintained')}>
-                          [View Details]
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+              {/* Services Section */}
+              <div className="space-y-3">
+                {/* Group devices by service type */}
+                {(() => {
+                  const serviceGroups = new Map<string, typeof status.devices>();
                   
-                  
-                </div>
-                <Button className="ml-4 bg-blue-600 hover:bg-blue-700" onClick={() => handleOpenBookingModal(status.location.id)}>
-                  <Plus className="w-4 h-4 mr-2" /> Add Booking
-                </Button>
+                  status.devices.forEach(device => {
+                    const serviceName = device.service?.name || 'No Service';
+                    if (!serviceGroups.has(serviceName)) {
+                      serviceGroups.set(serviceName, []);
+                    }
+                    serviceGroups.get(serviceName)!.push(device);
+                  });
+
+                    return Array.from(serviceGroups.entries()).map(([serviceName, devices]) => (
+                     <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
+                       <div className="flex justify-between items-start mb-2">
+                         <h4 className="font-semibold text-gray-800">
+                           {serviceName === 'No Service' ? serviceName : 
+                            `${serviceName} ${status.lastServiceDate ? 
+                              `(Last Serviced: ${format(new Date(status.lastServiceDate), 'MMM d, yyyy')})` : 
+                              '(No Service Record Yet)'}`}
+                         </h4>
+                         
+                       </div>
+                      
+                      {/* Group by status within each service */}
+                      {(() => {
+                                                 // For repair services, show as "Repair" status
+                         if (serviceName.toLowerCase().includes('repair') || serviceName.toLowerCase().includes('maintenance')) {
+                           const repairDevices = devices.filter(d => d.status === 'scheduled' || d.status === 'due' || d.status === 'well-maintained');
+                           if (repairDevices.length === 0) return null;
+                           
+                           return (
+                             <div key="repair" className="text-sm mb-2">
+                               <span className="text-purple-600 font-medium">
+                                 Repair: {repairDevices.length} Unit{repairDevices.length > 1 ? 's' : ''}
+                               </span>
+                               <Button
+                                 variant="link"
+                                 size="sm"
+                                 className="p-0 h-auto text-blue-600 ml-2"
+                                 onClick={() => handleOpenDetailsModal(status.location.id, 'repair', serviceName)}
+                               >
+                                 [View Details]
+                               </Button>
+                             </div>
+                           );
+                         }
+                        
+                        // For other services, group by status
+                        const statusGroups = {
+                          'well-maintained': devices.filter(d => d.status === 'well-maintained'),
+                          'due': devices.filter(d => d.status === 'due'),
+                          'scheduled': devices.filter(d => d.status === 'scheduled'),
+                          'no-service': devices.filter(d => d.status === 'no-service')
+                        };
+
+                        return Object.entries(statusGroups).map(([statusKey, statusDevices]) => {
+                          if (statusDevices.length === 0) return null;
+
+                          const statusLabels = {
+                            'well-maintained': 'Up to date',
+                            'due': 'Due',
+                            'scheduled': 'Booked',
+                            'no-service': 'No Service'
+                          };
+
+                          const statusColors = {
+                            'well-maintained': 'text-green-600',
+                            'due': 'text-red-600',
+                            'scheduled': 'text-blue-600',
+                            'no-service': 'text-gray-600'
+                          };
+
+                                                     return (
+                             <div key={statusKey} className="text-sm mb-2">
+                               <span className={`${statusColors[statusKey as keyof typeof statusColors]} font-medium`}>
+                                 {statusLabels[statusKey as keyof typeof statusLabels]}: {statusDevices.length} Unit{statusDevices.length > 1 ? 's' : ''}
+                               </span>
+                               <Button
+                                 variant="link"
+                                 size="sm"
+                                 className="p-0 h-auto text-blue-600 ml-2"
+                                 onClick={() => handleOpenDetailsModal(status.location.id, statusKey as 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName)}
+                               >
+                                 [View Details]
+                               </Button>
+                             </div>
+                           );
+                        }).filter(Boolean);
+                      })()}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           ))
-        ) : (
-          <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+                 ) : (
+           <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
+         )}
+
+         {/* Pagination Controls */}
+         {totalPages > 1 && (
+           <div className="flex justify-between items-center mt-6 pt-4 border-t">
+             <Button
+               onClick={onPreviousPage}
+               disabled={currentPage === 1}
+               variant="outline"
+               size="sm"
+               className="flex items-center space-x-2"
+             >
+               <ChevronLeft className="w-4 h-4" />
+               <span>Previous</span>
+             </Button>
+             <span className="text-sm text-gray-700">
+               Page {currentPage} of {totalPages}
+             </span>
+             <Button
+               onClick={onNextPage}
+               disabled={currentPage === totalPages}
+               variant="outline"
+               size="sm"
+               className="flex items-center space-x-2"
+             >
+               <span>Next</span>
+               <ChevronRight className="w-4 h-4" />
+             </Button>
+           </div>
+         )}
+       </CardContent>
+     </Card>
+   );
+ }

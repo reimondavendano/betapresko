@@ -436,31 +436,6 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="address-line1">Address Line 1</Label>
-            <Input
-              id="address-line1"
-              name="address_line1"
-              placeholder="Ex: Block C Lot 3"
-              value={locationInfo.address_line1 || ''}
-              onChange={handleInputChange}
-              disabled={isGettingLocation}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="street">Street</Label>
-            <Input
-              id="street"
-              name="street"
-              placeholder="Ex: 24 De Agosto"
-              value={locationInfo.street || ''}
-              onChange={handleInputChange}
-              disabled={isGettingLocation}
-            />
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative" ref={cityInputRef}>
           <div className="space-y-2">
             <Label htmlFor="city">City</Label>
@@ -522,6 +497,31 @@ export function LocationForm({ clientId, onSave }: LocationFormProps) {
                 )}
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="address-line1">Address Line 1</Label>
+            <Input
+              id="address-line1"
+              name="address_line1"
+              placeholder="Ex: Block C Lot 3"
+              value={locationInfo.address_line1 || ''}
+              onChange={handleInputChange}
+              disabled={isGettingLocation}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="street">Street</Label>
+            <Input
+              id="street"
+              name="street"
+              placeholder="Ex: 24 De Agosto"
+              value={locationInfo.street || ''}
+              onChange={handleInputChange}
+              disabled={isGettingLocation}
+            />
           </div>
         </div>
 

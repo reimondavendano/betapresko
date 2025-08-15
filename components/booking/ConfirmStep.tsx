@@ -290,8 +290,7 @@ export function ConfirmStep() {
 
   const isFormValid =
     clientInfo.name.trim() !== '' &&
-    mobileDigits.length === 10 &&
-    (!clientInfo.email || !emailError);
+    mobileDigits.length === 10;
 
   if (isCompleted) {
     return (

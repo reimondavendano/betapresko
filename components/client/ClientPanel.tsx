@@ -188,7 +188,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 <User className="w-5 h-5 mr-3" />
                 Client Info
               </Button>
-              <Button
+              {/* <Button
                 variant={activeTab === 'clientAddLocation' ? 'default' : 'ghost'}
                 onClick={() => handleTabClick('clientAddLocation')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
@@ -211,7 +211,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
               >
                 <Briefcase className="w-5 h-5 mr-3" />
                 Book Another Service
-              </Button>
+              </Button> */}
               <Button
                 variant={activeTab === 'referFriend' ? 'default' : 'ghost'}
                 onClick={() => handleTabClick('referFriend')}
@@ -237,8 +237,8 @@ export default function ClientPanel({ params }: ClientPanelProps) {
               />
             )}
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}
-            {activeTab === 'clientAddLocation' && <ClientAddLocationTab clientId={clientId} />}
-            {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />}
+            {/* {activeTab === 'clientAddLocation' && <ClientAddLocationTab clientId={clientId} />}
+            {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />} */}
             {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />}
           </div>
         </div>

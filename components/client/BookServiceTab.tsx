@@ -86,7 +86,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
           })
         );
       } catch (err: any) {
-        console.error('Failed to fetch booking initial data:', err);
         setError(err.message || 'Failed to load booking resources.');
       } finally {
         setIsLoading(false);
@@ -166,10 +165,9 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       };
       
       await notificationApi.createNotification(notificationData);
-      console.log('Notification created successfully');
+      
 
       } catch (notificationError) {
-      console.error('Error creating notification:', notificationError);
       // Don't fail the entire booking if notification creation fails
     }
 
@@ -179,7 +177,6 @@ export function BookServiceTab({ clientId }: BookServiceTabProps) {
       await clientPanelBooking.createClientBooking(payload);
       setIsModalOpen(true);
     } catch (err: any) {
-      console.error('Booking failed:', err);
       setError(err.message || 'Booking failed. Please try again.');
     } finally {
       setIsLoading(false);

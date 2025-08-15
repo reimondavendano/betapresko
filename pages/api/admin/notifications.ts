@@ -49,15 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           message = settingsMap['notif_confirmed']?.replace('{0}', clientName) || ''
         }
 
-        // === CLIENT VIEW ===
-        // else if (n.send_to_admin === false && n.send_to_client === true && n.is_referral === true) {
-        //   console.log(n, 'niceee');
-        //   message = settingsMap['notif_referral']?.replace('{0}', clientName) || ''
-        // }
-        // else if (n.send_to_admin === false && n.send_to_client === true && n.is_referral === false) {
-        //   console.log(n, 'hereeeeeeeeeeeeeeee?');
-        //   message = settingsMap['notif_completed']?.replace('{0}', clientName) || ''
-        // }
+        
 
         return {
           ...n,

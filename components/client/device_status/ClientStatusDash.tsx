@@ -105,7 +105,7 @@ export function ClientStatusDash({ cleaningStatuses, handleOpenBookingModal, han
                     </div>
                   )}
                   
-                  {/* Removed No Service Record section */}
+                  
                 </div>
                 <Button className="ml-4 bg-blue-600 hover:bg-blue-700" onClick={() => handleOpenBookingModal(status.location.id)}>
                   <Plus className="w-4 h-4 mr-2" /> Add Booking

@@ -51,8 +51,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
 
   const isInitialLoad = useRef(true);
 
-  // This logic runs at the start of every render.
-  // We use a ref to ensure it only dispatches the initial device once.
   if (isInitialLoad.current && newDevices.length === 0) {
     if (availableBrands.length > 0 && availableACTypes.length > 0 && availableHorsepowerOptions.length > 0) {
       dispatch(addNewDevice({
@@ -106,7 +104,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
     return total;
   };
 
-  // Calculate discount based on client's discounted status
   const calculateDiscount = () => {
     if (!currentClient) return { value: 0, type: 'None' };
 
@@ -141,7 +138,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
 
   const totalUnits = newDevices.reduce((sum, d) => sum + d.quantity, 0);
 
-  // This useEffect will run whenever newDevices changes to update the totals
   useEffect(() => {
     const newSubtotal = calculateSubtotal();
     const discount = calculateDiscount();
@@ -179,7 +175,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
 
   const handleSaveLocation = async () => {
     if (newDeviceIndexToUpdate !== null && tempSelectedLocationId) {
-      // For new devices, only update Redux state (no database persistence needed yet)
       dispatch(updateNewDeviceProperty({ index: newDeviceIndexToUpdate, field: 'location_id' as keyof BookingDevice, value: tempSelectedLocationId }));
     }
     setIsDialogOpen(false);
@@ -196,7 +191,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
         <p className="text-gray-600 text-lg">Add details for each aircon unit you want serviced</p>
       </div>
 
-      {/* New Units Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-start gap-2 text-gray-600 px-2">
           <h3 className="font-semibold text-lg">New Units</h3>
@@ -224,7 +218,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
                 <CardTitle className="text-xl font-semibold text-gray-800">Unit {index + 1}</CardTitle>
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    {/* Hide on mobile */}
                     <span className="hidden md:inline-block text-sm text-gray-500 truncate">{newDeviceLocationDisplayString}</span>
                     <Button
                       variant="outline"
@@ -246,7 +239,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
                 </div>
               </CardHeader>
               <CardContent className="p-0 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 items-start">
-                {/* Brand Select - Always show */}
                 <div className="space-y-1">
                   <Label htmlFor={`brand-${index}`} className="text-gray-700">Brand</Label>
                   <Select
@@ -264,7 +256,6 @@ export function Step2SelectDevices({ onNext, onBack }: Step2SelectDevicesProps) 
                   </Select>
                 </div>
 
-                {/* Type Select - Now visible on mobile */}
                 <div className="space-y-1">
                   <Label htmlFor={`ac-type-${index}`} className="text-gray-700">Type</Label>
                   <Select

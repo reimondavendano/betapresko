@@ -181,14 +181,12 @@ export function UnitsStep() {
   };
 
   const handleNext = () => {
-    console.log('Attempting to proceed to next step...');
     if (isFormValid()) {
-      console.log('Form is valid. Dispatching actions...');
       dispatch(setSelectedDevices(devices));
       dispatch(setTotalAmount(calculateFinalTotal())); // Dispatch the final total
       dispatch(setStep(4)); // Proceed to Schedule Step (Step 4 in the new flow)
     } else {
-      console.log('Form is NOT valid. Cannot proceed.');
+
     }
   };
 

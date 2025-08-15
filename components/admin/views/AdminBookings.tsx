@@ -1,7 +1,7 @@
 // AdminBookings.tsx
 'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Calendar, momentLocalizer, Views, type View } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
@@ -16,8 +16,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { AirVent } from 'lucide-react';
-import { blockedDatesApi } from '@/pages/api/dates/blockedDatesApi'
-import type { BlockedDate } from '@/types/database'
+import { supabase } from '@/lib/supabase';
+import { blockedDatesApi } from '@/pages/api/dates/blockedDatesApi';
+import type { BlockedDate } from '@/types/database';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/lib/store';
+import { setAppointments } from '@/lib/features/admin/adminSlice';
+import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking';
+
 
 const localizer = momentLocalizer(moment);
 
@@ -39,8 +45,9 @@ export default function AdminBookings() {
     blockedReason?: string | null
   }
 
+  const dispatch = useDispatch();
+  const appointments = useSelector((state: RootState) => state.admin.appointments);
   const [events, setEvents] = useState<BookingEvent[]>([]);
-  const [rawAppointments, setRawAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('today')
@@ -55,7 +62,14 @@ export default function AdminBookings() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
-  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([])
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+
+  useEffect(() => {
+    const channel = subscribeToBookings();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const onEventDrop = async ({ event, start, end }: any) => {
     // Update UI immediately
@@ -82,38 +96,38 @@ export default function AdminBookings() {
     }
   };
 
-  const loadAppointments = async (filter: 'all' | 'confirmed' | 'completed') => {
+    const loadAppointments = useCallback(async (filter: 'all' | 'confirmed' | 'completed') => {
     setLoading(true)
     try {
       const res = await fetch(`/api/admin/appointments?status=${filter === 'all' ? '' : filter}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to load appointments')
-      const apptsAll = json.data as any[]
-      setRawAppointments(apptsAll)
+      dispatch(setAppointments(json.data as any[]));
       setLoading(false)
     } catch (e) {
       setLoading(false)
     }
-  }
+  }, [dispatch]);
 
-  const loadBlockedDates = async () => {
+  const loadBlockedDates = useCallback(async () => {
     try {
       const list = await blockedDatesApi.getBlockedDates()
       setBlockedDates(list)
     } catch (e) {
       // noop
     }
-  }
+  }, []);
 
-  // initial load and on filter/view change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAppointments(statusFilter); loadBlockedDates() }, [statusFilter])
+  useEffect(() => {
+    loadAppointments(statusFilter);
+    loadBlockedDates();
+  }, [statusFilter, loadAppointments, loadBlockedDates]);
 
   // Reset page when filter changes or when data updates
-  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, rawAppointments.length])
+  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, appointments.length])
 
   // Derived filtered, sorted and paginated appointments
-  const filteredAppointments = rawAppointments.filter((a: any) => {
+  const filteredAppointments = appointments.filter((a: any) => {
     if (dateFilter === 'all') return true
     const apptDate = moment(a.appointment_date).startOf('day')
     const today = moment().startOf('day')
@@ -221,7 +235,7 @@ export default function AdminBookings() {
 
         {/* Appointment List */}
         <div>
-          {/* <h4 className="text-lg font-semibold mb-3">Client Appointment List</h4> */}
+          
           <div className="space-y-3">
             {sortedAppointments.length === 0 && <div className="text-sm text-gray-500">No appointments</div>}
             {paginatedAppointments.map((a, idx) => {
@@ -289,10 +303,7 @@ export default function AdminBookings() {
       <div className="flex-1 space-y-4">
         {/* Top Controls */}
         <div className="flex justify-between items-center">
-          {/* <div className="flex space-x-2">
-            <Button variant="outline"><Filter size={16} className="mr-2" /> Filter</Button>
-            <Button variant="outline"><Download size={16} className="mr-2" /> Download Data</Button>
-          </div> */}
+          
           <div className="flex space-x-2 items-center">
             <Button variant="ghost" size="icon" onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}><ChevronLeft /></Button>
             <span className="font-bold">{moment(date).format(view === Views.MONTH ? 'MMMM YYYY' : 'MMMM YYYY')}</span>
@@ -333,7 +344,7 @@ export default function AdminBookings() {
             views={[Views.MONTH, Views.WEEK, Views.DAY]}
             draggableAccessor={(e: any) => !!e.draggable}
             onSelectEvent={(event: any) => {
-              const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
+              const appt = appointments.find((a: any) => a.id === event.appointmentId)
               if (appt) {
                 const timeLabel = `${moment(event.start).format('hh:mm A')} - ${moment(event.end).format('hh:mm A')}`
                 setSelectedAppt(appt)
@@ -373,7 +384,7 @@ export default function AdminBookings() {
                     type="button"
                     className="leading-tight text-left cursor-pointer w-full h-full"
                     onClick={() => {
-                      const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
+                      const appt = appointments.find((a: any) => a.id === event.appointmentId)
                       if (appt) {
                         setSelectedAppt(appt)
                         setSelectedTimeRange(timeLabel)
@@ -389,7 +400,7 @@ export default function AdminBookings() {
               },
             }}
             onDoubleClickEvent={(event: any) => {
-              const appt = rawAppointments.find((a: any) => a.id === event.appointmentId)
+              const appt = appointments.find((a: any) => a.id === event.appointmentId)
               if (appt) {
                 const timeLabel = `${moment(event.start).format('hh:mm A')} - ${moment(event.end).format('hh:mm A')}`
                 setSelectedAppt(appt)
@@ -527,7 +538,7 @@ export default function AdminBookings() {
                     console.error('Error fetching client ref_id', err)
                   }
 
-                  console.log(confirmTarget.appointment_date);
+                  
                   // 3. Insert into notifications table
                   await fetch(`/api/clients/notification-by-id`, {
                     method: 'POST',

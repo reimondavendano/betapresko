@@ -10,7 +10,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Check } from 'lucide-react';
 import { Service } from '@/types/database';
 
-// Import icons for services (assuming you have these or similar)
 import { Wrench, Zap, Snowflake, Settings } from 'lucide-react'; 
 
 interface Step1SelectServiceProps {
@@ -25,7 +24,6 @@ export function Step1SelectService({ onNext }: Step1SelectServiceProps) {
     dispatch(setSelectedBookingService(service));
   };
 
-  // Function to get an icon based on service name (you might want to map this more robustly)
   const getServiceIcon = (serviceName: string) => {
     const lowerCaseName = serviceName.toLowerCase();
     if (lowerCaseName.includes('cleaning')) {
@@ -79,7 +77,6 @@ export function Step1SelectService({ onNext }: Step1SelectServiceProps) {
         ))}
       </div>
 
-      {/* Responsive button container */}
       <div className="flex flex-col sm:flex-row justify-between items-center mt-8 space-y-4 sm:space-y-0">
         <Button 
           variant="outline" 

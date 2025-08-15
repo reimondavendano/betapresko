@@ -196,7 +196,7 @@ export default function AdminClientInfo() {
   const handleDialogConfirm = () => {
     if (selectedClient && dialogAction) {
       // Here you can implement the actual action
-      console.log(`${dialogAction} action for client:`, selectedClient.name);
+      
       
       // Use your existing notification function instead of alert()
       if (dialogAction === 'edit') {
@@ -236,7 +236,7 @@ export default function AdminClientInfo() {
       );
       // Use notification for success as well
       showTempNotification(`Updated client ${clientId} discounted status to: ${checked ? 'Yes' : 'No'}`);
-      console.log(`Updated client ${clientId} discounted status to: ${checked}`);
+      
     } catch (error) {
       console.error('Error updating client discounted status:', error);
       // Use your existing notification function instead of alert()

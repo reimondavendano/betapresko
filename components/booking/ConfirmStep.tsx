@@ -253,15 +253,14 @@ export function ConfirmStep() {
         };
         
         await notificationApi.createNotification(notificationData);
-        console.log('Notification created successfully');
+        
 
         // If a referral ID was used, remove it from session storage
         if (referralId) {
           sessionStorage.removeItem('referralId');
-          console.log('[SESSION] Referral ID removed from session storage.');
+          
         }
       } catch (notificationError) {
-        console.error('Error creating notification:', notificationError);
         // Don't fail the entire booking if notification creation fails
       }
 
@@ -271,7 +270,6 @@ export function ConfirmStep() {
       setIsSubmitting(false);
       setIsCompleted(true);
     } catch (err: any) {
-      console.error('Booking submission error:', err);
       setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
       setIsSubmitting(false);
     }

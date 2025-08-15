@@ -1,30 +1,35 @@
+// components/AdminHeader.tsx
 'use client'
 
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
+import { setNotifications, setNewNotificationsCount } from '@/lib/features/admin/adminSlice'
 import type { RootState } from '@/lib/store'
 import { Bell, Globe, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function AdminHeader() {
+  const dispatch = useDispatch()
   const admin = useSelector((s: RootState) => s.admin.currentAdmin)
   const activeView = useSelector((s: RootState) => s.admin.activeView)
+  const notifications = useSelector((s: RootState) => s.admin.notifications)
+  const newNotificationsCount = useSelector((s: RootState) => s.admin.newNotificationsCount)
 
-  const [notifications, setNotifications] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await fetch('/api/admin/notifications')
-      const json = await res.json()
-      setNotifications(json.data || [])
-    } catch (err) {
-      console.error('Failed to fetch notifications', err)
-    }
-  }
-
   useEffect(() => {
-    fetchNotifications()
-  }, [])
+    const fetchInitialNotifications = async () => {
+      try {
+        const res = await fetch('/api/admin/notifications')
+        const json = await res.json()
+        dispatch(setNotifications(json.data || []))
+        dispatch(setNewNotificationsCount(json.data?.length || 0))
+      } catch (err) {
+        console.error('Failed to fetch initial notifications', err)
+      }
+    }
+    fetchInitialNotifications()
+  }, [dispatch])
 
   const viewLabelMap: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -36,38 +41,32 @@ export default function AdminHeader() {
   const headerTitle = viewLabelMap[activeView] || 'Dashboard'
 
   return (
-    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm relative">
-      <div className="flex-1 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-800">{headerTitle}</h1>
-      </div>
-      <div className="relative mx-8 w-80">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300"
-        />
-      </div>
-      <div className="flex items-center gap-4 text-gray-500">
-        <Globe size={24} className="hover:text-orange-500 cursor-pointer" />
+    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
+      <h1 className="text-xl font-bold text-gray-800">{headerTitle}</h1>
+      <div className="flex items-center">
         <div className="relative">
-          <button onClick={() => setIsOpen(!isOpen)}>
-            <Bell size={24} className="hover:text-orange-500 cursor-pointer" />
-            {notifications.length > 0 && (
-              <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
+          <button
+            className="p-2 rounded-full hover:bg-gray-200 transition-colors duration-200"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            <Bell className="w-5 h-5 text-gray-600" />
+            {newNotificationsCount > 0 && (
+             <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
                 {notifications.length}
               </span>
             )}
           </button>
           {isOpen && (
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
-              <div className="p-3 border-b font-semibold">Notifications</div>
-              <ul className="max-h-64 overflow-y-auto">
+              <ul className="divide-y divide-gray-200 max-h-80 overflow-y-auto">
+                <li className="px-3 py-2 text-sm font-semibold text-gray-800">
+                  Notifications
+                </li>
                 {notifications.length > 0 ? (
-                  notifications.map((n, idx) => (
+                  notifications.map((n: any) => (
                     <li
-                      key={idx}
-                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                      key={n.id}
+                      className="px-3 py-4 hover:bg-gray-100 cursor-pointer transition-colors duration-200"
                     >
                       <div className="text-sm text-gray-800">
                         {n.display_message || 'New notification'}
@@ -88,7 +87,7 @@ export default function AdminHeader() {
         </div>
         <div className="flex items-center gap-2 ml-4 cursor-pointer max-w-xs">
           <img
-            src="../assets/images/icon.jpg"
+            src="https://placehold.co/100x100/orange/white?text=A"
             alt="User Avatar"
             className="w-9 h-9 rounded-full ring-2 ring-orange-400"
           />

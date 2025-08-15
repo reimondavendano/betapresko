@@ -110,6 +110,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [isBookingModalOpen, setIsBookingModal] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<UUID | null>(null);
   const [selectedDevices, setSelectedDevices] = useState<UUID[]>([]);
+  const [bookingDate, setBookingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   // --- Details Modal State and Handlers ---
   const [isDetailsModalOpen, setIsDetailsModal] = useState(false);
@@ -127,6 +128,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setSelectedLocationId(locationId);
     setIsBookingModal(true);
     setSelectedDevices([]);
+    setBookingDate(format(new Date(), 'yyyy-MM-dd'));
   };
 
   const handleCloseBookingModal = () => {
@@ -162,11 +164,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     }
 
     try {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const appointmentDate = `${yyyy}-${mm}-${dd}`;
+      const appointmentDate = bookingDate;
 
       // Pick a service to associate with the appointment (fallback to first available)
       const selectedService = allServices[0];
@@ -200,8 +198,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         if (selectedLocationId && device.location_id !== selectedLocationId) {
           updatePayload.location_id = selectedLocationId;
         }
-        // If there are other editable fields you want to sync on booking, include them here
-        // We keep name and horsepower as their current values (no change) unless you have a UI to edit in this flow
+        
+        // --- ADDED: Set last_cleaning_date to null ---
+        updatePayload.last_cleaning_date = null;
+        // --- END ADDED ---
+
         if (Object.keys(updatePayload).length > 0) {
           await deviceApi.updateDevice(deviceId, updatePayload);
         }
@@ -866,7 +867,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           {getLocation(appointment.location_id)?.name || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ₱{appointment.amount.toLocaleString()}
+                          {appointment.amount.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Badge
@@ -961,6 +962,19 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                   return (
                     <div key={device.id} className="p-3 border rounded-lg">
                       <div className="flex items-center justify-between">
+                        <div className="mb-6">
+                          <Label htmlFor="bookingDate" className="font-semibold">Select Appointment Date</Label>
+                          <Input
+                            id="bookingDate"
+                            type="date"
+                            value={bookingDate}
+                            onChange={(e) => setBookingDate(e.target.value)}
+                            className="mt-1"
+                          />
+                          </div>
+                        </div>
+                      <div className="flex items-center justify-between">
+                        
                         <div className="flex items-center space-x-3">
                           <Checkbox 
                             id={`device-${device.id}`} 
@@ -975,12 +989,13 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                           </label>
                         </div>
                         <div className="text-sm font-semibold text-blue-600">
-                          ₱{devicePrice.toLocaleString()}
+                          {devicePrice.toLocaleString()}
                         </div>
                       </div>
 
                       {device.last_cleaning_date && (
                         <div className="mt-2 space-y-2">
+                          
                           <div>
                             <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
                             <div className="flex items-center space-x-2">
@@ -1031,19 +1046,19 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>₱{pricing.subtotal.toLocaleString()}</span>
+                        <span>{pricing.subtotal.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Discount ({pricing.discount}% - {(() => {
                           const discount = calculateDiscount();
                           return discount.type;
                         })()}):</span>
-                        <span className="text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
+                        <span className="text-red-600">-{pricing.discountAmount.toLocaleString()}</span>
                       </div>
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-bold">
                           <span>Total Amount:</span>
-                          <span className="text-blue-600">₱{pricing.total.toLocaleString()}</span>
+                          <span className="text-blue-600">{pricing.total.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>

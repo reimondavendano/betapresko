@@ -12,7 +12,7 @@ const SignUpPage = () => {
 
     if (referralId) {
       sessionStorage.setItem('referralId', referralId);
-      console.log(`[SESSION] Saved referral ID: ${referralId}`);
+      
     }
 
     setRedirecting(true);

@@ -6,6 +6,7 @@ import type { RootState } from '@/lib/store'
 import { setAuthenticated, setCurrentAdmin } from '@/lib/features/admin/adminSlice'
 import AdminLogin from '@/components/admin/AdminLogin'
 import AdminLayout from '@/components/admin/layout/AdminLayout'
+import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking'
 
 export default function AdminPage() {
   const dispatch = useDispatch()
@@ -37,6 +38,18 @@ export default function AdminPage() {
     }
     setHydrating(false)
   }, [dispatch])
+
+  useEffect(() => {
+    let channel: any;
+    if (isAuthenticated) {
+      channel = subscribeToBookings();
+    }
+    return () => {
+      if (channel) {
+        channel.unsubscribe();
+      }
+    };
+  }, [isAuthenticated]);
 
   if (hydrating) {
     return (

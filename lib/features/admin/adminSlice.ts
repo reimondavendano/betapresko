@@ -31,9 +31,12 @@ interface AdminState {
     completedAppointments: number
     totalRevenue: number
   }
+  appointments: any[]
   loading: boolean
   error: string | null
   activeView: AdminView
+  notifications: any[]
+  newNotificationsCount: number
 }
 
 const initialState: AdminState = {
@@ -46,9 +49,12 @@ const initialState: AdminState = {
     completedAppointments: 0,
     totalRevenue: 0,
   },
+  appointments: [],
   loading: false,
   error: null,
   activeView: 'dashboard',
+  notifications: [],
+  newNotificationsCount: 0,
 }
 
 const adminSlice = createSlice({
@@ -73,6 +79,21 @@ const adminSlice = createSlice({
     setActiveView: (state, action: PayloadAction<AdminView>) => {
       state.activeView = action.payload
     },
+    setAppointments: (state, action: PayloadAction<any[]>) => {
+      state.appointments = action.payload
+    },
+    addAppointment: (state, action: PayloadAction<any>) => {
+      const existingAppointment = state.appointments.find(appointment => appointment.id === action.payload.id);
+      if (!existingAppointment) {
+        state.appointments.unshift(action.payload);
+      }
+    },
+    setNotifications: (state, action: PayloadAction<any[]>) => {
+      state.notifications = action.payload;
+    },
+    setNewNotificationsCount: (state, action: PayloadAction<number>) => {
+      state.newNotificationsCount = action.payload;
+    },
     logout: (state) => {
       state.isAuthenticated = false
       state.currentAdmin = null
@@ -88,6 +109,10 @@ export const {
   setCurrentAdmin,
   setDashboardStats,
   setActiveView,
+  setAppointments,
+  addAppointment,
+  setNotifications,
+  setNewNotificationsCount,
   logout,
 } = adminSlice.actions
 

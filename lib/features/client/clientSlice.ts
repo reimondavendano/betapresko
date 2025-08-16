@@ -67,6 +67,7 @@ const initialState: ClientState = {
       surcharge: 0,
       discount: 0,
       familyDiscount: 0,
+      repairPrice: 0
     },
   },
 }

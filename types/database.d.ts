@@ -176,6 +176,7 @@ export interface ParsedCustomSettings {
   surcharge: number;
   discount: number;
   familyDiscount: number;
+  repairPrice: number;
 }
 
 export interface AdminUser {

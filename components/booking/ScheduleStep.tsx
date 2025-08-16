@@ -179,15 +179,14 @@ export function ScheduleStep() {
   // This function visually disables past dates only, leaving today and future dates enabled.
   const isDateVisuallyDisabled = (date: Date) => {
     const today = startOfDay(new Date());
-    // Disable dates that are before today
-    return isBefore(date, today);
+    // Disable today and any date before today (no on-the-spot booking)
+    return !isAfter(date, today);
   };
 
   const isDateActuallyUnavailable = (date: Date) => {
-    if (isBefore(date, startOfDay(new Date()))) {
-      return true;
-    }
-    if (date.getDay() === 0) {
+    const today = startOfDay(new Date());
+    // Treat today and past dates as unavailable
+    if (!isAfter(date, today)) {
       return true;
     }
     return blockedDatesApi.isDateBlocked(format(date, 'yyyy-MM-dd'), availableBlockedDates) !== null;
@@ -196,7 +195,8 @@ export function ScheduleStep() {
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      if (isBefore(date, startOfDay(new Date()))) {
+      const today = startOfDay(new Date());
+      if (!isAfter(date, today)) {
         setSelectedDate(undefined);
         return;
       }

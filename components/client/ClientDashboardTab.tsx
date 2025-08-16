@@ -2,38 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { format, addYears, differenceInDays, addDays } from 'date-fns';
 import {
-  User,
-  MapPin,
+  Star,
   Calendar,
-  Settings,
+  AirVent,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   Minus,
   Edit,
   Trash2,
-  QrCode,
-  Star,
-  Clock,
-  Loader2,
-  AlertCircle,
-  TrendingUp,
-  DollarSign,
-  AirVent,
-  Mail,
-  Phone,
-  Home,
-  ChevronRight,
-  ChevronLeft,
-  X,
   Save,
   Ban,
+  Loader2,
+  AlertCircle,
+  X,
   Check
 } from 'lucide-react';
-import {
-  PieChart, Pie, Cell, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from 'recharts';
-import { format, addMonths, isBefore, addYears, differenceInDays } from 'date-fns';
 
 // Import UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,8 +32,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Import the new components
-import { CleaningStatus } from '@/components/client/device_status/CleaningStatus';
-import { ClientStatusDash } from '@/components/client/device_status/ClientStatusDash';
+import { DashboardHeader } from '@/components/client/client_components/DashboardHeader';
+import { StatsOverview } from '@/components/client/client_components/StatsOverview';
+import { ClientStatusDash } from '@/components/client/client_components/ClientStatusDash';
+import { AddLocationButton } from '@/components/client/client_components/AddLocationButton';
+import { PointsCard } from '@/components/client/client_components/PointsCard';
+import { RecentAppointmentsTable } from '@/components/client/client_components/RecentAppointmentsTable';
+import { BlockedDateModal } from '@/components/client/client_components/BlockedDateModal';
+import { BookingModal } from '@/components/client/client_components/BookingModal';
+import { DetailsModal } from '@/components/client/client_components/DetailsModal';
 import { LocationForm } from '@/components/client/LocationForm';
 // --- CORRECTED API IMPORTS ---
 import { clientApi } from '../../pages/api/clients/clientApi';
@@ -109,12 +102,13 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allACTypes, setAllACTypes] = useState<ACType[]>([]);
   const [allHorsepowerOptions, setAllHorsepowerOptions] = useState<HorsepowerOption[]>([]);
-  const [customSettings, setCustomSettings] = useState<{ splitTypePrice: number; windowTypePrice: number; surcharge: number; discount: number; familyDiscount: number }>({
+  const [customSettings, setCustomSettings] = useState<{ splitTypePrice: number; windowTypePrice: number; surcharge: number; discount: number; familyDiscount: number; repairPrice: number }>({
     splitTypePrice: 0,
     windowTypePrice: 0,
     surcharge: 0,
     discount: 0,
-    familyDiscount: 0
+    familyDiscount: 0,
+    repairPrice: 0,
   });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,6 +198,14 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setIsSummaryModalOpen(true);
   };
 
+  // Close all open modals (Booking, New Units, Summary, etc.)
+  const handleCloseAllModals = () => {
+    setIsBookingModal(false);
+    setShowNewUnitsForm(false);
+    setIsSummaryModalOpen(false);
+    setShowAdditionalService(false);
+  };
+
 
 
   const handleCloseSummaryModal = () => {
@@ -270,18 +272,23 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setIsLocationModalOpen(false);
   };
 
-  const fetchLocations = async () => {
+  const fetchLocations = async (): Promise<ClientLocation[]> => {
     try {
       const fetchedLocations = await clientLocationApi.getByClientId(clientId);
       setLocations(fetchedLocations);
+      return fetchedLocations;
     } catch (err: any) {
       console.error('Error fetching locations:', err);
+      return [];
     }
   };
 
-  const handleLocationSaved = () => {
-    fetchLocations();
+  const handleLocationSaved = async () => {
+    const updatedLocations = await fetchLocations();
     handleCloseLocationModal();
+    // Jump to the last page so the newly added location is visible immediately
+    const totalPagesAfterAdd = Math.max(1, Math.ceil(updatedLocations.length / cleaningStatusItemsPerPage));
+    setCleaningStatusCurrentPage(totalPagesAfterAdd);
   };
 
   const handleStartEditPrimaryLocation = () => {
@@ -325,10 +332,26 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   
 
+  const isDeviceScheduledForService = (deviceId: UUID, serviceId: UUID | null) => {
+    if (!serviceId) return false;
+    const apptId = deviceIdToAppointmentId.get(deviceId);
+    if (!apptId) return false;
+    const appt = appointments.find(a => a.id === apptId);
+    return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+  };
+
   const handleSelectAllDevices = (checked: boolean) => {
-    const devicesToSelect = devicesForSelectedLocation.map(device => device.id);
+    if (!selectedLocationId || !selectedServiceId) {
+      setSelectedDevices([]);
+      return;
+    }
+    const locationDevices = devices.filter(d => d.location_id === selectedLocationId);
+    const eligible = locationDevices
+      .filter(d => !isDeviceScheduledForService(d.id as UUID, selectedServiceId))
+      .map(d => d.id as UUID);
+
     if (checked) {
-      setSelectedDevices(devicesToSelect);
+      setSelectedDevices(eligible);
     } else {
       setSelectedDevices([]);
     }
@@ -347,9 +370,17 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
 
   const handleSelectAllAdditionalServiceDevices = (checked: boolean) => {
-    const devicesToSelect = devicesForSelectedLocation.map(device => device.id);
+    if (!selectedLocationId || !additionalServiceId) {
+      setAdditionalServiceDevices([]);
+      return;
+    }
+    const locationDevices = devices.filter(d => d.location_id === selectedLocationId);
+    const eligible = locationDevices
+      .filter(d => !isDeviceScheduledForService(d.id as UUID, additionalServiceId))
+      .map(d => d.id as UUID);
+
     if (checked) {
-      setAdditionalServiceDevices(devicesToSelect);
+      setAdditionalServiceDevices(eligible);
     } else {
       setAdditionalServiceDevices([]);
     }
@@ -763,8 +794,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
     const today = new Date();
     
+    // Use all locations as-is
+    const allLocations = locations;
+
     // First, initialize all locations with 0 devices
-    locations.forEach(location => {
+    allLocations.forEach(location => {
       statusByLocation.set(location.id, {
         location,
         dueDevices: 0,
@@ -967,6 +1001,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   // Calculate device price based on AC type and horsepower
   const calculateDevicePrice = (device: Device) => {
+    // Default pricing (e.g., cleaning) based on AC type and horsepower
     const acType = allACTypes.find(t => t.id === device.ac_type_id);
     const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id);
     
@@ -1052,26 +1087,33 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   // Calculate total price for selected devices
   const calculateTotalPrice = () => {
+    const serviceName = allServices.find(s => s.id === selectedServiceId)?.name?.toLowerCase() || '';
+
+    // Pricing per device
+    const perDevicePrice = (device: Device) => {
+      if (serviceName.includes('repair')) {
+        return customSettings.repairPrice || 0;
+      }
+      return calculateDevicePrice(device);
+    };
+
     const subtotal = selectedDevices.reduce((total, deviceId) => {
       const device = devices.find(d => d.id === deviceId);
-      return total + (device ? calculateDevicePrice(device) : 0);
+      return total + (device ? perDevicePrice(device) : 0);
     }, 0);
     
-    const discount = calculateDiscount();
-    const discountAmount = (subtotal * discount.value) / 100;
+    let discountValue = 0;
+    let discountAmount = 0;
+    if (!serviceName.includes('repair')) {
+      const discount = calculateDiscount();
+      discountValue = discount.value;
+      discountAmount = (subtotal * discount.value) / 100;
+    }
     const total = subtotal - discountAmount;
-    
-    console.log('calculateTotalPrice debug:', {
-      subtotal,
-      discount,
-      discountAmount,
-      total,
-      clientDiscounted: client?.discounted
-    });
     
     return {
       subtotal,
-      discount: discount.value,
+      discount: discountValue,
       discountAmount,
       total
     };
@@ -1079,18 +1121,32 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   // Calculate total price for additional service devices
   const calculateAdditionalServicePrice = () => {
+    const serviceName = allServices.find(s => s.id === additionalServiceId)?.name?.toLowerCase() || '';
+
+    const perDevicePrice = (device: Device) => {
+      if (serviceName.includes('repair')) {
+        return customSettings.repairPrice || 0;
+      }
+      return calculateDevicePrice(device);
+    };
+
     const subtotal = additionalServiceDevices.reduce((total, deviceId) => {
       const device = devices.find(d => d.id === deviceId);
-      return total + (device ? calculateDevicePrice(device) : 0);
+      return total + (device ? perDevicePrice(device) : 0);
     }, 0);
     
-    const discount = calculateDiscount();
-    const discountAmount = (subtotal * discount.value) / 100;
+    let discountValue = 0;
+    let discountAmount = 0;
+    if (!serviceName.includes('repair')) {
+      const discount = calculateDiscount();
+      discountValue = discount.value;
+      discountAmount = (subtotal * discount.value) / 100;
+    }
     const total = subtotal - discountAmount;
     
     return {
       subtotal,
-      discount: discount.value,
+      discount: discountValue,
       discountAmount,
       total
     };
@@ -1160,36 +1216,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const getAvailableDevices = () => {
     if (!selectedLocationId || !selectedServiceId) return [];
 
-    // Limit to devices for this location
+    // Return all devices for this location; UI will disable those already scheduled for the selected service
     const locationDevices = devices.filter(device => device.location_id === selectedLocationId);
-
-    // From precomputed cleaningStatuses, allow only 'well-maintained' and 'due'
-    const locationStatus = cleaningStatuses.find(s => s.location.id === selectedLocationId);
-    if (!locationStatus) return [];
-
-    const allowedDeviceIds = new Set<UUID>(
-      locationStatus.devices
-        .filter(d => d.status === 'well-maintained' || d.status === 'due')
-        .map(d => d.device.id as UUID)
-    );
-
-    // Additionally, exclude devices already booked (confirmed) for the selected service at this location
-    const bookedDeviceIds = new Set<UUID>();
-    appointments.forEach(appt => {
-      if (
-        appt.status === 'confirmed' &&
-        appt.location_id === selectedLocationId &&
-        appt.service_id === selectedServiceId
-      ) {
-        deviceIdToAppointmentId.forEach((appointmentId, deviceId) => {
-          if (appointmentId === appt.id) bookedDeviceIds.add(deviceId);
-        });
-      }
-    });
-
-    return locationDevices.filter(
-      device => allowedDeviceIds.has(device.id as UUID) && !bookedDeviceIds.has(device.id as UUID)
-    );
+    return locationDevices;
   };
 
   // Get active services
@@ -1203,92 +1232,13 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     return getActiveServices().filter(service => service.id !== selectedServiceId);
   };
 
-  // BlockedDateModal (copied from ScheduleStep)
-  const BlockedDateModal = ({ blockedDate, onClose }: { blockedDate: BlockedDate, onClose: () => void }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-sm rounded-lg shadow-lg relative">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-          onClick={onClose}
-        >
-          <X className="h-5 w-5" />
-        </Button>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl font-bold text-red-600 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 mr-2" />
-            Date Unavailable
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-3">
-          <p className="text-gray-800 font-medium text-lg">{blockedDate.name}</p>
-          <p className="text-gray-600 text-sm">
-            From: {format(new Date(blockedDate.from_date), 'MMM d, yyyy')}
-          </p>
-          <p className="text-gray-600 text-sm">
-            To: {format(new Date(blockedDate.to_date), 'MMM d, yyyy')}
-          </p>
-          {blockedDate.reason && (
-            <p className="text-gray-700 text-base mt-2">
-              Reason: <span className="font-normal">{blockedDate.reason}</span>
-            </p>
-          )}
-          <Button onClick={onClose} className="mt-4 bg-red-600 hover:bg-red-700 w-full">
-            Got It
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
 
   return (
     <>
       <div className="space-y-8">
-        <Card className="rounded-xl shadow-lg overflow-hidden text-white relative p-6 md:p-8" style={{ backgroundColor: '#99BCC0' }}>
-          <div className="absolute inset-0 opacity-10" style={{ backgroundColor: '#99BCC0' }}></div>
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
-            <div className="text-center md:text-left mb-4 md:mb-0">
-              <h1 className="text-3xl md:text-4xl font-extrabold mb-2">Welcome, {client.name}!</h1>
-              <p className="text-lg opacity-90">{primaryLocation ? `${primaryLocation.city_name}, Philippines` : 'Philippines'}</p>
-            </div>
-            <div className="flex-shrink-0">
-              <Image
-                src={`/assets/images/icon.jpg`}
-                alt="Welcome Illustration"
-                width={150}
-                height={150}
-                className="w-24 h-24 md:w-36 md:h-36 rounded-full object-cover shadow-xl"
-              />
-            </div>
-          </div>
-        </Card>
+        <DashboardHeader clientName={client.name} locationLabel={primaryLocation ? `${primaryLocation.city_name}, Philippines` : 'Philippines'} />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Points</p>
-              <p className="text-3xl font-bold text-blue-600">{client.points}</p>
-            </div>
-            <Star className="w-10 h-10 text-yellow-500" />
-          </Card>
-
-          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Bookings</p>
-              <p className="text-3xl font-bold text-green-600">{appointments.length}</p>
-            </div>
-            <Calendar className="w-10 h-10 text-green-600" />
-          </Card>
-
-          <Card className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Registered AC Units</p>
-              <p className="text-3xl font-bold text-purple-600">{devices.length}</p>
-            </div>
-            <AirVent className="w-10 h-10 text-purple-600" />
-          </Card>
-        </div>
+        <StatsOverview points={client.points} bookingsCount={appointments.length} devicesCount={devices.length} />
 
         <ClientStatusDash 
           cleaningStatuses={currentCleaningStatuses} 
@@ -1307,683 +1257,102 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           onPreviousPage={handleCleaningStatusPreviousPage}
         />
 
-        {/* Add Location Button - Fixed at bottom */}
-        <Card className="rounded-xl shadow-lg p-6 bg-white">
-          <CardContent className="p-0">
-            <Button 
-              variant="outline" 
-              className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 py-4 text-lg font-medium" 
-              onClick={handleOpenLocationModal}
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Location
-            </Button>
-          </CardContent>
-        </Card>
+        <AddLocationButton onClick={handleOpenLocationModal} />
 
-        <Card className="rounded-xl shadow-lg p-6 bg-white">
-          <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-xl font-bold flex items-center">
-              <Star className="w-5 h-5 mr-2 text-yellow-500" />
-              Your Points
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 space-y-4">
-            <div className="flex justify-between items-center text-gray-700">
-              <p className="text-2xl font-bold text-blue-600">{client.points}</p>
-              {client.points > 0 && client.points_expiry && (
-                <Badge variant="outline" className="text-sm border-yellow-500 text-yellow-700">
-                  Expires on: {format(new Date(client.points_expiry), 'MMM d, yyyy')}
-                </Badge>
-              )}
-            </div>
-            <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
-              Refer A Friend
-            </Button>
-            <p className="text-xs text-gray-500 mt-2">
-              Note: Points will be credited after the completion of your booking or referrals booking.
-            </p>
-          </CardContent>
-        </Card>
+        <PointsCard points={client.points} pointsExpiry={client.points_expiry} onReferClick={onReferClick} />
 
-        <Card className="rounded-xl shadow-lg p-6 bg-white">
-          <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-xl font-bold flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-              Recent Appointments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Service
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Notes
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentAppointments.length > 0 ? (
-                    currentAppointments.map((appointment) => (
-                      <tr key={appointment.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {format(new Date(appointment.appointment_date), 'MMM d, yyyy')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getServiceName(appointment.service_id)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getLocation(appointment.location_id)?.name || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {appointment.amount.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <Badge
-                            className={
-                              appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }
-                          >
-                            {appointment.status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {appointment.notes || '-'}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                        No recent appointments found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {appointments.length > itemsPerPage && (
-              <div className="flex justify-between items-center mt-4 px-6">
-                <Button
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Previous</span>
-                </Button>
-                <span className="text-sm text-gray-700">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <RecentAppointmentsTable
+          appointments={currentAppointments}
+          getServiceName={getServiceName}
+          getLocationName={(id) => getLocation(id)?.name || 'N/A'}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPreviousPage={handlePreviousPage}
+          onNextPage={handleNextPage}
+          itemsPerPage={itemsPerPage}
+        />
       </div>
       
-             {isBookingModalOpen && (
-         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
-             <button 
-               onClick={handleCloseBookingModal} 
-               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-             >
-               <X className="w-6 h-6" />
-             </button>
-             
-             {/* Header with Location */}
-             <div className="mb-6">
-               <h2 className="text-2xl font-bold text-gray-800">
-                 {selectedLocationId ? locations.find(loc => loc.id === selectedLocationId)?.name : 'Select Location'}
-               </h2>
-               <p className="text-sm text-gray-600 mt-1">
-                 Devices: {devices.filter(d => d.location_id === selectedLocationId).map(d => {
-                   const brand = allBrands.find(b => b.id === d.brand_id)?.name || 'N/A';
-                   const acType = allACTypes.find(t => t.id === d.ac_type_id)?.name || 'N/A';
-                   const horsepower = allHorsepowerOptions.find(h => h.id === d.horsepower_id)?.display_name || 'N/A';
-                   return `${d.name} (${brand} ${acType} ${horsepower})`;
-                 }).join(', ')}
-               </p>
-             </div>
-
-             {/* Service Selection */}
-             <div className="mb-6">
-               <Label htmlFor="service-select" className="text-sm font-medium text-gray-700">Service</Label>
-               <Select
-                 value={selectedServiceId || ''}
-                 onValueChange={(value) => {
-                   setSelectedServiceId(value);
-                   setSelectedDevices([]);
-                   
-                   // Check if this location has 0 devices
-                   const locationDevices = devices.filter(d => d.location_id === selectedLocationId);
-                   if (locationDevices.length === 0) {
-                     setShowNewUnitsForm(true);
-                   }
-                 }}
-               >
-                 <SelectTrigger className="mt-1">
-                   <SelectValue placeholder="Select a service" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {allServices.filter(service => service.is_active).map(service => (
-                     <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-
-             {/* Device Selection - Only show after service is selected */}
-             {selectedServiceId && (
-               <div className="mb-6">
-                 <div className="mb-4 flex items-center space-x-2">
-                   <Checkbox
-                     id="selectAll"
-                     checked={selectedDevices.length === getAvailableDevices().length && getAvailableDevices().length > 0}
-                     onCheckedChange={handleSelectAllDevices}
-                   />
-                   <label htmlFor="selectAll" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                     Select All
-                   </label>
-                 </div>
-
-                 <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                   {getAvailableDevices().length > 0 ? (
-                     getAvailableDevices().map(device => {
-                       const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                       const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                       const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                       const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
-                       const devicePrice = calculateDevicePrice(device);
-
-                       return (
-                         <div key={device.id} className="flex items-center justify-between p-3 border rounded-lg">
-                           <div className="flex items-center space-x-3">
-                             <Checkbox 
-                               id={`device-${device.id}`} 
-                               checked={selectedDevices.includes(device.id)}
-                               onCheckedChange={() => handleToggleDevice(device.id)}
-                             />
-                             <label 
-                               htmlFor={`device-${device.id}`} 
-                               className="text-sm font-medium leading-none"
-                             >
-                               {acName}
-                             </label>
-                           </div>
-                           <div className="text-sm font-semibold text-blue-600">
-                             PHP {devicePrice.toLocaleString()}
-                           </div>
-                         </div>
-                       );
-                     })
-                   ) : (
-                     <p className="text-gray-500">No available devices for this service.</p>
-                   )}
-                 </div>
-
-                 {/* Calendar */}
-                 <div className="mt-4">
-                   <Label htmlFor="bookingDate" className="text-sm font-medium text-gray-700">Appointment Date</Label>
-                   <Input
-                     id="bookingDate"
-                     type="date"
-                     value={bookingDate}
-                     onChange={(e) => {
-                       const dateStr = e.target.value;
-                       const blockedInfo = blockedDatesApi.isDateBlocked(dateStr, availableBlockedDates);
-                       if (blockedInfo) {
-                         setShowBlockedDateModal(blockedInfo);
-                         // Do not update bookingDate
-                       } else {
-                         setBookingDate(dateStr);
-                       }
-                     }}
-                     className="mt-1"
-                   />
-                 </div>
-               </div>
-             )}
-
-             {/* Add Another Services Section */}
-             {selectedServiceId && (
-               <div className="mb-6">
-                 <Button
-                   variant="outline"
-                   onClick={() => setShowAdditionalService(!showAdditionalService)}
-                   className="w-full"
-                 >
-                   {showAdditionalService ? 'Remove Additional Service' : 'Add Another Services +'}
-                 </Button>
-
-                 {showAdditionalService && (
-                   <div className="mt-4 p-4 border rounded-lg">
-                     <div className="mb-4">
-                       <Label htmlFor="additional-service-select" className="text-sm font-medium text-gray-700">Additional Service</Label>
-                       <Select
-                         value={additionalServiceId || ''}
-                         onValueChange={(value) => {
-                           setAdditionalServiceId(value);
-                           setAdditionalServiceDevices([]);
-                         }}
-                       >
-                         <SelectTrigger className="mt-1">
-                           <SelectValue placeholder="Select an additional service" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {getAdditionalServiceOptions().map(service => (
-                             <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </div>
-
-                     {additionalServiceId && (
-                       <>
-                         <div className="mb-4 flex items-center space-x-2">
-                           <Checkbox
-                             id="selectAllAdditional"
-                             checked={additionalServiceDevices.length === getAvailableDevices().length && getAvailableDevices().length > 0}
-                             onCheckedChange={handleSelectAllAdditionalServiceDevices}
-                           />
-                           <label htmlFor="selectAllAdditional" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                             Select All
-                           </label>
-                         </div>
-
-                         <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                           {getAvailableDevices().map(device => {
-                             const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                             const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                             const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                             const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
-                             const devicePrice = calculateDevicePrice(device);
-
-                             return (
-                               <div key={device.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                 <div className="flex items-center space-x-3">
-                                   <Checkbox 
-                                     id={`additional-device-${device.id}`} 
-                                     checked={additionalServiceDevices.includes(device.id)}
-                                     onCheckedChange={() => handleToggleAdditionalServiceDevice(device.id)}
-                                   />
-                                   <label 
-                                     htmlFor={`additional-device-${device.id}`} 
-                                     className="text-sm font-medium leading-none"
-                                   >
-                                     {acName}
-                                   </label>
-                                 </div>
-                                 <div className="text-sm font-semibold text-blue-600">
-                                   PHP {devicePrice.toLocaleString()}
-                                 </div>
-                               </div>
-                             );
-                           })}
-                         </div>
-
-                         <div className="mt-4">
-                           <Label htmlFor="additionalBookingDate" className="text-sm font-medium text-gray-700">Additional Service Date</Label>
-                           <Input
-                             id="additionalBookingDate"
-                             type="date"
-                             value={additionalServiceDate}
-                             onChange={(e) => setAdditionalServiceDate(e.target.value)}
-                             className="mt-1"
-                           />
-                         </div>
-                       </>
-                     )}
-                   </div>
-                 )}
-               </div>
-             )}
-
-             {/* Pricing Summary - Fixed at bottom */}
-             {(selectedDevices.length > 0 || additionalServiceDevices.length > 0) && (
-               <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
-                 <div className="p-4 bg-gray-50 rounded-lg">
-                   <h3 className="text-lg font-semibold mb-3">Pricing Summary</h3>
-                   {(() => {
-                     const pricing = calculateCombinedTotalPrice();
-                     return (
-                       <div className="space-y-2">
-                         <div className="flex justify-between">
-                           <span>Subtotal:</span>
-                           <span>P{pricing.subtotal.toLocaleString()}</span>
-                         </div>
-                         <div className="flex justify-between">
-                           <span>Discount ({pricing.discount}% - {(() => {
-                             const discount = calculateDiscount();
-                             return discount.type;
-                           })()}):</span>
-                           <span className="text-red-600">-P{pricing.discountAmount.toLocaleString()}</span>
-                         </div>
-                         <div className="border-t pt-2 mt-2">
-                           <div className="flex justify-between font-bold">
-                             <span>Total Amount:</span>
-                             <span className="text-blue-600">P{pricing.total.toLocaleString()}</span>
-                           </div>
-                         </div>
-                       </div>
-                     );
-                   })()}
-                 </div>
-                 <div className="flex justify-end mt-4 space-x-4">
-                   <Button onClick={handleCloseBookingModal} variant="outline">
-                     Cancel
-                   </Button>
-                   <Button 
-                     onClick={handleOpenSummaryModal} 
-                     disabled={selectedDevices.length === 0} 
-                     className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                   >
-                     Check Summary
-                   </Button>
-                 </div>
-               </div>
-             )}
-           </div>
-         </div>
-       )}
-
-      {isDetailsModalOpen && modalLocation && modalStatusType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl p-8 relative">
-            <button 
-              onClick={handleCloseDetailsModal} 
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            {/* Header Section */}
-            <div className="mb-6">
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <span className="font-semibold text-gray-700 mr-2">Location:</span>
-                  <span className="text-lg font-medium text-gray-800">{modalLocation.name}</span>
-                </div>
-
-                {modalServiceName && modalServiceName !== 'No Service' && (
-                  <div className="flex items-center">
-                    <span className="font-semibold text-gray-700 mr-2">Service:</span>
-                    <span className="text-lg font-medium text-blue-600">{modalServiceName}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center">
-                  <span className="font-semibold text-gray-700 mr-2">Status:</span>
-                  <span className="text-lg font-medium text-gray-800">
-                    {modalStatusType === 'scheduled' ? 'Scheduled Units' :
-                     modalStatusType === 'repair' ? 'Repair Units' : 
-                     modalStatusType === 'no-service' ? 'No Service Units' :
-                     `${modalStatusType.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')} Units`}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <Card className="p-4 rounded-xl shadow-md">
-
-                <CardTitle className="text-lg font-semibold mb-4 text-gray-700">Devices ({modalDevices.length})</CardTitle>
-
-                <CardContent className="space-y-4 p-0 max-h-96 overflow-y-auto">
-
-                  {modalDevices.length > 0 ? (
-
-                    modalDevices.map(device => {
-
-                      const { brand, acType, horsepower } = getDeviceDetails(device);
-
-                      const progressBar3Month = getProgressBarValue(device, 3);
-
-                      const progressBar4Month = getProgressBarValue(device, 4);
-
-                      const progressBar6Month = getProgressBarValue(device, 6);
-
-                      const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
-
-                      const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
-
-                      const service = deviceAppointment ? allServices.find(s => s.id === deviceAppointment.service_id) : undefined;
-
-                      
-
-                      // Determine if edit should be shown (only for well-maintained and due)
-
-                      const showEdit = modalStatusType === 'well-maintained' || modalStatusType === 'due';
-
-
-
-                      return (
-
-                        <div key={device.id} className="border-b last:border-b-0 pb-3">
-
-                          {editingDeviceId === device.id ? (
-
-                            // Edit Form
-
-                            <div className="space-y-3">
-
-                              <div>
-
-                                <Label htmlFor={`name-${device.id}`}>Name</Label>
-
-                                <Input
-
-                                  id={`name-${device.id}`}
-
-                                  value={editedDeviceData.name || ''}
-
-                                  onChange={(e) => setEditedDeviceData({ ...editedDeviceData, name: e.target.value })}
-
-                                />
-
-                              </div>
-
-                              <div>
-
-                                <Label htmlFor={`location-${device.id}`}>Location</Label>
-
-                                <Select
-
-                                  value={editedDeviceData.location_id || ''}
-
-                                  onValueChange={(value) => setEditedDeviceData({ ...editedDeviceData, location_id: value })}
-
-                                >
-
-                                  <SelectTrigger>
-
-                                    <SelectValue placeholder="Select a location" />
-
-                                  </SelectTrigger>
-
-                                  <SelectContent>
-
-                                    {locations.map(loc => (
-
-                                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-
-                                    ))}
-
-                                  </SelectContent>
-
-                                </Select>
-
-                              </div>
-
-                              <div>
-
-                                <Label htmlFor={`horsepower-${device.id}`}>Horsepower</Label>
-
-                                <Select
-
-                                  value={editedDeviceData.horsepower_id || ''}
-
-                                  onValueChange={(value) => setEditedDeviceData({ ...editedDeviceData, horsepower_id: value })}
-
-                                >
-
-                                  <SelectTrigger>
-
-                                    <SelectValue placeholder="Select horsepower" />
-
-                                  </SelectTrigger>
-
-                                  <SelectContent>
-
-                                    {allHorsepowerOptions.map(hp => (
-
-                                      <SelectItem key={hp.id} value={hp.id}>{hp.display_name}</SelectItem>
-
-                                    ))}
-
-                                  </SelectContent>
-
-                                </Select>
-                              </div>
-
-                              <div className="flex justify-end space-x-2 mt-4">
-
-                                <Button onClick={handleCancelEdit} variant="outline" size="sm">
-
-                                  <Ban className="w-4 h-4 mr-2" />
-
-                                  Cancel
-
-                                </Button>
-
-                                <Button onClick={handleUpdateDevice} size="sm" className="bg-blue-600 hover:bg-blue-700">
-                                  <Save className="w-4 h-4 mr-2" />
-                                  Update
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                              // Default View - Different layouts based on status type
-                             <div>
-                               <div className="flex items-center justify-between">
-                                 <p className="font-medium text-gray-900">{device.name}</p>
-                                 {showEdit && (
-                                   <Button onClick={() => handleEditDevice(device)} variant="ghost" size="icon">
-                                     <Edit className="w-4 h-4 text-blue-500" />
-                                   </Button>
-                                 )}
-                               </div>
-                               <p className="text-sm text-gray-600">{brand} | {acType} | {horsepower}</p>
-                               {/* Service Information - Only show if modalServiceName is NOT set, or if it's 'No Service' (which is a special case) */}
-                               {service && (!modalServiceName || modalServiceName === 'No Service') && (
-                                 <div className="mt-2 p-2 bg-blue-50 rounded-md">
-                                   <p className="text-xs font-semibold text-blue-800">Service: {service.name}</p>
-                                   {deviceAppointment && (
-                                     <p className="text-xs text-blue-600">
-                                       Appointment Date: {format(new Date(deviceAppointment.appointment_date), 'MMM d, yyyy')}
-                                     </p>
-                                   )}
-                                 </div>
-                               )}
-
-                               
-
-                               {/* Appointment Date - Always show if available and service name is not in header */}
-                               {deviceAppointment && modalServiceName && modalServiceName !== 'No Service' && (
-                                 <div className="mt-2 p-2 bg-blue-50 rounded-md">
-                                   <p className="text-xs text-blue-600">
-                                     Appointment Date: {format(new Date(deviceAppointment.appointment_date), 'MMM d, yyyy')}
-                                   </p>
-                                 </div>
-                               )}
-                      
-                              {/* Progress Bars - Only show for well-maintained and due statuses */}
-                              {(modalStatusType === 'well-maintained' || modalStatusType === 'due') && device.last_cleaning_date && (
-                                <div className="mt-2 space-y-3">
-                                  <p className="text-xs text-gray-500">
-                                    Last serviced: {format(new Date(device.last_cleaning_date), 'MMM d, yyyy')}
-                                  </p>
-
-                                  {/* 3-month Progress Bar */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 3 Months</p>
-                                    <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar3Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar3Month)}`} />
-                                      <span className={`text-xs font-semibold ${progressBar3Month > 75 ? 'text-red-500' : progressBar3Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
-                                        {Math.round(progressBar3Month)}%
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* 4-month Progress Bar */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 4 Months</p>
-                                    <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar4Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar4Month)}`} />
-                                      <span className={`text-xs font-semibold ${progressBar4Month > 75 ? 'text-red-500' : progressBar4Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
-                                        {Math.round(progressBar4Month)}%
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* 6-month Progress Bar */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-700 mb-1">Due in 6 Months</p>
-                                    <div className="flex items-center space-x-2">
-                                      <Progress value={Number(progressBar6Month) || 0} className={`w-full h-2 ${getProgressColorClass(progressBar6Month)}`} />
-                                      <span className={`text-xs font-semibold ${progressBar6Month > 75 ? 'text-red-500' : progressBar6Month > 40 ? 'text-orange-500' : 'text-green-500'}`}>
-                                        {Math.round(progressBar6Month)}%
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-center text-gray-500">No devices in this category for this location.</p>
-                  )}
-                </CardContent>
-              </Card>
-            
-            <div className="flex justify-end mt-8">
-              <Button onClick={handleCloseDetailsModal} variant="outline">
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+       <BookingModal
+         isOpen={isBookingModalOpen}
+         onClose={handleCloseBookingModal}
+         locations={locations}
+         selectedLocationId={selectedLocationId}
+         allServices={allServices}
+         allBrands={allBrands}
+         allACTypes={allACTypes}
+         allHorsepowerOptions={allHorsepowerOptions}
+         customSettings={customSettings}
+         devices={devices}
+         appointments={appointments}
+         deviceIdToAppointmentId={deviceIdToAppointmentId}
+         bookingDate={bookingDate}
+         setBookingDate={(v: string) => {
+           const blockedInfo = blockedDatesApi.isDateBlocked(v, availableBlockedDates);
+           if (blockedInfo) {
+             setShowBlockedDateModal(blockedInfo);
+           } else {
+             setBookingDate(v);
+           }
+         }}
+         selectedServiceId={selectedServiceId}
+         setSelectedServiceId={(id) => {
+           setSelectedServiceId(id);
+           setSelectedDevices([]);
+           const locationDevices = devices.filter(d => d.location_id === selectedLocationId);
+           if (locationDevices.length === 0) setShowNewUnitsForm(true);
+         }}
+         selectedDevices={selectedDevices}
+         onToggleDevice={handleToggleDevice}
+         onSelectAllDevices={handleSelectAllDevices}
+         showAdditionalService={showAdditionalService}
+         setShowAdditionalService={setShowAdditionalService}
+         additionalServiceId={additionalServiceId}
+         setAdditionalServiceId={setAdditionalServiceId}
+         additionalServiceDevices={additionalServiceDevices}
+         onToggleAdditionalServiceDevice={handleToggleAdditionalServiceDevice}
+         onSelectAllAdditionalServiceDevices={handleSelectAllAdditionalServiceDevices}
+         additionalServiceDate={additionalServiceDate}
+         setAdditionalServiceDate={setAdditionalServiceDate}
+         showNewUnitsForm={showNewUnitsForm}
+         setShowNewUnitsForm={setShowNewUnitsForm}
+         newUnits={newUnits}
+         onAddNewUnit={handleAddNewUnit}
+         onRemoveNewUnit={handleRemoveNewUnit}
+         onUpdateNewUnit={handleUpdateNewUnit}
+         onNewUnitsSubmit={handleNewUnitsSubmit}
+         availableBlockedDates={availableBlockedDates}
+         onDateBlocked={(bd) => setShowBlockedDateModal(bd)}
+         calculateDevicePrice={calculateDevicePrice}
+         calculateDiscount={calculateDiscount}
+         calculateTotalPrice={calculateTotalPrice}
+         calculateAdditionalServicePrice={calculateAdditionalServicePrice}
+         calculateCombinedTotalPrice={calculateCombinedTotalPrice}
+         onCheckSummary={handleOpenSummaryModal}
+         getAvailableDevices={getAvailableDevices}
+       />
+
+      <DetailsModal
+        isOpen={isDetailsModalOpen && !!modalLocation && !!modalStatusType}
+        onClose={handleCloseDetailsModal}
+        location={modalLocation as any}
+        statusType={modalStatusType as any}
+        serviceName={modalServiceName}
+        devices={modalDevices}
+        allBrands={allBrands}
+        allACTypes={allACTypes}
+        allHorsepowerOptions={allHorsepowerOptions}
+        appointments={appointments}
+        deviceIdToAppointmentId={deviceIdToAppointmentId}
+        onEditStart={handleEditDevice}
+        onEditCancel={handleCancelEdit}
+        onEditSave={handleUpdateDevice}
+        editingDeviceId={editingDeviceId}
+        editedDeviceData={editedDeviceData}
+        setEditedDeviceData={setEditedDeviceData}
+        getProgressBarValue={getProgressBarValue}
+        getProgressColorClass={getProgressColorClass}
+      />
 
              {/* NEW: Summary Modal */}
        {isSummaryModalOpen && (
@@ -2158,26 +1527,50 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform scale-100 transition-transform duration-300">
              <div className="flex justify-between items-center p-6 border-b">
                <h2 className="text-2xl font-bold text-gray-800">New Units</h2>
-               <Button
-                 onClick={() => setShowNewUnitsForm(false)}
-                 variant="ghost"
-                 size="sm"
-                 className="h-8 w-8 p-0"
-               >
+                <Button
+                  onClick={handleCloseAllModals}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
                  <X className="h-4 w-4" />
                </Button>
              </div>
              <div className="p-6 space-y-6">
                {/* Location Info */}
-               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                 <div>
-                   <p className="font-semibold text-gray-800">
-                     {selectedLocationId ? locations.find(loc => loc.id === selectedLocationId)?.name : 'Location'}
-                   </p>
-                   <p className="text-sm text-gray-600">
-                     {selectedServiceId ? allServices.find(s => s.id === selectedServiceId)?.name : 'Service'}
-                   </p>
-                 </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="w-full">
+                  <p className="font-semibold text-gray-800">
+                    {selectedLocationId ? locations.find(loc => loc.id === selectedLocationId)?.name : 'Location'}
+                  </p>
+                  <div className="mt-2">
+                    <Label htmlFor="new-units-service" className="text-sm font-medium text-gray-700">Service</Label>
+                    <Select
+                      value={selectedServiceId || ''}
+                      onValueChange={(value) => setSelectedServiceId(value as UUID)}
+                    >
+                      <SelectTrigger id="new-units-service" className="mt-1">
+                        <SelectValue placeholder="Select a service" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allServices.filter(s => s.is_active).map(service => (
+                          <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+               <div className="space-y-4">
+                 <Label htmlFor="newUnitsDate" className="text-sm font-large text-gray-700">Appointment Date</Label>
+                 <Input
+                   id="newUnitsDate"
+                   type="date"
+                   min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
+                   value={bookingDate}
+                   onChange={(e) => setBookingDate(e.target.value)}
+                   className="ml-3 mt-1 w-50" // Added w-32 to make it smaller
+                 />
                </div>
                {/* Units Form */}
                <div className="space-y-4">
@@ -2286,18 +1679,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
                  Add Another Unit
                </Button>
 
-               {/* Date Picker */}
-               <div>
-                 <Label htmlFor="newUnitsDate">Appointment Date</Label>
-                 <Input
-                   id="newUnitsDate"
-                   type="date"
-                   value={bookingDate}
-                   onChange={(e) => setBookingDate(e.target.value)}
-                   className="mt-1"
-                 />
-               </div>
-
                {/* Pricing Summary */}
                <div className="p-4 bg-gray-50 rounded-lg">
                  <h3 className="text-lg font-semibold mb-3">Pricing Summary</h3>
@@ -2356,12 +1737,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
                {/* Action Buttons */}
                <div className="flex justify-end space-x-4">
-                 <Button
-                   variant="outline"
-                   onClick={() => setShowNewUnitsForm(false)}
-                 >
-                   Cancel
-                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCloseAllModals}
+                >
+                  Cancel
+                </Button>
                  <Button
                    onClick={handleNewUnitsSubmit}
                    className="bg-blue-600 hover:bg-blue-700"

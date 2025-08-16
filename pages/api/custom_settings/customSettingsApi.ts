@@ -23,6 +23,7 @@ export const customSettingsApi = {
       splitTypePrice: 0,
       surcharge: 0,
       familyDiscount: 0,
+      repairPrice: 0,
     };
 
     // Map fetched settings to the structured object
@@ -44,6 +45,9 @@ export const customSettingsApi = {
             break;
           case 'family_discount':
             parsedSettings.familyDiscount = value;
+            break;
+          case 'repair_price':
+            parsedSettings.repairPrice = value;
             break;
           // Add other cases for new settings here
         }

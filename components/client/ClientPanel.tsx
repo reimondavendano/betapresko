@@ -11,7 +11,7 @@ import { ClientDashboardTab } from './ClientDashboardTab'
 import { ClientInfoTab } from './ClientInfoTab'
 import { BookServiceTab } from './BookServiceTab'
 import { ReferFriendTab } from './ReferFriendTab'
-import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
+// import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
 
 const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={150} height={50} />
 

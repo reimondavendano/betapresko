@@ -39,6 +39,11 @@ export function ServiceStep() {
         if (selectedService && !fetchedServices.some(s => s.id === selectedService.id)) {
           dispatch(setSelectedService(null)); // Clear if previously selected service is not found
         }
+        // Default select "Cleaning" if nothing selected yet
+        if (!selectedService && fetchedServices.length > 0) {
+          const cleaning = fetchedServices.find(s => s.name?.toLowerCase().includes('clean')) || fetchedServices[0];
+          if (cleaning) dispatch(setSelectedService(cleaning));
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load services.');
       } finally {
@@ -131,11 +136,6 @@ export function ServiceStep() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 text-sm mb-4">{service.description || 'No description available.'}</p>
-                  {/* Features are not in your DB schema for 'services' table.
-                      If you need features, you'd need a separate table (e.g., service_features)
-                      or store them as JSONB in the 'description' field if simple.
-                      For now, removing mock features display.
-                  */}
                   {service.base_price > 0 && (
                     <div className="text-sm text-gray-700 font-medium mt-2">
                       Starting from: ₱{service.base_price.toLocaleString()}

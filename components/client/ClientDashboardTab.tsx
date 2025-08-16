@@ -776,7 +776,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       }
     };
     buildLinks();
-  }, [devices]);
+  }, [devices, appointments]);
 
   const getDeviceCleaningStatus = () => {
     const statusByLocation = new Map<UUID, {
@@ -888,6 +888,44 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         horsepower,
       });
     });
+    // Augment: ensure any confirmed Repair appointments are reflected even if device service mapping failed
+    // Build a quick helper to check if a device entry already exists for a given device and service name
+    const hasDeviceWithService = (bucket: typeof statusByLocation extends Map<any, infer V> ? V : never, deviceId: UUID, serviceName: string) => {
+      return bucket.devices.some(d => d.device.id === deviceId && (d.service?.name || '') === serviceName);
+    };
+
+    // For each location bucket, scan appointments for confirmed Repair and add missing devices as scheduled under Repair
+    statusByLocation.forEach(bucket => {
+      const repairServiceAppointments = appointments.filter(a => a.location_id === bucket.location.id && a.status === 'confirmed');
+      repairServiceAppointments.forEach(appt => {
+        const svc = allServices.find(s => s.id === appt.service_id);
+        const svcName = (svc?.name || '').toLowerCase();
+        if (!svcName.includes('repair')) return;
+        // Find devices linked to this appointment
+        const linkedDevices = devices.filter(d => {
+          const ids = deviceIdToAppointmentId.get(d.id as UUID) || [];
+          return ids.includes(appt.id);
+        });
+        linkedDevices.forEach(dv => {
+          if (hasDeviceWithService(bucket as any, dv.id as UUID, svc?.name || '')) return;
+          const brand = allBrands.find(b => b.id === dv.brand_id)?.name || 'N/A';
+          const acType = allACTypes.find(t => t.id === dv.ac_type_id)?.name || 'N/A';
+          const horsepower = allHorsepowerOptions.find(h => h.id === dv.horsepower_id)?.display_name || 'N/A';
+          bucket.devices.push({
+            device: dv,
+            appointment: appointments.find(a => a.id === appt.id),
+            service: svc,
+            status: 'scheduled',
+            brand,
+            acType,
+            horsepower,
+          });
+          bucket.scheduledDevices += 1;
+          bucket.totalDevices = bucket.totalDevices; // unchanged
+        });
+      });
+    });
+
     // Sort locations: primary first, then by name
     const sortedStatuses = Array.from(statusByLocation.values()).sort((a, b) => {
       // Primary location always comes first

@@ -87,6 +87,7 @@ const initialState: BookingState = {
     surcharge: 0,
     discount: 0,
     familyDiscount: 0,
+    repairPrice: 0,
   },
 };
 

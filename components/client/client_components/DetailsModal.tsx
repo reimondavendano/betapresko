@@ -30,7 +30,7 @@ interface DetailsModalProps {
   allACTypes: ACType[];
   allHorsepowerOptions: HorsepowerOption[];
   appointments: Appointment[];
-  deviceIdToAppointmentId: Map<UUID, UUID>;
+  deviceIdToAppointmentId: Map<UUID, UUID[]>
   onEditStart: (device: Device) => void;
   onEditCancel: () => void;
   onEditSave: () => Promise<void>;
@@ -108,8 +108,14 @@ export function DetailsModal({
                 const progressBar3Month = getProgressBarValue(device, 3);
                 const progressBar4Month = getProgressBarValue(device, 4);
                 const progressBar6Month = getProgressBarValue(device, 6);
-                const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
-                const deviceAppointment = linkedAppointmentId ? appointments.find((a) => a.id === linkedAppointmentId) : undefined;
+                const linkedAppointmentIds = deviceIdToAppointmentId.get(device.id as UUID) || [];
+                const deviceAppointments = linkedAppointmentIds
+                  .map((id) => appointments.find((a) => a.id === id))
+                  .filter(Boolean) as Appointment[];
+                const confirmedAppt = deviceAppointments.find(a => a.status === 'confirmed');
+                const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
+                const latestCompleted = completedAppts.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())[0];
+                const deviceAppointment = confirmedAppt || latestCompleted;
 
                 const showEdit = statusType === 'well-maintained' || statusType === 'due';
 

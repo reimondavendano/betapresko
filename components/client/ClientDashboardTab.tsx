@@ -334,10 +334,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   const isDeviceScheduledForService = (deviceId: UUID, serviceId: UUID | null) => {
     if (!serviceId) return false;
-    const apptId = deviceIdToAppointmentId.get(deviceId);
-    if (!apptId) return false;
-    const appt = appointments.find(a => a.id === apptId);
-    return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+    const apptIds = deviceIdToAppointmentId.get(deviceId) || [];
+    if (apptIds.length === 0) return false;
+    return apptIds.some((id) => {
+      const appt = appointments.find((a) => a.id === id);
+      return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+    });
   };
 
   const handleSelectAllDevices = (checked: boolean) => {
@@ -751,8 +753,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const getLocationCity = (locationId: UUID | null) => locations.find(loc => loc.id === locationId)?.city_name || 'N/A';
   const getLocation = (locationId: UUID | null) => locations.find(loc => loc.id === locationId) || null;
 
-  // Build and cache device->appointment mapping from appointment_devices joins
-  const [deviceIdToAppointmentId, setDeviceIdToAppointmentId] = useState<Map<UUID, UUID>>(new Map());
+  // Build and cache device->appointments mapping from appointment_devices joins
+  const [deviceIdToAppointmentId, setDeviceIdToAppointmentId] = useState<Map<UUID, UUID[]>>(new Map());
   useEffect(() => {
     const buildLinks = async () => {
       try {
@@ -761,8 +763,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           return;
         }
         const links = await appointmentDevicesApi.getByDeviceIds(devices.map(d => d.id));
-        const map = new Map<UUID, UUID>();
-        (links || []).forEach((l: any) => map.set(l.device_id, l.appointment_id));
+        const map = new Map<UUID, UUID[]>();
+        (links || []).forEach((l: any) => {
+          const arr = map.get(l.device_id) || [];
+          arr.push(l.appointment_id);
+          map.set(l.device_id, arr);
+        });
         setDeviceIdToAppointmentId(map);
       } catch (e) {
         console.error('Failed to fetch appointment_devices links:', e);
@@ -828,9 +834,18 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         }
       }
       
-      // Resolve appointment via appointment_devices map
-      const linkedAppointmentId = deviceIdToAppointmentId.get(device.id as UUID) || null;
-      const deviceAppointment = linkedAppointmentId ? appointments.find(appt => appt.id === linkedAppointmentId) : undefined;
+      // Resolve appointments via appointment_devices map (could be many)
+      const linkedAppointmentIds = deviceIdToAppointmentId.get(device.id as UUID) || [];
+      const deviceAppointments = linkedAppointmentIds
+        .map(id => appointments.find(appt => appt.id === id))
+        .filter(Boolean) as Appointment[];
+
+      // Determine primary appointment for status display
+      const confirmedAppt = deviceAppointments.find(a => a.status === 'confirmed');
+      const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
+      const latestCompleted = completedAppts.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())[0];
+
+      const deviceAppointment = confirmedAppt || latestCompleted;
       const service = deviceAppointment ? allServices.find(s => s.id === deviceAppointment.service_id) : undefined;
 
       const hasLastCleaning = !!device.last_cleaning_date;
@@ -847,12 +862,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       let deviceStatus: 'scheduled' | 'due' | 'well-maintained' | 'no-service' = 'no-service';
 
       // Booked (confirmed) devices are exclusive
-      if (deviceAppointment?.status === 'confirmed') {
+      if (confirmedAppt) {
         status.scheduledDevices++;
         deviceStatus = 'scheduled';
       }
       // Due / Well Maintained (only if there's a completed appointment)
-      else if (deviceAppointment?.status === 'completed' && hasLastCleaning && hasDueDates) {
+      else if (latestCompleted && hasLastCleaning && hasDueDates) {
         if (isDue) {
           status.dueDevices++;
           deviceStatus = 'due';

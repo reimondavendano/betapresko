@@ -34,7 +34,7 @@ interface BookingModalProps {
   customSettings: { splitTypePrice: number; windowTypePrice: number; surcharge: number; discount: number; familyDiscount: number; repairPrice: number };
   devices: Device[];
   appointments: Appointment[];
-  deviceIdToAppointmentId: Map<UUID, UUID>;
+  deviceIdToAppointmentId: Map<UUID, UUID[]>;
   bookingDate: string;
   setBookingDate: (v: string) => void;
   selectedServiceId: UUID | null;
@@ -160,10 +160,12 @@ export function BookingModal(props: BookingModalProps) {
             {(() => {
               const isScheduledForService = (deviceId: UUID, serviceId: UUID | null) => {
                 if (!serviceId) return false;
-                const apptId = deviceIdToAppointmentId.get(deviceId);
-                if (!apptId) return false;
-                const appt = appointments.find(a => a.id === apptId);
-                return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+                const apptIds = deviceIdToAppointmentId.get(deviceId) || [];
+                if (apptIds.length === 0) return false;
+                return apptIds.some(id => {
+                  const appt = appointments.find(a => a.id === id);
+                  return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+                });
               };
               const allDevices = getAvailableDevices();
               const eligible = allDevices.filter(d => !isScheduledForService(d.id as UUID, selectedServiceId));
@@ -266,10 +268,12 @@ export function BookingModal(props: BookingModalProps) {
                     {(() => {
                       const isScheduledForService = (deviceId: UUID, serviceId: UUID | null) => {
                         if (!serviceId) return false;
-                        const apptId = deviceIdToAppointmentId.get(deviceId);
-                        if (!apptId) return false;
-                        const appt = appointments.find(a => a.id === apptId);
-                        return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+                        const apptIds = deviceIdToAppointmentId.get(deviceId) || [];
+                        if (apptIds.length === 0) return false;
+                        return apptIds.some(id => {
+                          const appt = appointments.find(a => a.id === id);
+                          return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+                        });
                       };
                       const allDevices = getAvailableDevices();
                       const eligible = allDevices.filter(d => !isScheduledForService(d.id as UUID, additionalServiceId));

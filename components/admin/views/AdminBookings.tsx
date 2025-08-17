@@ -81,7 +81,7 @@ export default function AdminBookings() {
     setEvents(updatedEvents)
 
     // Persist to backend: if this is a real appointment, set appointment_date and appointment_time
-    if (event.appointmentId) {
+    if (event.appointmentId && event.service_id) {
       const newDate = moment(start).format('YYYY-MM-DD')
       const newTime = moment(start).format('hh:mm A')
       try {

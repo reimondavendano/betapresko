@@ -215,7 +215,6 @@ export function ClientStatusDash({
                       
                       {/* Group by status within each service */}
                       {(() => {
-                                                 // For repair services, show as "Repair" status
                          if (serviceName.toLowerCase().includes('repair') || serviceName.toLowerCase().includes('maintenance')) {
                            const repairDevices = devices.filter(d => d.status === 'repair');
                            if (repairDevices.length === 0) return null;

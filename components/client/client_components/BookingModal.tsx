@@ -207,6 +207,8 @@ export function BookingModal(props: BookingModalProps) {
                         const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
                         const devicePrice = calculateDevicePrice(device);
                         const scheduled = isScheduledForService(device.id as UUID, selectedServiceId);
+                        const selectedService = allServices.find(s => s.id === selectedServiceId);
+                        const isRepairService = selectedService?.name.toLowerCase().includes('repair') || false;
                         return (
                           <div key={device.id} className={`flex items-center justify-between p-3 border rounded-lg ${scheduled ? 'opacity-60' : ''}`}>
                             <div className="flex items-center space-x-3">
@@ -221,7 +223,7 @@ export function BookingModal(props: BookingModalProps) {
                               </label>
                               {scheduled && <Badge variant="secondary">Scheduled</Badge>}
                             </div>
-                            <div className="text-sm font-semibold text-blue-600">PHP {devicePrice.toLocaleString()}</div>
+                            {!isRepairService && <div className="text-sm font-semibold text-blue-600">PHP {devicePrice.toLocaleString()}</div>}
                           </div>
                         );
                       })
@@ -298,6 +300,8 @@ export function BookingModal(props: BookingModalProps) {
                               const acName = `${device.name} (${brand} ${acType} ${horsepower})`;
                               const devicePrice = calculateDevicePrice(device);
                               const scheduled = isScheduledForService(device.id as UUID, additionalServiceId);
+                              const additionalService = allServices.find(s => s.id === additionalServiceId);
+                              const isAdditionalRepairService = additionalService?.name.toLowerCase().includes('repair') || false;
                               return (
                                 <div key={device.id} className={`flex items-center justify-between p-3 border rounded-lg ${scheduled ? 'opacity-60' : ''}`}>
                                   <div className="flex items-center space-x-3">
@@ -312,7 +316,7 @@ export function BookingModal(props: BookingModalProps) {
                                     </label>
                                     {scheduled && <Badge variant="secondary">Scheduled</Badge>}
                                   </div>
-                                  <div className="text-sm font-semibold text-blue-600">PHP {devicePrice.toLocaleString()}</div>
+                                  {!isAdditionalRepairService && <div className="text-sm font-semibold text-blue-600">PHP {devicePrice.toLocaleString()}</div>}
                                 </div>
                               );
                             })}
@@ -404,41 +408,52 @@ export function BookingModal(props: BookingModalProps) {
           </div>
         )}
 
-        {(selectedDevices.length > 0 || additionalServiceDevices.length > 0) && (
-          <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3">Pricing Summary</h3>
-              {(() => {
-                const pricing = calculateCombinedTotalPrice();
-                const discount = calculateDiscount();
-                return (
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>P{pricing.subtotal.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Discount ({pricing.discount}% - {discount.type}):</span>
-                      <span className="text-red-600">-P{pricing.discountAmount.toLocaleString()}</span>
-                    </div>
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between font-bold">
-                        <span>Total Amount:</span>
-                        <span className="text-blue-600">P{pricing.total.toLocaleString()}</span>
+        {(selectedDevices.length > 0 || additionalServiceDevices.length > 0) && (() => {
+          const selectedService = allServices.find(s => s.id === selectedServiceId);
+          const additionalService = allServices.find(s => s.id === additionalServiceId);
+          const isMainRepairService = selectedService?.name.toLowerCase().includes('repair') || false;
+          const isAdditionalRepairService = additionalService?.name.toLowerCase().includes('repair') || false;
+          const shouldHidePricing = (selectedDevices.length > 0 && isMainRepairService) || 
+                                   (additionalServiceDevices.length > 0 && isAdditionalRepairService);
+          
+          return (
+            <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
+              {!shouldHidePricing && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">Pricing Summary</h3>
+                  {(() => {
+                    const pricing = calculateCombinedTotalPrice();
+                    const discount = calculateDiscount();
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>P{pricing.subtotal.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Discount ({pricing.discount}% - {discount.type}):</span>
+                          <span className="text-red-600">-P{pricing.discountAmount.toLocaleString()}</span>
+                        </div>
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex justify-between font-bold">
+                            <span>Total Amount:</span>
+                            <span className="text-blue-600">P{pricing.total.toLocaleString()}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })()}
+                    );
+                  })()}
+                </div>
+              )}
+              <div className="flex justify-end mt-4 space-x-4">
+                <Button onClick={onClose} variant="outline">Cancel</Button>
+                <Button onClick={onCheckSummary} className="bg-blue-600 hover:bg-blue-700" disabled={selectedDevices.length === 0}>
+                  Check Summary
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end mt-4 space-x-4">
-              <Button onClick={onClose} variant="outline">Cancel</Button>
-              <Button onClick={onCheckSummary} className="bg-blue-600 hover:bg-blue-700" disabled={selectedDevices.length === 0}>
-                Check Summary
-              </Button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

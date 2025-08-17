@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input' // Added Input import
 export function UnitsStep() {
   const dispatch = useDispatch();
   const { 
+    selectedService,
     selectedDevices, 
     availableBrands, 
     availableACTypes, 
@@ -115,6 +116,20 @@ export function UnitsStep() {
 
   // Calculate the price for a single unit based on AC Type, HP, and custom settings
   const getUnitPrice = (device: BookingDevice): number => {
+    // Ensure custom pricing settings object is populated.
+    if (Object.keys(customPricingSettings).length === 0) {
+        return 0; // Settings not loaded yet
+    }
+
+    // Check if the selected service is a repair service
+    const isRepairService = selectedService?.name?.toLowerCase().includes('repair') || false;
+    
+    if (isRepairService) {
+      // For repair services, use the fixed repair price from custom settings
+      return customPricingSettings.repairPrice || 0;
+    }
+
+    // For non-repair services, use the original pricing logic
     let unitPrice = 0;
     const acType = availableACTypes.find(type => type.id === device.ac_type_id);
     const horsepowerOption = availableHorsepowerOptions.find(hp => hp.id === device.horsepower_id);
@@ -122,11 +137,6 @@ export function UnitsStep() {
     // Ensure we have the necessary data (AC Type and Horsepower)
     if (!acType || !horsepowerOption) {
       return 0; // Return 0 if AC Type or Horsepower is not selected/found
-    }
-
-    // Ensure custom pricing settings object is populated.
-    if (Object.keys(customPricingSettings).length === 0) {
-        return 0; // Settings not loaded yet
     }
 
     const hpValue = horsepowerOption.value; // e.g., 1.0, 1.5, 2.0, 2.5, 3.0
@@ -162,7 +172,16 @@ export function UnitsStep() {
   // Calculate the final total after applying discount
   const calculateFinalTotal = (): number => {
     const subtotal = calculateSubtotal();
-    // Apply discount from customPricingSettings. Ensure discount doesn't make total negative.
+    
+    // Check if the selected service is a repair service
+    const isRepairService = selectedService?.name?.toLowerCase().includes('repair') || false;
+    
+    if (isRepairService) {
+      // For repair services, return subtotal without discount
+      return subtotal;
+    }
+    
+    // For non-repair services, apply discount from customPricingSettings. Ensure discount doesn't make total negative.
     const finalTotal = Math.max(0, subtotal - customPricingSettings.discount);
     return finalTotal;
   };
@@ -379,10 +398,18 @@ export function UnitsStep() {
             <span>Subtotal:</span>
             <span className="font-semibold">₱{currentSubtotal.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between items-center text-lg">
-            <span>Discount:</span>
-            <span className="font-semibold text-red-600">- {customPricingSettings.discount.toLocaleString()}%</span>
-          </div>
+          {(() => {
+            const isRepairService = selectedService?.name?.toLowerCase().includes('repair') || false;
+            if (!isRepairService) {
+              return (
+                <div className="flex justify-between items-center text-lg">
+                  <span>Discount:</span>
+                  <span className="font-semibold text-red-600">- {customPricingSettings.discount.toLocaleString()}%</span>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <div className="border-t pt-2 mt-2">
             <div className="flex justify-between items-center text-xl font-bold">
               <span>Total Amount:</span>

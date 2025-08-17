@@ -47,7 +47,7 @@ interface CleaningStatusEntry {
     device: any;
     appointment: any;
     service: any;
-    status: 'scheduled' | 'due' | 'well-maintained' | 'no-service';
+    status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair';
     brand: string;
     acType: string;
     horsepower: string;
@@ -217,7 +217,7 @@ export function ClientStatusDash({
                       {(() => {
                                                  // For repair services, show as "Repair" status
                          if (serviceName.toLowerCase().includes('repair') || serviceName.toLowerCase().includes('maintenance')) {
-                           const repairDevices = devices.filter(d => d.status === 'scheduled' || d.status === 'due' || d.status === 'well-maintained');
+                           const repairDevices = devices.filter(d => d.status === 'repair');
                            if (repairDevices.length === 0) return null;
                            
                            return (

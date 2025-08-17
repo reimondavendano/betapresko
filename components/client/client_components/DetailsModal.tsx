@@ -167,7 +167,7 @@ export function DetailsModal({
                           )}
                         </div>
                         <p className="text-sm text-gray-600">{brand} | {acType} | {horsepower}</p>
-                        {deviceAppointment && serviceName && serviceName !== 'No Service' && (
+                        {deviceAppointment && serviceName && serviceName !== 'No Service' && statusType !== 'due' && statusType !== 'well-maintained' && statusType !== 'repair' && (
                           <div className="mt-2 p-2 bg-blue-50 rounded-md">
                             <p className="text-xs text-blue-600">Appointment Date: {format(new Date(deviceAppointment.appointment_date), 'MMM d, yyyy')}</p>
                           </div>

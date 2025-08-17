@@ -778,33 +778,31 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     buildLinks();
   }, [devices, appointments]);
 
-  const getDeviceCleaningStatus = () => {
-    // New structure: Group by location, then by service
+   const getDeviceCleaningStatus = () => {
     const statusByLocation = new Map<UUID, {
       location: ClientLocation,
       totalDevices: number,
       lastServiceDate: string | null,
-      // Group devices by service
-        serviceGroups: Array<{
-          service: Service,
-          scheduledDevices: number,
-          dueDevices: number, 
-          wellMaintainedDevices: number,
-          repairDevices: number,
-          devices: Array<{
-            device: Device;
-            appointment: Appointment | undefined;
-            status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair';
-            brand: string;
-            acType: string;
-            horsepower: string;
-          }>;
-        }>
+      serviceGroups: Array<{
+        service: Service,
+        scheduledDevices: number,
+        dueDevices: number, 
+        wellMaintainedDevices: number,
+        repairDevices: number,
+        devices: Array<{
+          device: Device;
+          appointment: Appointment | undefined;
+          status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair';
+          brand: string;
+          acType: string;
+          horsepower: string;
+        }>;
+      }>
     }>();
 
     const today = new Date();
-    
-    // First, initialize all locations
+
+    // Initialize locations
     locations.forEach(location => {
       statusByLocation.set(location.id, {
         location,
@@ -813,124 +811,108 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         serviceGroups: [],
       });
     });
-    
-    // Process each device
+
     devices.forEach(device => {
       const locationId = device.location_id;
       if (!locationId) return;
-
       const locationStatus = statusByLocation.get(locationId);
       if (!locationStatus) return;
 
       locationStatus.totalDevices++;
-      
-      // Update last service date for the location
+
       if (device.last_cleaning_date) {
         const lastCleanDate = new Date(device.last_cleaning_date);
         if (!locationStatus.lastServiceDate || lastCleanDate > new Date(locationStatus.lastServiceDate)) {
           locationStatus.lastServiceDate = device.last_cleaning_date;
         }
       }
-      
-      // Get device details
+
       const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
       const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
       const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-      
-      // Get device appointments
+
       const linkedAppointmentIds = deviceIdToAppointmentId.get(device.id as UUID) || [];
       const deviceAppointments = linkedAppointmentIds
         .map(id => appointments.find(appt => appt.id === id))
         .filter(Boolean) as Appointment[];
-      
+
       const confirmedAppts = deviceAppointments.filter(a => a.status === 'confirmed');
       const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
       const latestCompleted = completedAppts.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())[0];
-      
-      // Check maintenance status
+
       const hasLastCleaning = !!device.last_cleaning_date;
       const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
       const isDue = [device.due_3_months, device.due_4_months, device.due_6_months]
         .filter(Boolean)
         .some((d) => new Date(d as string) <= today);
-      
-      // Process confirmed appointments (scheduled status)
-      if (confirmedAppts.length > 0) {
-        confirmedAppts.forEach(appt => {
-          const service = allServices.find(s => s.id === appt.service_id);
-          if (service) {
-            // Find or create service group
-            let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
-            if (!serviceGroup) {
-              serviceGroup = {
-                service,
-                scheduledDevices: 0,
-                dueDevices: 0,
-                wellMaintainedDevices: 0,
-                repairDevices: 0,
-                devices: []
-              };
-              locationStatus.serviceGroups.push(serviceGroup);
-            }
-            
-            // Check if this is a repair service
-            const isRepairService = service.name.toLowerCase().includes('repair') || service.name.toLowerCase().includes('maintenance');
-            const deviceStatus = isRepairService ? 'repair' : 'scheduled';
-            
-            if (isRepairService) {
-              serviceGroup.repairDevices++;
-            } else {
-              serviceGroup.scheduledDevices++;
-            }
-            
-            serviceGroup.devices.push({
-              device,
-              appointment: appt,
-              status: deviceStatus,
-              brand,
-              acType,
-              horsepower,
-            });
+
+      // --- Step 1: Handle repair appointments (always add if exists) ---
+      confirmedAppts.forEach(appt => {
+        const service = allServices.find(s => s.id === appt.service_id);
+        if (!service) return;
+        const isRepairService = service.name.toLowerCase().includes('repair') || service.name.toLowerCase().includes('maintenance');
+        if (isRepairService) {
+          let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
+          if (!serviceGroup) {
+            serviceGroup = {
+              service,
+              scheduledDevices: 0,
+              dueDevices: 0,
+              wellMaintainedDevices: 0,
+              repairDevices: 0,
+              devices: []
+            };
+            locationStatus.serviceGroups.push(serviceGroup);
           }
+          serviceGroup.repairDevices++;
+          serviceGroup.devices.push({ device, appointment: appt, status: 'repair', brand, acType, horsepower });
+        }
+      });
+
+      // --- Step 2: Handle cleaning-related appointments/status ---
+      const cleaningAppts = confirmedAppts.filter(appt => {
+        const service = allServices.find(s => s.id === appt.service_id);
+        if (!service) return false;
+        return service.name.toLowerCase().includes('clean');
+      });
+
+      if (cleaningAppts.length > 0) {
+        cleaningAppts.forEach(appt => {
+          const service = allServices.find(s => s.id === appt.service_id);
+          if (!service) return;
+          let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
+          if (!serviceGroup) {
+            serviceGroup = {
+              service,
+              scheduledDevices: 0,
+              dueDevices: 0,
+              wellMaintainedDevices: 0,
+              repairDevices: 0,
+              devices: []
+            };
+            locationStatus.serviceGroups.push(serviceGroup);
+          }
+          serviceGroup.scheduledDevices++;
+          serviceGroup.devices.push({ device, appointment: appt, status: 'scheduled', brand, acType, horsepower });
         });
-      }
-      
-      // Process devices without confirmed appointments
-      if (confirmedAppts.length === 0) {
+      } else {
+        // No confirmed cleaning appointment → fallback to last cleaning / due logic
         let deviceStatus: 'due' | 'well-maintained' | 'no-service' = 'no-service';
         let serviceToUse: Service | undefined = undefined;
         let appointmentToUse: Appointment | undefined = undefined;
-        
-        // Determine device status and service
+
         if (latestCompleted && hasLastCleaning && hasDueDates) {
           deviceStatus = isDue ? 'due' : 'well-maintained';
           serviceToUse = allServices.find(s => s.id === latestCompleted.service_id);
           appointmentToUse = latestCompleted;
-        }
-        else if (hasLastCleaning) {
+        } else if (hasLastCleaning) {
           deviceStatus = 'well-maintained';
-          serviceToUse = allServices.find(s => 
-            s.name.toLowerCase().includes('cleaning') || 
-            s.name.toLowerCase().includes('clean')
-          );
-          if (!serviceToUse && allServices.length > 0) {
-            serviceToUse = allServices[0];
-          }
+          serviceToUse = allServices.find(s => s.name.toLowerCase().includes('cleaning'));
+        } else {
+          serviceToUse = allServices.find(s => s.name.toLowerCase().includes('cleaning'));
+          if (serviceToUse) deviceStatus = 'well-maintained';
         }
-        else {
-          serviceToUse = allServices.find(s => 
-            s.name.toLowerCase().includes('cleaning') || 
-            s.name.toLowerCase().includes('clean')
-          );
-          if (!serviceToUse && allServices.length > 0) {
-            serviceToUse = allServices[0];
-          }
-          if (serviceToUse) {
-            deviceStatus = 'well-maintained';
-          }
-        }
-        
-        // Add to appropriate service group
+
         if (serviceToUse) {
           let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === serviceToUse!.id);
           if (!serviceGroup) {
@@ -944,47 +926,28 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             };
             locationStatus.serviceGroups.push(serviceGroup);
           }
-          
-          if (deviceStatus === 'due') {
-            serviceGroup.dueDevices++;
-          } else if (deviceStatus === 'well-maintained') {
-            serviceGroup.wellMaintainedDevices++;
-          }
-          
-          serviceGroup.devices.push({
-            device,
-            appointment: appointmentToUse,
-            status: deviceStatus,
-            brand,
-            acType,
-            horsepower,
-          });
+
+          if (deviceStatus === 'due') serviceGroup.dueDevices++;
+          else if (deviceStatus === 'well-maintained') serviceGroup.wellMaintainedDevices++;
+
+          serviceGroup.devices.push({ device, appointment: appointmentToUse, status: deviceStatus, brand, acType, horsepower });
         }
       }
     });
-    
-    // Transform to the expected format for the UI
-    const result = Array.from(statusByLocation.values()).map(locationStatus => {
-      // Flatten service groups back to the old format for now
-      // We'll create separate entries for each service
+
+    return Array.from(statusByLocation.values()).map(locationStatus => {
       const allDeviceEntries: any[] = [];
       let totalScheduled = 0;
       let totalDue = 0;
       let totalWellMaintained = 0;
-      
+
       locationStatus.serviceGroups.forEach(serviceGroup => {
         totalScheduled += serviceGroup.scheduledDevices;
         totalDue += serviceGroup.dueDevices;
         totalWellMaintained += serviceGroup.wellMaintainedDevices;
-        
-        serviceGroup.devices.forEach(deviceEntry => {
-          allDeviceEntries.push({
-            ...deviceEntry,
-            service: serviceGroup.service
-          });
-        });
+        serviceGroup.devices.forEach(deviceEntry => allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service }));
       });
-      
+
       return {
         location: locationStatus.location,
         totalDevices: locationStatus.totalDevices,
@@ -993,13 +956,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         wellMaintainedDevices: totalWellMaintained,
         lastServiceDate: locationStatus.lastServiceDate,
         devices: allDeviceEntries,
-        // Add service groups for new UI logic
         serviceGroups: locationStatus.serviceGroups
       };
-    });
-    
-    // Sort locations: primary first, then by name
-    return result.sort((a, b) => {
+    }).sort((a, b) => {
       if (a.location.is_primary && !b.location.is_primary) return -1;
       if (!a.location.is_primary && b.location.is_primary) return 1;
       return a.location.name.localeCompare(b.location.name);

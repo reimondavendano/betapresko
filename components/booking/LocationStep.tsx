@@ -553,7 +553,7 @@ export function LocationStep() {
                     <Frown className="mr-2" /> Location Not in Range
                 </DialogTitle>
                 <DialogDescription>
-                    We couldn`t find your current city in our service area. Please select your location manually from the dropdowns.
+                    Your city isn`t in our service area yet. Please choose your location from the dropdowns to continue.
                 </DialogDescription>
             </DialogHeader>
             <Button onClick={() => setIsModalOpen(false)}>Okay</Button>

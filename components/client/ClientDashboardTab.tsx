@@ -584,26 +584,37 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setEditedDeviceData({});
   };
 
-  const handleUpdateDevice = async () => {
+  const handleUpdateDevice = async (updatedDeviceData: Partial<Device>) => {
     if (!editingDeviceId) return;
-    
-    // Create a clean object with only the editable fields
+
     const updatePayload = {
-      name: editedDeviceData.name,
-      location_id: editedDeviceData.location_id,
-      horsepower_id: editedDeviceData.horsepower_id,
+      name: updatedDeviceData.name,
+      location_id: updatedDeviceData.location_id,
+      horsepower_id: updatedDeviceData.horsepower_id,
     };
-    
+
     try {
       const updatedDevice = await deviceApi.updateDevice(editingDeviceId, updatePayload);
-      setDevices(prevDevices => 
-        prevDevices.map(d => (d.id === updatedDevice.id ? updatedDevice : d))
+
+      // ✅ Update global devices state
+      setDevices((prevDevices) =>
+        prevDevices.map((d) => (d.id === updatedDevice.id ? updatedDevice : d))
       );
+
+      // ✅ Update modalDevices state so the modal reflects changes instantly
+      setModalDevices((prev) =>
+        modalLocation && updatedDevice.location_id !== modalLocation.id
+          ? prev.filter((d) => d.id !== updatedDevice.id) // remove if moved location
+          : prev.map((d) => (d.id === updatedDevice.id ? updatedDevice : d))
+      );
+
       handleCancelEdit();
     } catch (err) {
-      console.error('Failed to update device:', err);
+      console.error("Failed to update device:", err);
     }
   };
+
+
 
 
   // --- Details Modal Handlers ---
@@ -702,25 +713,49 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         fetchedAppointments.forEach(appt => {
           if (appt.status === 'completed') {
             calculatedPoints += 1;
-            if (appt.total_units && appt.total_units >= 3) {
-              calculatedPoints += 1;
-            }
+            // if (appt.total_units && appt.total_units >= 3) {
+            //   calculatedPoints += 1;
+            // }
           }
         });
         
+        // let pointsExpiry = null;
+        // if (calculatedPoints > 0) {
+        //   const lastCompletedAppointment = fetchedAppointments.reduce((latest, current) => {
+        //     if (current.status === 'completed') {
+        //       const currentTimestamp = new Date(current.appointment_date).getTime();
+        //       const latestTimestamp = latest ? new Date(latest.appointment_date).getTime() : 0;
+        //       return currentTimestamp > latestTimestamp ? current : latest;
+        //     }
+        //     return latest;
+        //   }, null as Appointment | null);
+
+        //   if (lastCompletedAppointment) {
+        //     pointsExpiry = addYears(new Date(lastCompletedAppointment.appointment_date), 1).toISOString();
+        //   }
+        // }
+
         let pointsExpiry = null;
         if (calculatedPoints > 0) {
-          const lastCompletedAppointment = fetchedAppointments.reduce((latest, current) => {
-            if (current.status === 'completed') {
-              const currentTimestamp = new Date(current.appointment_date).getTime();
-              const latestTimestamp = latest ? new Date(latest.appointment_date).getTime() : 0;
-              return currentTimestamp > latestTimestamp ? current : latest;
-            }
-            return latest;
-          }, null as Appointment | null);
+          const firstCompletedAppointment = fetchedAppointments.reduce(
+            (earliest, current) => {
+              if (current.status === "completed") {
+                const currentTimestamp = new Date(current.appointment_date).getTime();
+                const earliestTimestamp = earliest
+                  ? new Date(earliest.appointment_date).getTime()
+                  : Infinity;
+                return currentTimestamp < earliestTimestamp ? current : earliest;
+              }
+              return earliest;
+            },
+            null as Appointment | null
+          );
 
-          if (lastCompletedAppointment) {
-            pointsExpiry = addYears(new Date(lastCompletedAppointment.appointment_date), 1).toISOString();
+          if (firstCompletedAppointment) {
+            pointsExpiry = addYears(
+              new Date(firstCompletedAppointment.appointment_date),
+              1
+            ).toISOString();
           }
         }
         
@@ -1415,6 +1450,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         isOpen={isDetailsModalOpen && !!modalLocation && !!modalStatusType}
         onClose={handleCloseDetailsModal}
         location={modalLocation as any}
+        locations={locations}
         statusType={modalStatusType as any}
         serviceName={modalServiceName}
         devices={modalDevices}

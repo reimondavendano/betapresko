@@ -170,6 +170,7 @@ export function UnitsStep() {
   };
 
   // Calculate the final total after applying discount
+
   const calculateFinalTotal = (): number => {
     const subtotal = calculateSubtotal();
     
@@ -177,14 +178,24 @@ export function UnitsStep() {
     const isRepairService = selectedService?.name?.toLowerCase().includes('repair') || false;
     
     if (isRepairService) {
-      // For repair services, return subtotal without discount
-      return subtotal;
+      return subtotal; // no discount for repair
     }
     
-    // For non-repair services, apply discount from customPricingSettings. Ensure discount doesn't make total negative.
-    const finalTotal = Math.max(0, subtotal - customPricingSettings.discount);
+    // percentage discount
+    const discountRate = customPricingSettings.discount || 0;
+    const discountAmount = subtotal * (discountRate / 100);
+    
+    const finalTotal = Math.max(0, subtotal - discountAmount);
     return finalTotal;
   };
+
+  // helper for view
+  const calculateDiscountAmount = (): number => {
+    const subtotal = calculateSubtotal();
+    const discountRate = customPricingSettings.discount || 0;
+    return subtotal * (discountRate / 100);
+  };
+
 
   const isFormValid = () => {
     const isValid = devices.every((device, index) => {
@@ -400,11 +411,12 @@ export function UnitsStep() {
           </div>
           {(() => {
             const isRepairService = selectedService?.name?.toLowerCase().includes('repair') || false;
-            if (!isRepairService) {
+            if (!isRepairService && customPricingSettings.discount > 0) {
+              const discountAmount = calculateDiscountAmount();
               return (
                 <div className="flex justify-between items-center text-lg">
-                  <span>Discount:</span>
-                  <span className="font-semibold text-red-600">- {customPricingSettings.discount.toLocaleString()}%</span>
+                  <span>Discount ({customPricingSettings.discount}%):</span>
+                  <span className="font-semibold text-red-600">- ₱{discountAmount.toLocaleString()}</span>
                 </div>
               );
             }
@@ -418,6 +430,7 @@ export function UnitsStep() {
           </div>
         </CardContent>
       </Card>
+
 
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <Button

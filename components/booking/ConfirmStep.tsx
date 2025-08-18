@@ -32,6 +32,7 @@ import { deviceApi } from '../../pages/api/device/deviceApi';
 import { appointmentDevicesApi } from '../../pages/api/appointment_devices/appointmentDevicesApi';
 import { notificationApi } from '../../pages/api/notification/notificationApi';
 import { Client, ClientLocation, Appointment, Device, UUID } from '../../types/database';
+import { customSettingsApi } from '@/pages/api/custom_settings/customSettingsApi'
 
 interface ClientExistsModalProps {
   onClose: () => void;
@@ -100,6 +101,7 @@ export function ConfirmStep() {
   const [mobileDigits, setMobileDigits] = useState<string>(''); // 10-digit, no prefix
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [confirmedMessage, setConfirmedMessage] = useState<string>();
 
   const getServiceName = () => selectedService?.name || '';
   const getBrandName = (id: string | null) => {
@@ -166,11 +168,19 @@ export function ConfirmStep() {
           mobile: finalMobile,
           email: clientInfo.email || null,
           sms_opt_in: true,
+          qr_code: 'qr_code',
           ref_id: referralId || null, 
         };
         const createdClient: Client = await clientApi.createClient(newClientData);
         currentClientId = createdClient.id;
         dispatch(setClientId(currentClientId));
+
+        const siteUrlSetting = await customSettingsApi.getSetting('site_url');
+        const siteUrl = siteUrlSetting?.setting_value || 
+        (typeof window !== 'undefined' ? window.location.origin : 'https://betapresko.vercel.app');
+
+        // update with real QR
+        await clientApi.updateClient(currentClientId, { qr_code: `client/${currentClientId}`});
 
 
         // Create client location for the new client
@@ -225,6 +235,8 @@ export function ConfirmStep() {
         }
       }
 
+       const siteUrlSetting = await customSettingsApi.getSetting('pre');
+
       // Create appointment_devices entries for all created devices
       const appointmentDeviceRows = createdDeviceIds.map((deviceId) => ({
         appointment_id: createdAppointment.id,
@@ -275,6 +287,7 @@ export function ConfirmStep() {
     }
   };
 
+
   const handleGoToExistingClientDashboard = () => {
     if (existingClientId) {
       window.open(`/client/${existingClientId}`, '_blank');
@@ -283,6 +296,21 @@ export function ConfirmStep() {
       dispatch(setStep(1));
     }
   };
+
+  useEffect(() => {
+  const fetchConfirmedMessage = async () => {
+    try {
+      const setting = await customSettingsApi.getSetting("pre_confirmed_booking");
+      if (setting?.setting_value) {
+        setConfirmedMessage(setting.setting_value);
+      }
+    } catch (err) {
+      console.error("Error fetching pre_confirmed_booking setting:", err);
+    }
+  };
+
+  fetchConfirmedMessage();
+}, []);
 
   const handleBack = () => {
     dispatch(setStep(4));
@@ -302,8 +330,7 @@ export function ConfirmStep() {
             </div>
             <h2 className="text-2xl font-bold text-green-900 mb-4">Booking Confirmed!</h2>
             <p className="text-green-800 mb-6">
-              Your aircon service appointment has been successfully booked.
-              You will receive an SMS confirmation shortly.
+              {confirmedMessage}
             </p>
             <div className="space-y-4">
               <Button

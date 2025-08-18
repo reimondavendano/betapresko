@@ -2,21 +2,44 @@
 import { supabase } from '../../../lib/supabase';
 import { CustomSetting, ParsedCustomSettings } from '../../../types/database'; // Import new types
 
+
 export const customSettingsApi = {
-  /**
-   * Fetches all custom settings and parses them into a structured object.
-   */
+  getAll: async (): Promise<CustomSetting[]> => {
+    const { data, error } = await supabase
+      .from('custom_settings')
+      .select('*')
+
+    if (error) {
+      console.error('Error fetching custom settings:', error.message)
+      return []
+    }
+    return data as CustomSetting[]
+  },
+
+  getSetting: async (key: string): Promise<CustomSetting | null> => {
+    const { data, error } = await supabase
+      .from('custom_settings')
+      .select('*')
+      .eq('setting_key', key)
+      .maybeSingle()
+
+    if (error) {
+      console.error(`Error fetching custom setting: ${key}`, error.message)
+      return null
+    }
+    return data as CustomSetting | null
+  },
+
   getCustomSettings: async (): Promise<ParsedCustomSettings> => {
     const { data, error } = await supabase
       .from('custom_settings')
-      .select('setting_key, setting_value');
+      .select('setting_key, setting_value')
 
     if (error) {
-      console.error('Error fetching custom settings:', error);
-      throw new Error(error.message);
+      console.error('Error fetching custom settings:', error)
+      throw new Error(error.message)
     }
 
-    // Initialize with default values to ensure all properties exist
     const parsedSettings: ParsedCustomSettings = {
       discount: 0,
       windowTypePrice: 0,
@@ -24,36 +47,77 @@ export const customSettingsApi = {
       surcharge: 0,
       familyDiscount: 0,
       repairPrice: 0,
-    };
+    }
 
-    // Map fetched settings to the structured object
     data.forEach((setting: { setting_key: string; setting_value: string }) => {
-      const value = parseFloat(setting.setting_value); // Parse value to number
+      const value = parseFloat(setting.setting_value)
       if (!isNaN(value)) {
         switch (setting.setting_key) {
           case 'discount':
-            parsedSettings.discount = value;
-            break;
+            parsedSettings.discount = value
+            break
           case 'window_type_price':
-            parsedSettings.windowTypePrice = value;
-            break;
+            parsedSettings.windowTypePrice = value
+            break
           case 'split_type_price':
-            parsedSettings.splitTypePrice = value;
-            break;
+            parsedSettings.splitTypePrice = value
+            break
           case 'surcharge':
-            parsedSettings.surcharge = value;
-            break;
+            parsedSettings.surcharge = value
+            break
           case 'family_discount':
-            parsedSettings.familyDiscount = value;
-            break;
+            parsedSettings.familyDiscount = value
+            break
           case 'repair_price':
-            parsedSettings.repairPrice = value;
-            break;
-          // Add other cases for new settings here
+            parsedSettings.repairPrice = value
+            break
+          // 🔑 Add new numeric settings here if needed
         }
       }
-    });
+    })
 
-    return parsedSettings;
+    return parsedSettings
   },
-};
+
+  create: async (setting: Partial<CustomSetting>): Promise<CustomSetting | null> => {
+    const { data, error } = await supabase
+      .from('custom_settings')
+      .insert(setting)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating custom setting:', error.message)
+      return null
+    }
+    return data as CustomSetting
+  },
+
+  update: async (id: string, setting: Partial<CustomSetting>): Promise<CustomSetting | null> => {
+    const { data, error } = await supabase
+      .from('custom_settings')
+      .update(setting)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error(`Error updating custom setting with id ${id}:`, error.message)
+      return null
+    }
+    return data as CustomSetting
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('custom_settings')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error(`Error deleting custom setting with id ${id}:`, error.message)
+      return false
+    }
+    return true
+  },
+}

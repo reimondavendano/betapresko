@@ -10,6 +10,8 @@ import 'leaflet/dist/leaflet.css';
 import type * as L from 'leaflet';
 import { cityApi } from '../../pages/api/cities/cityApi';
 import { barangayApi } from '../../pages/api/barangays/barangayApi';
+import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi' // add this import
+
 import {
   Dialog,
   DialogContent,
@@ -86,6 +88,9 @@ export function LocationStep() {
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
   const [isFetchingCities, setIsFetchingCities] = useState(false);
 
+  const [locationErrorMessage, setLocationErrorMessage] = useState<string>();
+
+
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const cityInputRef = useRef<HTMLDivElement>(null);
@@ -110,6 +115,22 @@ export function LocationStep() {
   useEffect(() => {
     allCitiesRef.current = allCities;
   }, [allCities]);
+
+  // fetch setting_key = "location_error"
+  useEffect(() => {
+    const fetchLocationErrorMessage = async () => {
+      try {
+        const setting = await customSettingsApi.getSetting('location_error');
+        if (setting?.setting_value) {
+          setLocationErrorMessage(setting.setting_value);
+        }
+      } catch (err) {
+        console.error('Error fetching location_error setting:', err);
+      }
+    };
+
+    fetchLocationErrorMessage();
+  }, []);
 
   // Fetch all cities on component mount
   useEffect(() => {
@@ -553,7 +574,7 @@ export function LocationStep() {
                     <Frown className="mr-2" /> Location Not in Range
                 </DialogTitle>
                 <DialogDescription>
-                    Your city isn`t in our service area yet. Please choose your location from the dropdowns to continue.
+                    {locationErrorMessage}
                 </DialogDescription>
             </DialogHeader>
             <Button onClick={() => setIsModalOpen(false)}>Okay</Button>

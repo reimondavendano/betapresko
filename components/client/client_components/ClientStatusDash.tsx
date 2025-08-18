@@ -57,7 +57,7 @@ interface CleaningStatusEntry {
 interface ClientStatusDashProps {
   cleaningStatuses: CleaningStatusEntry[];
   handleOpenBookingModal: (locationId: UUID) => void;
-  handleOpenDetailsModal: (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName?: string) => void;
+  handleOpenDetailsModal: (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName?: string,) => void;
   // Primary location editing props
   locations: ClientLocation[];
   isEditingPrimaryLocation: boolean;
@@ -205,11 +205,17 @@ export function ClientStatusDash({
                      <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
                        <div className="flex justify-between items-start mb-2">
                          <h4 className="font-semibold text-gray-800">
-                           {serviceName === 'No Service' ? serviceName : 
-                            `${serviceName} ${status.lastServiceDate ? 
-                              `(Last Serviced: ${format(new Date(status.lastServiceDate), 'MMM d, yyyy')})` : 
-                              '(No Service Record Yet)'}`}
-                         </h4>
+                            {serviceName === 'No Service'
+                              ? serviceName
+                              : serviceName.toLowerCase().includes('repair')
+                                ? serviceName
+                                : `${serviceName} ${
+                                    status.lastServiceDate
+                                      ? `(Last Serviced: ${format(new Date(status.lastServiceDate), 'MMM d, yyyy')})`
+                                      : '(No Service Record Yet)'
+                                  }`}
+                          </h4>
+
                          
                        </div>
                       
@@ -261,7 +267,7 @@ export function ClientStatusDash({
                             'no-service': 'text-gray-600'
                           };
 
-                                                     return (
+                              return (
                              <div key={statusKey} className="text-sm mb-2">
                                <span className={`${statusColors[statusKey as keyof typeof statusColors]} font-medium`}>
                                  {statusLabels[statusKey as keyof typeof statusLabels]}: {statusDevices.length} Unit{statusDevices.length > 1 ? 's' : ''}

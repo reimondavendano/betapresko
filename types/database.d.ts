@@ -13,6 +13,7 @@ export interface Service {
   description: string | null;
   base_price: number; // decimal(10,2) in SQL maps to number in TS
   is_active: boolean;
+  set_inactive: boolean;
   created_at: Timestamp;
 }
 
@@ -86,6 +87,23 @@ export interface ClientLocation {
   created_at: Timestamp;
   updated_at: Timestamp;
 }
+
+export type DeviceWithLocation = Device & {
+  client_locations?: {
+    id: string;
+    address_line1: string | null;
+    street: string | null;
+    landmark: string | null;
+    barangays?: { id: string; name: string } | null;
+    cities?: { id: string; name: string } | null;
+  } | null;
+};
+
+export type ClientLocationWithDetails = ClientLocation & {
+  barangays?: { id: string; name: string } | null;
+  cities?: { id: string; name: string } | null;
+};
+
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'voided';
 

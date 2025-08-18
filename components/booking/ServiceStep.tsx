@@ -2,70 +2,84 @@
 
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import type { RootState } from '@/lib/store' // Use type-only import for RootState
+import type { RootState } from '@/lib/store'
 import { setSelectedService, setStep } from '@/lib/features/booking/bookingSlice'
-import { servicesApi } from '../../pages/api/service/servicesApi' // Adjust path to your actual API file
-import { Service } from '../../types/database' // Import Service type
+import { servicesApi } from '../../pages/api/service/servicesApi'
+import { customSettingsApi } from '../../pages/api/custom_settings/customSettingsApi'
+import { Service } from '../../types/database'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Wrench, Sparkles, Settings, ChevronRight, ChevronLeft, Loader2, AlertCircle } from 'lucide-react'
+import { Wrench, Sparkles, Settings, ChevronRight, ChevronLeft, Loader2, AlertCircle, Lock } from 'lucide-react'
 
-// Map service names to Lucide icons (adjust as needed for your actual service names)
+// Map service names to Lucide icons
 const serviceIcons: Record<string, React.ElementType> = {
-  'Cleaning': Sparkles,
-  'Repair': Wrench,
-  'Maintenance': Settings,
-  // Add more mappings if you have other service names in your DB
-};
+  Cleaning: Sparkles,
+  Repair: Wrench,
+  Maintenance: Settings,
+}
 
 export function ServiceStep() {
-  const dispatch = useDispatch();
-  const { selectedService } = useSelector((state: RootState) => state.booking);
+  const dispatch = useDispatch()
+  const { selectedService } = useSelector((state: RootState) => state.booking)
 
-  const [services, setServices] = useState<Service[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [services, setServices] = useState<Service[]>([])
+  const [inactiveLabel, setInactiveLabel] = useState<string>('Unavailable')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Fetch services on component mount
+  // Fetch services + custom settings
   useEffect(() => {
-    const fetchServices = async () => {
-      setIsLoading(true);
-      setError(null);
+    const fetchData = async () => {
+      setIsLoading(true)
+      setError(null)
       try {
-        const fetchedServices = await servicesApi.getServices();
-        setServices(fetchedServices);
-        // If a service was previously selected in Redux, ensure it's still valid
-        if (selectedService && !fetchedServices.some(s => s.id === selectedService.id)) {
-          dispatch(setSelectedService(null)); // Clear if previously selected service is not found
+        const [fetchedServices, setting] = await Promise.all([
+          servicesApi.getServices(),
+          customSettingsApi.getSetting('service_inactive'),
+        ])
+
+        // Show only active services
+        setServices(fetchedServices.filter((s) => s.is_active))
+
+        // Dynamic label (fallback if missing)
+        if (setting?.setting_value) {
+          setInactiveLabel(setting.setting_value)
         }
-        // Default select "Cleaning" if nothing selected yet
+
+        // Clear invalid selected service
+        if (selectedService && !fetchedServices.some((s) => s.id === selectedService.id)) {
+          dispatch(setSelectedService(null))
+        }
+
+        // Auto select Cleaning if none selected
         if (!selectedService && fetchedServices.length > 0) {
-          const cleaning = fetchedServices.find(s => s.name?.toLowerCase().includes('clean')) || fetchedServices[0];
-          if (cleaning) dispatch(setSelectedService(cleaning));
+          const cleaning =
+            fetchedServices.find((s) => s.name?.toLowerCase().includes('clean')) || fetchedServices[0]
+          if (cleaning) dispatch(setSelectedService(cleaning))
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to load services.');
+        setError(err.message || 'Failed to load services.')
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
-    fetchServices();
-  }, [dispatch, selectedService]); // Add selectedService to dependencies
+    }
+    fetchData()
+  }, [dispatch, selectedService])
 
   const handleServiceSelect = (service: Service) => {
-    dispatch(setSelectedService(service));
-  };
+    if (service.set_inactive) return // 🚫 block selecting inactive
+    dispatch(setSelectedService(service))
+  }
 
   const handleNext = () => {
     if (selectedService) {
-      dispatch(setStep(3)); // Proceed to the next step (e.g., Units selection)
+      dispatch(setStep(3))
     }
-  };
+  }
 
   const handleBack = () => {
-    dispatch(setStep(1)); // Go back to Location selection
-  };
+    dispatch(setStep(1))
+  }
 
   if (isLoading) {
     return (
@@ -73,7 +87,7 @@ export function ServiceStep() {
         <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
         <p className="text-gray-600 text-lg">Loading services...</p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -86,7 +100,7 @@ export function ServiceStep() {
           Retry
         </Button>
       </div>
-    );
+    )
   }
 
   if (services.length === 0) {
@@ -96,7 +110,7 @@ export function ServiceStep() {
         <p className="text-orange-700 text-lg">No active services available at the moment.</p>
         <p className="text-orange-600 text-sm">Please check back later or contact support.</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -109,41 +123,48 @@ export function ServiceStep() {
 
         <div className="grid md:grid-cols-3 gap-4 md:gap-6 mb-8">
           {services.map((service) => {
-            const IconComponent = serviceIcons[service.name] || Settings; // Fallback icon
+            const IconComponent = serviceIcons[service.name] || Settings
+            const isInactive = service.set_inactive
+
             return (
               <Card
                 key={service.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-lg rounded-xl ${
-                  selectedService?.id === service.id
-                    ? 'ring-2 ring-blue-500 shadow-lg'
-                    : 'hover:shadow-md'
-                }`}
+                className={`transition-all duration-200 rounded-xl ${
+                  isInactive
+                    ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                    : 'cursor-pointer hover:shadow-lg'
+                } ${selectedService?.id === service.id ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
                 onClick={() => handleServiceSelect(service)}
               >
                 <CardHeader className="text-center">
                   <div className="relative">
-                    {/* Assuming 'popular' is a property you might add to your Service type or determine dynamically */}
-                    {/* For now, no 'popular' badge as it's not in your DB schema */}
-                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
-                      selectedService?.id === service.id
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      <IconComponent className="w-8 h-8" />
+                    <div
+                      className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                        selectedService?.id === service.id
+                          ? 'bg-blue-100 text-blue-600'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {isInactive ? <Lock className="w-8 h-8" /> : <IconComponent className="w-8 h-8" />}
                     </div>
                     <CardTitle className="text-lg md:text-xl mb-2">{service.name}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 text-sm mb-4">{service.description || 'No description available.'}</p>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {service.description || 'No description available.'}
+                  </p>
                   {service.base_price > 0 && (
                     <div className="text-sm text-gray-700 font-medium mt-2">
                       Starting from: ₱{service.base_price.toLocaleString()}
                     </div>
                   )}
+                  {isInactive && (
+                    <div className="text-xs font-medium text-red-500 mt-2 text-center">{inactiveLabel}</div>
+                  )}
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
 
@@ -155,20 +176,17 @@ export function ServiceStep() {
           >
             <ChevronLeft className="w-4 h-4 mr-1 md:mr-2" />
             Back to Location
-            
           </Button>
-          
           <Button
             onClick={handleNext}
             disabled={!selectedService}
             className="px-4 py-2 md:px-8 md:py-3 bg-blue-600 hover:bg-blue-700 text-sm md:text-base"
           >
             Continue to Units
-            
             <ChevronRight className="w-4 h-4 ml-1 md:ml-2" />
           </Button>
         </div>
       </div>
     </div>
-  );
+  )
 }

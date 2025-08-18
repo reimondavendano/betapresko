@@ -23,6 +23,7 @@ interface DetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   location: ClientLocation;
+  locations: ClientLocation[]; // ✅ new prop for the list
   statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service';
   serviceName?: string | null;
   devices: Device[];
@@ -33,7 +34,7 @@ interface DetailsModalProps {
   deviceIdToAppointmentId: Map<UUID, UUID[]>
   onEditStart: (device: Device) => void;
   onEditCancel: () => void;
-  onEditSave: () => Promise<void>;
+  onEditSave: (updatedDevice: Partial<Device>) => Promise<void>;
   editingDeviceId: UUID | null;
   editedDeviceData: Partial<Device>;
   setEditedDeviceData: (data: Partial<Device>) => void;
@@ -45,6 +46,7 @@ export function DetailsModal({
   isOpen,
   onClose,
   location,
+  locations,
   statusType,
   serviceName,
   devices,
@@ -134,8 +136,24 @@ export function DetailsModal({
                               <SelectValue placeholder="Select a location" />
                             </SelectTrigger>
                             <SelectContent>
-                              {/* The parent can pass locations if you want to support moving devices here */}
-                            </SelectContent>
+                                  {locations
+                                    .filter((loc) => loc.client_id === location.client_id)
+                                    .map((loc) => {
+                                      const label = [
+                                        loc.name,
+                                        loc.address_line1,
+                                        loc.barangay_name,
+                                        loc.city_name,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(", ");
+                                      return (
+                                        <SelectItem key={loc.id} value={loc.id as unknown as string}>
+                                          {label || loc.name}
+                                        </SelectItem>
+                                      );
+                                    })}
+                                </SelectContent>
                           </Select>
                         </div>
                         <div>
@@ -153,7 +171,7 @@ export function DetailsModal({
                         </div>
                         <div className="flex justify-end space-x-2 mt-4">
                           <Button onClick={onEditCancel} variant="outline" size="sm"><Ban className="w-4 h-4 mr-2" />Cancel</Button>
-                          <Button onClick={onEditSave} size="sm" className="bg-blue-600 hover:bg-blue-700"><Save className="w-4 h-4 mr-2" />Update</Button>
+                          <Button onClick={() => onEditSave(editedDeviceData)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Save className="w-4 h-4 mr-2" />Update</Button>
                         </div>
                       </div>
                     ) : (

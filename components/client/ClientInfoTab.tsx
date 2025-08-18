@@ -17,6 +17,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
+import QRCode from "react-qr-code";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,7 @@ import { clientApi } from '../../pages/api/clients/clientApi';
 import { clientLocationApi } from '../../pages/api/clientLocation/clientLocationApi';
 
 import { Client, ClientLocation } from '../../types/database';
+import { customSettingsApi } from '@/pages/api/custom_settings/customSettingsApi';
 
 interface ClientInfoTabProps {
   clientId: string;
@@ -47,6 +49,8 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Client>>({});
+  const [siteUrl, setSiteUrl] = useState<string>('');
+
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -73,6 +77,26 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
 
     fetchClientData();
   }, [clientId]);
+
+  useEffect(() => {
+  const fetchSiteUrl = async () => {
+    try {
+      const setting = await customSettingsApi.getSetting('site_url');
+      if (setting?.setting_value) {
+        setSiteUrl(setting.setting_value);
+      } else if (typeof window !== 'undefined') {
+        setSiteUrl(window.location.origin);
+      }
+    } catch (err) {
+      console.error('Error fetching site_url:', err);
+      if (typeof window !== 'undefined') {
+        setSiteUrl(window.location.origin);
+      }
+    }
+  };
+
+  fetchSiteUrl();
+}, []);
 
   const handleUpdate = async () => {
     if (!client) return;
@@ -175,32 +199,6 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
               </div>
             </div>
 
-            {/* Points Expiry */}
-            <div className="flex items-center">
-              <Calendar className="w-5 h-5 mr-3 text-red-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Points Expiry</p>
-                <p className="text-gray-900">{client.points_expiry || 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* Discounted */}
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-3 text-teal-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Discounted</p>
-                {client.discounted ? (
-                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-lg">
-                    Yes
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-lg">
-                    No
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* SMS Opt In */}
             <div className="flex items-center">
               <MessageSquare className="w-5 h-5 mr-3 text-indigo-500" />
@@ -219,15 +217,20 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
             </div>
 
             {/* QR Code */}
-            <div className="flex items-center">
+             <div className="flex items-center">
               <QrCode className="w-5 h-5 mr-3 text-pink-500" />
               <div>
-                <p className="text-sm font-semibold text-gray-700">QR Code</p>
+                <p className="text-sm font-semibold text-gray-700">Scan for user profile</p>
                 <div className="mt-1 border rounded-lg shadow-sm p-2 bg-gray-50 inline-block">
-                  <img src={client.qr_code} alt="QR Code" className="w-20 h-20" />
+                  <QRCode
+                    value={`${siteUrl}${client.qr_code}`}
+                    size={200}
+                    bgColor="transparent" // optional
+                  />
                 </div>
               </div>
             </div>
+
           </div>
         </CardContent>
       </Card>

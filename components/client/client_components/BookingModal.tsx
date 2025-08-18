@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,16 @@ import {
   HorsepowerOption,
   UUID,
   BlockedDate,
+  CustomSetting,
 } from "../../../types/database";
+import { customSettingsApi } from "@/pages/api/custom_settings/customSettingsApi";
+import { Sparkles, Wrench, Settings } from "lucide-react"; // ✅ add imports for icons
+
+const serviceIcons: Record<string, React.ElementType> = {
+  Cleaning: Sparkles,
+  Repair: Wrench,
+  Maintenance: Settings,
+};
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -115,6 +124,20 @@ export function BookingModal(props: BookingModalProps) {
 
   const location = selectedLocationId ? locations.find(l => l.id === selectedLocationId) : undefined;
   const locationDevices = selectedLocationId ? props.devices.filter(d => d.location_id === selectedLocationId) : [];
+  const [customSettings, setCustomSettings] = useState<CustomSetting[]>([])
+  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const settings = await customSettingsApi.getAll();
+        setCustomSettings(settings);
+      } catch (err) {
+        console.error("Failed to load custom settings:", err);
+      }
+    }
+    fetchSettings();
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -136,24 +159,52 @@ export function BookingModal(props: BookingModalProps) {
         </div>
 
         <div className="mb-6">
-          <Label htmlFor="service-select" className="text-sm font-medium text-gray-700">Service</Label>
-          <Select
-            value={selectedServiceId || ''}
-            onValueChange={(value) => {
-              setSelectedServiceId(value as UUID);
-              // Clear previously selected devices when service changes
-            }}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Select a service" />
-            </SelectTrigger>
-            <SelectContent>
-              {allServices.filter(s => s.is_active).map(service => (
-                <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label className="text-sm font-medium text-gray-700">Select Service</Label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+            {allServices.filter(s => s.is_active).map(service => {
+              const isDisabled = service.set_inactive;
+              const inactiveMessage =
+                customSettings.find(cs => cs.setting_key === "service_inactive")?.setting_value
+                || "Service not available";
+              const isSelected = selectedServiceId === service.id;
+
+              const ServiceIcon = serviceIcons[service.name] || null;
+
+              return (
+                <Card
+                  key={service.id}
+                  onClick={() => !isDisabled && setSelectedServiceId(service.id)}
+                  className={`cursor-pointer rounded-lg p-3 flex items-center space-x-2 
+                    ${isDisabled ? "opacity-50 cursor-not-allowed border-gray-300" : "hover:border-blue-500"}
+                    ${isSelected ? "border-blue-600 bg-blue-50" : "border"}`}
+                >
+                  <div className="bg-blue-100 p-2 rounded-md">
+                    {ServiceIcon ? (
+                      <ServiceIcon className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <svg
+                        className="w-5 h-5 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M6 6h12M6 12h12M6 18h12" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-gray-800">{service.name}</p>
+                    {isDisabled && (
+                      <p className="text-xs text-red-600 mt-1">{inactiveMessage}</p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
+
 
         {selectedServiceId && (
           <div className="mb-6">
@@ -176,16 +227,32 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
 
 
-                  <div className="mt-4 mb-4 flex items-center">
-                    <Label htmlFor="bookingDate" className="text-sm font-large text-gray-700">Appointment Date : </Label>
+                  <div className="mb-6">
+                    <Label htmlFor="bookingDate" className="text-sm font-medium text-gray-700">
+                      Appointment Date
+                    </Label>
                     <Input
-                        id="bookingDate"
-                        type="date"
-                        min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
-                        value={bookingDate}
-                        onChange={(e) => setBookingDate(e.target.value)}
-                        className="ml-3 mt-1 w-50" // Added w-32 to make it smaller
-                      />
+                      id="bookingDate"
+                      type="date"
+                      min={format(addDays(new Date(), 1), "yyyy-MM-dd")}
+                      value={
+                        bookingDate
+                          ? (format(new Date(bookingDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                              ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
+                              : format(new Date(bookingDate), "yyyy-MM-dd"))
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw) {
+                          const formatted = format(new Date(raw), "yyyy-MM-dd");
+                          setBookingDate(formatted); // store exact picked date
+                        } else {
+                          setBookingDate("");
+                        }
+                      }}
+                      className="mt-2 w-48"
+                    />
                   </div>
 
                   <div className="mb-4 flex items-center space-x-2">
@@ -247,23 +314,54 @@ export function BookingModal(props: BookingModalProps) {
             {showAdditionalService && (
               <div className="mt-4 p-4 border rounded-lg">
                 <div className="mb-4">
-                  <Label htmlFor="additional-service-select" className="text-sm font-medium text-gray-700">Additional Service</Label>
-                  <Select
-                    value={additionalServiceId || ''}
-                    onValueChange={(value) => {
-                      setAdditionalServiceId(value as UUID);
-                    }}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select an additional service" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allServices.filter(s => s.is_active && s.id !== selectedServiceId).map(service => (
-                        <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm font-medium text-gray-700">Additional Service</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                    {allServices
+                      .filter(s => s.is_active && s.id !== selectedServiceId) // exclude already chosen service
+                      .map(service => {
+                        const isDisabled = service.set_inactive;
+                        const inactiveMessage =
+                          customSettings.find(cs => cs.setting_key === "service_inactive")?.setting_value
+                          || "Service not available";
+                        const isSelected = additionalServiceId === service.id;
+                        const ServiceIcon = serviceIcons[service.name] || null;
+
+                        return (
+                          <Card
+                            key={service.id}
+                            onClick={() => !isDisabled && setAdditionalServiceId(service.id)}
+                            className={`cursor-pointer rounded-lg p-3 flex items-center space-x-2 
+                              ${isDisabled ? "opacity-50 cursor-not-allowed border-gray-300" : "hover:border-blue-500"}
+                              ${isSelected ? "border-blue-600 bg-blue-50" : "border"}`}
+                          >
+                            <div className="bg-blue-100 p-2 rounded-md">
+                              {ServiceIcon ? (
+                                <ServiceIcon className="w-5 h-5 text-blue-600" />
+                              ) : (
+                                <svg
+                                  className="w-5 h-5 text-blue-600"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path d="M6 6h12M6 12h12M6 18h12" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-sm text-gray-800">{service.name}</p>
+                              {isDisabled && (
+                                <p className="text-xs text-red-600 mt-1">{inactiveMessage}</p>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
+                  </div>
                 </div>
+
+                
 
                 {additionalServiceId && (
                   <>
@@ -274,15 +372,49 @@ export function BookingModal(props: BookingModalProps) {
                         if (apptIds.length === 0) return false;
                         return apptIds.some(id => {
                           const appt = appointments.find(a => a.id === id);
-                          return !!(appt && appt.status === 'confirmed' && appt.service_id === serviceId);
+                          return !!(appt && appt.status === "confirmed" && appt.service_id === serviceId);
                         });
                       };
+
                       const allDevices = getAvailableDevices();
-                      const eligible = allDevices.filter(d => !isScheduledForService(d.id as UUID, additionalServiceId));
+
+                      // ✅ exclude devices already scheduled for the selectedServiceId OR the additionalServiceId
+                      const eligible = allDevices.filter(
+                        (d) =>
+                          !isScheduledForService(d.id as UUID, selectedServiceId) &&
+                          !isScheduledForService(d.id as UUID, additionalServiceId)
+                      );
+                      
                       return (
                         <>
                           <div className="mb-2 text-sm text-gray-600">
                             Total devices: {allDevices.length} | Eligible to book: {eligible.length}
+                          </div>
+
+                          <div className="mb-6">
+                            <Label htmlFor="additionalBookingDate" className="text-sm font-medium text-gray-700">Additional Service Date</Label>
+                            <Input
+                              id="additionalBookingDate"
+                              type="date"
+                              min={format(addDays(new Date(), 1), "yyyy-MM-dd")}
+                              value={
+                                additionalServiceDate
+                                  ? (format(new Date(additionalServiceDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                                      ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
+                                      : format(new Date(additionalServiceDate), "yyyy-MM-dd"))
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw) {
+                                  const formatted = format(new Date(raw), "yyyy-MM-dd");
+                                  setBookingDate(formatted); // store exact picked date
+                                } else {
+                                  setBookingDate("");
+                                }
+                              }}
+                              className="mt-2 w-48"
+                            />
                           </div>
                           <div className="mb-4 flex items-center space-x-2">
                             <Checkbox
@@ -326,7 +458,8 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
                   </>
                 )}
-                <div className="mt-4">
+
+                {/* <div className="mt-4">
                       <Label htmlFor="additionalBookingDate" className="text-sm font-medium text-gray-700">Additional Service Date</Label>
                       <Input
                         id="additionalBookingDate"
@@ -336,7 +469,7 @@ export function BookingModal(props: BookingModalProps) {
                         onChange={(e) => setAdditionalServiceDate(e.target.value)}
                         className="mt-1"
                       />
-                </div>
+                </div> */}
               </div>
             )}
           </div>

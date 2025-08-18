@@ -1,7 +1,7 @@
 // AdminBookings.tsx
 'use client'
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer, Views, type View } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
@@ -147,66 +147,132 @@ export default function AdminBookings() {
   const paginatedAppointments = sortedAppointments.slice(startIndex, startIndex + pageSize)
 
   // Build calendar events from filtered appointments
-  useEffect(() => {
-    const mapped: BookingEvent[] = []
-    let hourCursor = 9
-    filteredAppointments.forEach((a: any) => {
-      const baseDate = new Date(a.appointment_date)
-      let start = new Date(baseDate)
-      let end = new Date(baseDate)
+  // useEffect(() => {
+  //   const mapped: BookingEvent[] = []
+  //   let hourCursor = 9
+  //   filteredAppointments.forEach((a: any) => {
+  //     const baseDate = new Date(a.appointment_date)
+  //     let start = new Date(baseDate)
+  //     let end = new Date(baseDate)
 
-      // If appointment_time exists, honor it; else use rolling 9am + 1h blocks
-      if (a.appointment_time) {
-        const parsed = moment(a.appointment_time, 'hh:mm A')
-        start.setHours(parsed.hour(), parsed.minute(), 0, 0)
-        end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
-      } else {
-        start.setHours(hourCursor, 0, 0, 0)
-        end.setHours(hourCursor + 1, 0, 0, 0)
-        hourCursor += 1
-        if (hourCursor >= 17) hourCursor = 9
-      }
+  //     // If appointment_time exists, honor it; else use rolling 9am + 1h blocks
+  //     if (a.appointment_time) {
+  //       const parsed = moment(a.appointment_time, 'hh:mm A')
+  //       start.setHours(parsed.hour(), parsed.minute(), 0, 0)
+  //       end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
+  //     } else {
+  //       start.setHours(hourCursor, 0, 0, 0)
+  //       end.setHours(hourCursor + 1, 0, 0, 0)
+  //       hourCursor += 1
+  //       if (hourCursor >= 17) hourCursor = 9
+  //     }
 
-      const city = a.client_locations?.cities?.name || ''
-      const brgy = a.client_locations?.barangays?.name || ''
-      const date = a.appointment_date || ''
-      const title = `${a.clients?.name || 'Client'}`
+  //     const city = a.client_locations?.cities?.name || ''
+  //     const brgy = a.client_locations?.barangays?.name || ''
+  //     const date = a.appointment_date || ''
+  //     const title = `${a.clients?.name || 'Client'}`
+  //     mapped.push({
+  //       title,
+  //       start,
+  //       end,
+  //       status: a.status,
+  //       draggable: a.status === 'confirmed',
+  //       clientName: a.clients?.name || 'Client',
+  //       city,
+  //       barangay: brgy,
+  //       appointmentDate: date,
+  //       appointmentId: a.id,
+  //     })
+  //   })
+
+  //   // Add blocked dates as full-day red events covering 12:00 AM to 11:59 PM
+  //   blockedDates.forEach((b) => {
+  //     const from = moment(b.from_date).startOf('day')
+  //     const to = moment(b.to_date).startOf('day')
+  //     const day = from.clone()
+  //     while (day.isSameOrBefore(to)) {
+  //       const start = day.clone().startOf('day').toDate()
+  //       const end = day.clone().endOf('day').toDate()
+  //       mapped.push({
+  //         title: `Blocked: ${b.name}`,
+  //         start,
+  //         end,
+  //         status: 'blocked',
+  //         draggable: false,
+  //         blockedName: b.name,
+  //         blockedReason: b.reason,
+  //       })
+  //       day.add(1, 'day')
+  //     }
+  //   })
+  //   setEvents(mapped)
+  // }, [filteredAppointments, blockedDates])
+
+  const mappedEvents = useMemo(() => {
+  const mapped: BookingEvent[] = []
+
+  let hourCursor = 9
+  filteredAppointments.forEach((a: any) => {
+    const baseDate = new Date(a.appointment_date)
+    let start = new Date(baseDate)
+    let end = new Date(baseDate)
+
+    if (a.appointment_time) {
+      const parsed = moment(a.appointment_time, "hh:mm A")
+      start.setHours(parsed.hour(), parsed.minute(), 0, 0)
+      end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
+    } else {
+      start.setHours(hourCursor, 0, 0, 0)
+      end.setHours(hourCursor + 1, 0, 0, 0)
+      hourCursor = hourCursor >= 16 ? 9 : hourCursor + 1
+    }
+
+    mapped.push({
+      title: a.clients?.name || "Client",
+      start,
+      end,
+      status: a.status,
+      draggable: a.status === "confirmed",
+      clientName: a.clients?.name || "Client",
+      city: a.client_locations?.cities?.name || "",
+      barangay: a.client_locations?.barangays?.name || "",
+      appointmentDate: a.appointment_date,
+      appointmentId: a.id,
+    })
+  })
+
+  blockedDates.forEach((b) => {
+    const from = moment(b.from_date).startOf("day")
+    const to = moment(b.to_date).startOf("day")
+    const day = from.clone()
+    while (day.isSameOrBefore(to)) {
       mapped.push({
-        title,
-        start,
-        end,
-        status: a.status,
-        draggable: a.status === 'confirmed',
-        clientName: a.clients?.name || 'Client',
-        city,
-        barangay: brgy,
-        appointmentDate: date,
-        appointmentId: a.id,
+        title: `Blocked: ${b.name}`,
+        start: day.clone().startOf("day").toDate(),
+        end: day.clone().endOf("day").toDate(),
+        status: "blocked",
+        draggable: false,
+        blockedName: b.name,
+        blockedReason: b.reason,
       })
-    })
+      day.add(1, "day")
+    }
+  })
 
-    // Add blocked dates as full-day red events covering 12:00 AM to 11:59 PM
-    blockedDates.forEach((b) => {
-      const from = moment(b.from_date).startOf('day')
-      const to = moment(b.to_date).startOf('day')
-      const day = from.clone()
-      while (day.isSameOrBefore(to)) {
-        const start = day.clone().startOf('day').toDate()
-        const end = day.clone().endOf('day').toDate()
-        mapped.push({
-          title: `Blocked: ${b.name}`,
-          start,
-          end,
-          status: 'blocked',
-          draggable: false,
-          blockedName: b.name,
-          blockedReason: b.reason,
-        })
-        day.add(1, 'day')
-      }
-    })
-    setEvents(mapped)
-  }, [filteredAppointments, blockedDates])
+  return mapped
+}, [filteredAppointments, blockedDates])
+
+// ✅ Only update if different
+useEffect(() => {
+  const isSame =
+    events.length === mappedEvents.length &&
+    events.every((e, i) => e.title === mappedEvents[i].title && e.start.getTime() === mappedEvents[i].start.getTime())
+
+  if (!isSame) {
+    setEvents(mappedEvents)
+  }
+}, [mappedEvents, events])
+
 
   return (
     <div className="flex space-x-6 p-4">
@@ -526,19 +592,55 @@ export default function AdminBookings() {
 
                   // 2. Check if client is referral
                   let isReferral = false
+                  let clientData: any = null
                   try {
                     const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`)
                     if (clientRes.ok) {
-                      const clientData = await clientRes.json()
+                      clientData = await clientRes.json()
                       if (clientData?.ref_id) {
                         isReferral = true
-                      }
+
+                        // --- Add points to client and referrer ---
+                        const clientId = clientData.id
+                        const refId = clientData.ref_id
+
+                        const pointsToAdd = 1;
+
+                        // Add points to completed client
+                        await fetch(`/api/clients/${confirmTarget.clients?.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            field: "points",
+                            value: (clientData.points || 0) + pointsToAdd,
+                          }),
+                        })
+
+                        // Fetch referrer
+                        const refRes = await fetch(`/api/clients/${refId}`)
+                        if (refRes.ok) {
+                          const refData = await refRes.json()
+                          await fetch(`/api/clients/${refId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              points: (refData.points || 0) + pointsToAdd,
+                            }),
+                          })
+                        }
+
+                        // Remove ref_id from completed client
+                        await fetch(`/api/clients/${clientId}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ ref_id: null }),
+                        })
+                      } 
                     }
                   } catch (err) {
-                    console.error('Error fetching client ref_id', err)
+                    console.error('Error handling client points/ref_id', err)
                   }
 
-                  
                   // 3. Insert into notifications table
                   await fetch(`/api/clients/notification-by-id`, {
                     method: 'POST',

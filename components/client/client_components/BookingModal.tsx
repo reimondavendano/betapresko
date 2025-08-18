@@ -120,11 +120,7 @@ export function BookingModal(props: BookingModalProps) {
     deviceIdToAppointmentId,
   } = props;
 
-  if (!isOpen) return null;
-
-  const location = selectedLocationId ? locations.find(l => l.id === selectedLocationId) : undefined;
-  const locationDevices = selectedLocationId ? props.devices.filter(d => d.location_id === selectedLocationId) : [];
-  const [customSettings, setCustomSettings] = useState<CustomSetting[]>([])
+   const [customSettings, setCustomSettings] = useState<CustomSetting[]>([])
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -138,6 +134,12 @@ export function BookingModal(props: BookingModalProps) {
     }
     fetchSettings();
   }, []);
+
+  if (!isOpen) return null;
+
+  const location = selectedLocationId ? locations.find(l => l.id === selectedLocationId) : undefined;
+  const locationDevices = selectedLocationId ? props.devices.filter(d => d.location_id === selectedLocationId) : [];
+ 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

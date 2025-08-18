@@ -709,19 +709,19 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           appointmentApi.getByClientId(clientId),
         ]);
         
-        let calculatedPoints = 0;
-        fetchedAppointments.forEach(appt => {
-          if (appt.status === 'completed') {
-            calculatedPoints += 1;
-            // if (appt.total_units && appt.total_units >= 3) {
-            //   calculatedPoints += 1;
-            // }
-          }
-        });
+        // let calculatedPoints = 0;
+        // fetchedAppointments.forEach(appt => {
+        //   if (appt.status === 'completed') {
+        //     calculatedPoints += 1;
+        //     // if (appt.total_units && appt.total_units >= 3) {
+        //     //   calculatedPoints += 1;
+        //     // }
+        //   }
+        // });
         
 
         let pointsExpiry = null;
-        if (calculatedPoints > 0) {
+        
           const firstCompletedAppointment = fetchedAppointments.reduce(
             (earliest, current) => {
               if (current.status === "completed") {
@@ -742,15 +742,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
               1
             ).toISOString();
           }
-        }
         
-        console.log(fetchedClient)
-        console.log(fetchedClient.points)
-        console.log(calculatedPoints);
-
+        
         
         const updatedClient = await clientApi.updateClient(clientId, {
-          points: calculatedPoints,
+          // points: calculatedPoints,
           points_expiry: pointsExpiry,
         });
         setClient(updatedClient);

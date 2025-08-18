@@ -592,7 +592,7 @@ useEffect(() => {
 
                   // 2. Check if client is referral
                   let isReferral = false
-                  let clientData: any = null
+                  let clientData: any
                   try {
                     const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`)
                     if (clientRes.ok) {
@@ -607,7 +607,7 @@ useEffect(() => {
                         const pointsToAdd = 1;
 
                         // Add points to completed client
-                        await fetch(`/api/clients/${confirmTarget.clients?.id}`, {
+                        await fetch(`/api/clients/${clientId}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({

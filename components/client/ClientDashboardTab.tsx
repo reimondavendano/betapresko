@@ -719,21 +719,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           }
         });
         
-        // let pointsExpiry = null;
-        // if (calculatedPoints > 0) {
-        //   const lastCompletedAppointment = fetchedAppointments.reduce((latest, current) => {
-        //     if (current.status === 'completed') {
-        //       const currentTimestamp = new Date(current.appointment_date).getTime();
-        //       const latestTimestamp = latest ? new Date(latest.appointment_date).getTime() : 0;
-        //       return currentTimestamp > latestTimestamp ? current : latest;
-        //     }
-        //     return latest;
-        //   }, null as Appointment | null);
-
-        //   if (lastCompletedAppointment) {
-        //     pointsExpiry = addYears(new Date(lastCompletedAppointment.appointment_date), 1).toISOString();
-        //   }
-        // }
 
         let pointsExpiry = null;
         if (calculatedPoints > 0) {
@@ -759,15 +744,17 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           }
         }
         
-        if (fetchedClient.points !== calculatedPoints || fetchedClient.points_expiry !== pointsExpiry) {
-          const updatedClient = await clientApi.updateClient(clientId, {
-            points: calculatedPoints,
-            points_expiry: pointsExpiry,
-          });
-          setClient(updatedClient);
-        } else {
-          setClient(fetchedClient);
-        }
+        console.log(fetchedClient)
+        console.log(fetchedClient.points)
+        console.log(calculatedPoints);
+
+        
+        const updatedClient = await clientApi.updateClient(clientId, {
+          points: calculatedPoints,
+          points_expiry: pointsExpiry,
+        });
+        setClient(updatedClient);
+      
         setLocations(fetchedLocations);
         setDevices(fetchedDevices);
         setAppointments(fetchedAppointments);

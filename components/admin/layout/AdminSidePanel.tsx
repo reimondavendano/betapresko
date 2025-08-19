@@ -11,12 +11,14 @@ import {
   Blocks,
   Users2,
   Database,
-  Power
+  Power,
+  BookAIcon
 } from 'lucide-react'
 
 const items: Array<{ key: AdminView; label: string; icon: React.ComponentType<any> }> = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'bookings', label: 'Bookings', icon: CalendarCheck2 },
+  { key: 'bookings', label: 'Booking Calendar', icon: CalendarCheck2 },
+  { key: 'appointments', label: 'Appointment Details', icon: BookAIcon },
   { key: 'clients', label: 'Client Info', icon: Users2 },
   { key: 'master_data', label: 'Master Data', icon: Database },
   { key: 'custom_settings', label: 'Settings', icon: Settings },

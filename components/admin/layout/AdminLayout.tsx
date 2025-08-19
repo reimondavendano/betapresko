@@ -16,6 +16,7 @@ import AdminServices from '../views/AdminServices'
 import AdminBlockedDates from '../views/AdminBlockedDates'
 import AdminMasterData from '../views/AdminMasterData'
 import AdminClientInfo from '../views/AdminClientInfo'
+import AdminAppointments from '../views/AdminAppointments'
 
 export default function AdminLayout() {
   const view = useSelector((s: RootState) => s.admin.activeView)
@@ -26,6 +27,8 @@ export default function AdminLayout() {
         return <AdminDashboard />
       case 'bookings':
         return <AdminBookings />
+      case 'appointments':
+          return <AdminAppointments />
       case 'clients':
           return <AdminClientInfo />
       case 'master_data':
@@ -39,12 +42,14 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 font-sans text-gray-900">
+    <div className="flex h-screen bg-gray-100 font-sans text-gray-900">
       <AdminSidePanel />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-w-0">
         <AdminHeader />
-        <main className="flex-1 p-6  bg-gray-50 shadow-inner overflow-hidden">
-          {renderView()}
+        <main className="flex-1 p-6 bg-gray-50 shadow-inner overflow-hidden">
+          <div className="h-full">
+            {renderView()}
+          </div>
         </main>
       </div>
     </div>

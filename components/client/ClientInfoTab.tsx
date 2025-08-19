@@ -15,6 +15,11 @@ import {
   CheckCircle,
   Calendar,
   MessageSquare,
+  Crown,
+  Star,
+  Shield,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 
 import QRCode from "react-qr-code";
@@ -147,123 +152,300 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
     );
   }
 
+  // Helper function to copy QR code URL
+  const copyQRCodeUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(`${siteUrl}${client?.qr_code}`);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy URL:', err);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Personal Information */}
-      <Card className="rounded-xl shadow-lg p-6 bg-white">
-        <CardHeader className="p-0 mb-6 flex flex-row items-center justify-between border-b pb-3">
-          <CardTitle className="text-xl font-bold flex items-center">
-            <User className="w-6 h-6 mr-2 text-blue-600" />
-            Client Profile
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-            <Edit className="w-4 h-4 mr-2 text-gray-600" /> Edit Profile
-          </Button>
-        </CardHeader>
-
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            {/* Name */}
-            <div className="flex items-center">
-              <User className="w-5 h-5 mr-3 text-blue-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Name</p>
-                <p className="text-gray-900">{client.name}</p>
-              </div>
+    <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Hero Section - Client Overview */}
+      <div className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden" style={{ backgroundColor: "#99BCC0" }}>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-24 -translate-x-24"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between">
+          <div className="flex items-center space-x-4 mb-6 md:mb-0">
+            <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+              <User className="w-8 h-8 text-white" />
             </div>
-
-            {/* Mobile */}
-            <div className="flex items-center">
-              <Phone className="w-5 h-5 mr-3 text-green-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Mobile</p>
-                <p className="text-gray-900">{client.mobile}</p>
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="flex items-center">
-              <Mail className="w-5 h-5 mr-3 text-purple-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Email</p>
-                <p className="text-gray-900">{client.email || 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* Points */}
-            <div className="flex items-center">
-              <Gift className="w-5 h-5 mr-3 text-orange-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Points</p>
-                <p className="text-gray-900">{client.points}</p>
-              </div>
-            </div>
-
-            {/* SMS Opt In */}
-            <div className="flex items-center">
-              <MessageSquare className="w-5 h-5 mr-3 text-indigo-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">SMS Opt In</p>
-                {client.sms_opt_in ? (
-                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-lg">
-                    Yes
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg">
-                    No
-                  </span>
+            <div>
+              <h1 className="text-3xl font-bold">{client.name}</h1>
+              <div className="flex items-center space-x-4 mt-2">
+                <div className="flex items-center space-x-1">
+                  <Phone className="w-4 h-4" />
+                  <span className="text-blue-100">{client.mobile}</span>
+                </div>
+                {client.email && (
+                  <div className="flex items-center space-x-1">
+                    <Mail className="w-4 h-4" />
+                    <span className="text-blue-100">{client.email}</span>
+                  </div>
                 )}
               </div>
             </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {/* <div className="text-center">
+              <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full mb-2">
+                <Gift className="w-8 h-8 text-white" />
+              </div>
+              <p className="text-2xl font-bold">{client.points}</p>
+              <p className="text-blue-100 text-sm">Loyalty Points</p>
+            </div> */}
+            
+            <Button 
+              onClick={() => setIsEditOpen(true)}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white"
+              size="lg"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Profile
+            </Button>
+          </div>
+        </div>
+      </div>
 
-            {/* QR Code */}
-             <div className="flex items-center">
-              <QrCode className="w-5 h-5 mr-3 text-pink-500" />
-              <div>
-                <p className="text-sm font-semibold text-gray-700">Scan for user profile</p>
-                <div className="mt-1 border rounded-lg shadow-sm p-2 bg-gray-50 inline-block">
-                  <QRCode
-                    value={`${siteUrl}${client.qr_code}`}
-                    size={200}
-                    bgColor="transparent" // optional
-                  />
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Client Details */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Contact Information */}
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 p-6">
+              <CardTitle className="text-xl font-bold text-gray-800 flex items-center">
+                <div className="p-2 bg-blue-500 rounded-lg mr-3">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+                Contact Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Name */}
+                <div className="group">
+                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+                    <div className="p-2 bg-blue-100 rounded-lg mr-4">
+                      <User className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Full Name</p>
+                      <p className="text-lg font-medium text-gray-900">{client.name}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile */}
+                <div className="group">
+                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+                    <div className="p-2 bg-green-100 rounded-lg mr-4">
+                      <Phone className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Mobile Number</p>
+                      <p className="text-lg font-medium text-gray-900">{client.mobile}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="group">
+                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+                    <div className="p-2 bg-purple-100 rounded-lg mr-4">
+                      <Mail className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Email Address</p>
+                      <p className="text-lg font-medium text-gray-900">{client.email || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SMS Preferences */}
+                <div className="group">
+                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+                    <div className="p-2 bg-indigo-100 rounded-lg mr-4">
+                      <MessageSquare className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">SMS Notifications</p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        {client.sms_opt_in ? (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <span className="text-lg font-medium text-green-700">Enabled</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-5 h-5 text-gray-400" />
+                            <span className="text-lg font-medium text-gray-500">Disabled</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          </div>
-        </CardContent>
-      </Card>
+        {/* Right Column - QR Code & Stats */}
+        <div className="space-y-6">
+          {/* QR Code Card */}
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-purple-50 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-6">
+              <CardTitle className="text-lg font-bold text-gray-800 flex items-center">
+                <div className="p-2 bg-purple-500 rounded-lg mr-3">
+                  <QrCode className="w-5 h-5 text-white" />
+                </div>
+                Client QR Code
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 text-center">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-purple-100 inline-block">
+                <QRCode
+                  value={`${siteUrl}${client.qr_code}`}
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#6366f1"
+                  className="rounded-lg"
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-4 mb-4">Scan to view client profile</p>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={copyQRCodeUrl}
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 border-purple-200 hover:bg-purple-50"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy URL
+                </Button>
+                <Button 
+                  onClick={() => window.open(`${siteUrl}${client.qr_code}`, '_blank')}
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 border-purple-200 hover:bg-purple-50"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Loyalty Points Card */}
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-400 to-yellow-500 rounded-full mb-4">
+                  <Crown className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Loyalty Points</h3>
+                <div className="text-4xl font-bold text-orange-600 mb-2">{client.points}</div>
+                <p className="text-sm text-gray-600">Total earned points</p>
+                <div className="mt-4 p-3 bg-white/60 rounded-lg">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    <span className="text-sm font-medium text-gray-700">Valued Customer</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Registered Locations */}
-      <Card className="rounded-xl shadow-lg p-6 bg-white">
-        <CardHeader className="p-0 mb-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-xl font-bold flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-            Registered Locations
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 p-6">
+          <CardTitle className="text-xl font-bold text-gray-800 flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-500 rounded-lg mr-3">
+                <MapPin className="w-5 h-5 text-white" />
+              </div>
+              Registered Locations
+            </div>
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {locations.length} {locations.length === 1 ? 'location' : 'locations'}
+            </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0 space-y-4">
+        <CardContent className="p-6">
           {locations.length > 0 ? (
-            locations.map((location) => (
-              <div key={location.id} className="border rounded-lg p-4 bg-gray-50 shadow-sm">
-                <div className="flex items-center">
-                  <Home className="w-5 h-5 mr-2 text-gray-600" />
-                  <h3 className="font-medium">{location.name}</h3>
-                  {location.is_primary && (
-                    <Badge className="ml-2 bg-blue-100 text-blue-800">Primary</Badge>
-                  )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {locations.map((location, index) => (
+                <div key={location.id} className="group">
+                  <div className="relative p-6 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
+                    {/* Location Icon and Primary Badge */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-3 rounded-lg ${
+                          location.is_primary 
+                            ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          <Home className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-lg">{location.name}</h3>
+                          {location.is_primary && (
+                            <div className="flex items-center space-x-1 mt-1">
+                              <Crown className="w-4 h-4 text-blue-500" />
+                              <Badge className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1">
+                                Primary Location
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Address Information */}
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-2">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+                        <div className="text-sm text-gray-600 leading-relaxed">
+                          <p className="font-medium text-gray-800">{location.address_line1}</p>
+                          <p>{location.street}, {location.barangay_name}</p>
+                          <p className="font-medium">{location.city_name}</p>
+                        </div>
+                      </div>
+                      
+                      {location.landmark && (
+                        <div className="flex items-start space-x-2">
+                          <Star className="w-4 h-4 text-yellow-500 mt-1 flex-shrink-0" />
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium text-gray-700">Landmark:</span> {location.landmark}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Decorative element for primary location */}
+                    {location.is_primary && (
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-3xl"></div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-gray-600 text-sm">
-                  {location.address_line1}, {location.street}, {location.barangay_name}, {location.city_name}
-                </p>
-                {location.landmark && (
-                  <p className="text-gray-500 text-sm">Landmark: {location.landmark}</p>
-                )}
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <p className="text-gray-600 text-center py-4">No locations registered.</p>
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <MapPin className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">No Locations Registered</h3>
+              <p className="text-gray-500">This client hasn`t registered any locations yet.</p>
+            </div>
           )}
         </CardContent>
       </Card>

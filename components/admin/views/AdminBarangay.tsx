@@ -12,7 +12,7 @@ type City = { id: string; name: string }
 type Barangay = { id: string; name: string; city_id: string; is_set: boolean; cities?: { name: string } }
 
 export default function AdminBarangay() {
-  const pageSize = 10
+  const pageSize = 5
   const [rows, setRows] = useState<Barangay[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -94,8 +94,9 @@ export default function AdminBarangay() {
   }
 
   return (
-    <div className="p-4">
-      {/* Header section */}
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-6 pb-6">
+        {/* Header section */}
       <div className="flex items-center justify-between p-4 bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg">
         <h1 className="text-2xl font-bold">Manage Barangays</h1>
         <div className="flex space-x-2">
@@ -232,6 +233,7 @@ export default function AdminBarangay() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

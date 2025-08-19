@@ -5,11 +5,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     if (req.method === 'GET') {
       const filter = String(req.query.status || '').trim()
+      const dateFilter = String(req.query.dateFilter || '').trim()
+      const specificDate = String(req.query.date || '').trim()
+      const page = parseInt(String(req.query.page || '1'))
+      const limit = parseInt(String(req.query.limit || '15'))
+      const offset = (page - 1) * limit
+      
       let query = supabase
         .from('appointments')
         .select(`
-          id, appointment_date, appointment_time, status, amount, total_units,
+          id, appointment_date, appointment_time, status, amount, total_units, notes,
           clients:client_id(id, name, mobile),
+          services:service_id(id, name, description, base_price),
           client_locations:location_id(
             id, name, address_line1, street, barangay_id, city_id,
             cities:city_id(name, province),
@@ -22,16 +29,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               ac_types:ac_type_id(name)
             )
           )
-        `)
-        .order('appointment_date', { ascending: true })
+        `, { count: 'exact' })
 
+      // Status filter
       if (filter === 'confirmed' || filter === 'completed') {
         query = query.eq('status', filter)
       }
 
-      const { data, error } = await query
+      // Date filtering
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      
+      if (specificDate) {
+        query = query.eq('appointment_date', specificDate)
+      } else if (dateFilter === 'today') {
+        query = query.eq('appointment_date', today)
+      } else if (dateFilter === 'incoming') {
+        query = query.gte('appointment_date', today)
+      } else if (dateFilter === 'previous') {
+        query = query.lt('appointment_date', today)
+      }
+
+      // Apply pagination
+      query = query.range(offset, offset + limit - 1)
+      
+      // Order by appointment_date and time
+      query = query.order('appointment_date', { ascending: true })
+      query = query.order('appointment_time', { ascending: true })
+
+      const { data, error, count } = await query
       if (error) return handleSupabaseError(error, res)
-      return res.status(200).json({ data })
+      
+      return res.status(200).json({ 
+        data,
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit)
+        }
+      })
     }
 
     if (req.method === 'PATCH') {

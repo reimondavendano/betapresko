@@ -33,7 +33,8 @@ export default function AdminHeader() {
 
   const viewLabelMap: Record<string, string> = {
     dashboard: 'Dashboard',
-    bookings: 'Bookings',
+    bookings: 'Booking Calendar',
+    appointments: 'Appointment Details',
     clients: 'Client Info',
     master_data: 'Master Data',
     custom_settings: 'Custom Settings',

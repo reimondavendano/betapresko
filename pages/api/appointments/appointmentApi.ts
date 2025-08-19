@@ -52,6 +52,28 @@ export const appointmentApi = {
   },
 
   /**
+   * Updates appointment fields (for general appointment updates like rescheduling)
+   */
+  updateAppointment: async (appointmentId: UUID, updateData: Partial<Omit<Appointment, 'id' | 'created_at'>>): Promise<Appointment> => {
+    const { data, error } = await supabase
+      .from('appointments')
+      .update({ 
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', appointmentId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating appointment ${appointmentId}:`, error);
+      throw new Error(error.message);
+    }
+
+    return data as Appointment;
+  },
+
+  /**
    * Updates appointment status and sets device cleaning dates when status becomes 'completed'
    */
   updateAppointmentStatus: async (appointmentId: UUID, status: 'pending' | 'confirmed' | 'completed' | 'voided'): Promise<Appointment> => {

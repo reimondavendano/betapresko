@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 export type AdminView =
   | 'dashboard'
   | 'bookings'
+  | 'appointments'
   | 'custom_settings'
   | 'master_data'
   | 'brands'

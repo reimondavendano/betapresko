@@ -10,7 +10,7 @@ import { Plus, Trash2, PenSquare } from 'lucide-react'
 type City = { id: string; name: string; province: string }
 
 export default function AdminCity() {
-  const pageSize = 10
+  const pageSize = 5
   const [rows, setRows] = useState<City[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -82,8 +82,9 @@ export default function AdminCity() {
   }
 
   return (
-    <div className="p-4">
-      {/* Header section */}
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-6 pb-6">
+        {/* Header section */}
       <div className="flex items-center justify-between p-4 bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg">
         <h1 className="text-2xl font-bold">Manage Cities</h1>
         <div className="flex space-x-2">
@@ -209,6 +210,7 @@ export default function AdminCity() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

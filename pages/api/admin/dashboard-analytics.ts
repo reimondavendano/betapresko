@@ -1,0 +1,389 @@
+// pages/api/admin/dashboard-analytics.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { supabase, handleSupabaseError } from '../../../lib/supabase'
+import { 
+  DashboardStats, 
+  MonthlySalesData, 
+  UpcomingAppointment, 
+  TopClient,
+  ClientsByArea,
+  DeviceDueSoon,
+  ForecastData,
+  ChurnRiskClient
+} from '../../../types/database'
+
+interface DashboardAnalytics {
+  stats: DashboardStats;
+  monthlySalesData: MonthlySalesData[];
+  upcomingAppointments: UpcomingAppointment[];
+  topClients: TopClient[];
+  clientsByArea: ClientsByArea[];
+  devicesDueSoon: DeviceDueSoon[];
+  forecastData: ForecastData[];
+  churnRiskClients: ChurnRiskClient[];
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<DashboardAnalytics | { error: string }>
+) {
+  if (req.method === 'GET') {
+    try {
+      // Get current date ranges
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const next30Days = new Date();
+      next30Days.setDate(now.getDate() + 30);
+
+      // 🔹 Sales & Bookings Data
+      const todayISO = today.toISOString().split('T')[0];
+      const weekISO = startOfWeek.toISOString().split('T')[0];
+      const monthISO = startOfMonth.toISOString().split('T')[0];
+
+      // Total sales calculations
+      const { data: todaySales } = await supabase
+        .from('appointments')
+        .select('amount')
+        .eq('status', 'completed')
+        .eq('appointment_date', todayISO);
+
+      const { data: weekSales } = await supabase
+        .from('appointments')
+        .select('amount')
+        .eq('status', 'completed')
+        .gte('appointment_date', weekISO);
+
+      const { data: monthSales } = await supabase
+        .from('appointments')
+        .select('amount')
+        .eq('status', 'completed')
+        .gte('appointment_date', monthISO);
+
+      // Booking status breakdown
+      const { data: statusBreakdown } = await supabase
+        .from('appointments')
+        .select('status')
+        .gte('appointment_date', monthISO);
+
+      const bookingStatusBreakdown = {
+        pending: statusBreakdown?.filter(a => a.status === 'pending').length || 0,
+        confirmed: statusBreakdown?.filter(a => a.status === 'confirmed').length || 0,
+        completed: statusBreakdown?.filter(a => a.status === 'completed').length || 0,
+        voided: statusBreakdown?.filter(a => a.status === 'voided').length || 0,
+      };
+
+      // Monthly sales trend data (last 12 months)
+      const { data: monthlySalesRaw } = await supabase
+        .from('appointments')
+        .select('appointment_date, amount, status')
+        .eq('status', 'completed')
+        .gte('appointment_date', new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString().split('T')[0])
+        .order('appointment_date');
+
+      const monthlySalesMap = new Map();
+      monthlySalesRaw?.forEach(appointment => {
+        const monthKey = appointment.appointment_date.substring(0, 7); // YYYY-MM
+        if (!monthlySalesMap.has(monthKey)) {
+          monthlySalesMap.set(monthKey, { sales: 0, bookings: 0 });
+        }
+        monthlySalesMap.get(monthKey).sales += appointment.amount;
+        monthlySalesMap.get(monthKey).bookings += 1;
+      });
+
+      const monthlySalesData: MonthlySalesData[] = Array.from(monthlySalesMap.entries())
+        .map(([month, data]) => ({
+          month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          sales: data.sales,
+          bookings: data.bookings
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      // Upcoming appointments (next 30 days, confirmed status)
+      const { data: upcomingAppointmentsData } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          appointment_date,
+          appointment_time,
+          amount,
+          clients (name, mobile),
+          client_locations (name),
+          services (name)
+        `)
+        .eq('status', 'confirmed')
+        .gte('appointment_date', todayISO)
+        .lte('appointment_date', next30Days.toISOString().split('T')[0])
+        .order('appointment_date')
+        .limit(10);
+
+      const upcomingAppointments: UpcomingAppointment[] = upcomingAppointmentsData?.map(apt => ({
+        id: apt.id,
+        client_name: apt.clients?.name || 'Unknown',
+        client_mobile: apt.clients?.mobile || '',
+        appointment_date: apt.appointment_date,
+        appointment_time: apt.appointment_time,
+        service_name: apt.services?.name || 'Unknown Service',
+        location_name: apt.client_locations?.name || 'Unknown Location',
+        amount: apt.amount
+      })) || [];
+
+      // 🔹 Clients & Retention Data
+      
+      // New clients this month
+      const { count: newClientsCount } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startOfMonth.toISOString());
+
+      // Returning clients (clients with more than one appointment)
+      const { data: clientAppointmentCounts } = await supabase
+        .from('appointments')
+        .select('client_id')
+        .eq('status', 'completed');
+
+      const clientCounts = new Map();
+      clientAppointmentCounts?.forEach(apt => {
+        clientCounts.set(apt.client_id, (clientCounts.get(apt.client_id) || 0) + 1);
+      });
+      const returningClientsCount = Array.from(clientCounts.values()).filter(count => count > 1).length;
+
+      // Top clients by spend
+      const { data: topClientsData } = await supabase
+        .from('appointments')
+        .select(`
+          client_id,
+          amount,
+          clients (id, name, mobile)
+        `)
+        .eq('status', 'completed');
+
+      const clientSpendMap = new Map();
+      topClientsData?.forEach(apt => {
+        const clientId = apt.client_id;
+        if (!clientSpendMap.has(clientId)) {
+          clientSpendMap.set(clientId, {
+            id: clientId,
+            name: apt.clients?.name || 'Unknown',
+            mobile: apt.clients?.mobile || '',
+            totalSpend: 0,
+            appointmentCount: 0
+          });
+        }
+        const client = clientSpendMap.get(clientId);
+        client.totalSpend += apt.amount;
+        client.appointmentCount += 1;
+      });
+
+      const topClients: TopClient[] = Array.from(clientSpendMap.values())
+        .sort((a, b) => b.totalSpend - a.totalSpend)
+        .slice(0, 10);
+
+      // Clients by area - simplified query to avoid complex joins
+      const { data: clientsByAreaData } = await supabase
+        .from('client_locations')
+        .select(`
+          barangays (name),
+          cities (name),
+          client_id
+        `);
+
+      // Get appointments data separately to avoid complex joins
+      const { data: appointmentsRevenue } = await supabase
+        .from('appointments')
+        .select('client_id, amount, status')
+        .eq('status', 'completed');
+
+      const areaMap = new Map();
+      const clientRevenueMap = new Map();
+      
+      // Build client revenue mapping
+      appointmentsRevenue?.forEach(apt => {
+        const current = clientRevenueMap.get(apt.client_id) || 0;
+        clientRevenueMap.set(apt.client_id, current + apt.amount);
+      });
+      
+      clientsByAreaData?.forEach(location => {
+        const areaKey = `${location.barangays?.name || 'Unknown'}, ${location.cities?.name || 'Unknown'}`;
+        if (!areaMap.has(areaKey)) {
+          areaMap.set(areaKey, {
+            area: location.barangays?.name || 'Unknown',
+            city: location.cities?.name || 'Unknown',
+            clientCount: new Set(),
+            totalRevenue: 0
+          });
+        }
+        const area = areaMap.get(areaKey);
+        if (location.client_id) {
+          area.clientCount.add(location.client_id);
+          const clientRevenue = clientRevenueMap.get(location.client_id) || 0;
+          area.totalRevenue += clientRevenue;
+        }
+      });
+
+      const clientsByArea: ClientsByArea[] = Array.from(areaMap.values())
+        .map(area => ({
+          ...area,
+          clientCount: area.clientCount.size
+        }))
+        .filter(area => area.clientCount > 0)
+        .sort((a, b) => b.clientCount - a.clientCount)
+        .slice(0, 10);
+
+      // 🔹 Devices & Maintenance Forecast
+
+      // Devices due soon (within 30 days)
+      const { data: devicesDueData } = await supabase
+        .from('devices')
+        .select(`
+          id,
+          name,
+          due_3_months,
+          due_4_months,
+          due_6_months,
+          clients (name),
+          client_locations (name),
+          brands (name),
+          ac_types (name)
+        `);
+
+      const devicesDueSoon: DeviceDueSoon[] = [];
+      const next30DaysISO = next30Days.toISOString().split('T')[0];
+
+      devicesDueData?.forEach(device => {
+        const dueDates = [
+          { date: device.due_3_months, type: '3_months' as const },
+          { date: device.due_4_months, type: '4_months' as const },
+          { date: device.due_6_months, type: '6_months' as const }
+        ];
+
+        dueDates.forEach(due => {
+          if (due.date && due.date <= next30DaysISO && due.date >= todayISO) {
+            devicesDueSoon.push({
+              id: device.id,
+              name: device.name,
+              client_name: device.clients?.name || 'Unknown',
+              location_name: device.client_locations?.name || 'Unknown',
+              brand_name: device.brands?.name,
+              ac_type_name: device.ac_types?.name,
+              due_date: due.date,
+              due_type: due.type
+            });
+          }
+        });
+      });
+
+      // Churn risk clients (clients with devices but no appointments in last 6 months)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      const sixMonthsAgoISO = sixMonthsAgo.toISOString().split('T')[0];
+
+      const { data: churnRiskData } = await supabase
+        .from('clients')
+        .select(`
+          id,
+          name,
+          mobile,
+          devices (id),
+          appointments (appointment_date)
+        `);
+
+      const churnRiskClients: ChurnRiskClient[] = [];
+      churnRiskData?.forEach(client => {
+        const deviceCount = client.devices?.length || 0;
+        if (deviceCount > 0) {
+          const appointments = client.appointments || [];
+          const lastAppointment = appointments
+            .map(apt => apt.appointment_date)
+            .sort()
+            .pop() || null;
+          
+          const daysSinceLastAppointment = lastAppointment 
+            ? Math.floor((now.getTime() - new Date(lastAppointment).getTime()) / (1000 * 60 * 60 * 24))
+            : 999;
+
+          if (!lastAppointment || lastAppointment < sixMonthsAgoISO) {
+            churnRiskClients.push({
+              id: client.id,
+              name: client.name,
+              mobile: client.mobile,
+              deviceCount,
+              lastAppointment,
+              daysSinceLastAppointment
+            });
+          }
+        }
+      });
+
+      // 🔹 Forecast & Projections
+
+      // Generate forecast data for next 6 months
+      const forecastData: ForecastData[] = [];
+      for (let i = 0; i < 6; i++) {
+        const forecastMonth = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
+        const monthKey = forecastMonth.toISOString().substring(0, 7);
+        
+        // Count devices due in this month
+        const devicesScheduled = devicesDueData?.filter(device => {
+          return [device.due_3_months, device.due_4_months, device.due_6_months]
+            .some(due => due?.startsWith(monthKey));
+        }).length || 0;
+
+        // Simple projection based on historical data
+        const avgMonthlySales = monthlySalesData.length > 0 
+          ? monthlySalesData.reduce((sum, month) => sum + month.sales, 0) / monthlySalesData.length 
+          : 0;
+        
+        const avgMonthlyBookings = monthlySalesData.length > 0 
+          ? monthlySalesData.reduce((sum, month) => sum + month.bookings, 0) / monthlySalesData.length 
+          : 0;
+
+        forecastData.push({
+          month: forecastMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          projectedRevenue: Math.round(avgMonthlySales * (1 + (devicesScheduled * 0.1))),
+          projectedBookings: Math.round(avgMonthlyBookings + devicesScheduled),
+          devicesScheduled
+        });
+      }
+
+      // Compile dashboard stats
+      const stats: DashboardStats = {
+        totalSales: {
+          today: todaySales?.reduce((sum, apt) => sum + apt.amount, 0) || 0,
+          thisWeek: weekSales?.reduce((sum, apt) => sum + apt.amount, 0) || 0,
+          thisMonth: monthSales?.reduce((sum, apt) => sum + apt.amount, 0) || 0
+        },
+        bookingStatusBreakdown,
+        devicesData: {
+          dueWithin30Days: devicesDueSoon.length,
+          churnRisk: churnRiskClients.length
+        },
+        clientStats: {
+          newThisMonth: newClientsCount || 0,
+          returningClients: returningClientsCount
+        }
+      };
+
+      const analytics: DashboardAnalytics = {
+        stats,
+        monthlySalesData,
+        upcomingAppointments,
+        topClients,
+        clientsByArea,
+        devicesDueSoon: devicesDueSoon.slice(0, 20), // Limit to top 20
+        forecastData,
+        churnRiskClients: churnRiskClients.slice(0, 15) // Limit to top 15
+      };
+
+      return res.status(200).json(analytics);
+    } catch (error: any) {
+      console.error('Dashboard analytics error:', error);
+      return handleSupabaseError(error, res);
+    }
+  } else {
+    res.setHeader('Allow', ['GET']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+}

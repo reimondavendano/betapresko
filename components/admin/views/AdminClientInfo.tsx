@@ -63,7 +63,7 @@ export default function AdminClientInfo() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dialogAction, setDialogAction] = useState<'edit' | 'view' | null>(null);
-  const pageSize = 10;
+  const pageSize = 5;
   const [notificationMessage, setNotificationMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [showNotification, setShowNotification] = useState(false);

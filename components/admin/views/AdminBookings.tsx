@@ -10,9 +10,11 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ChevronLeft, ChevronRight, Download, Filter, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Filter, Search, Settings, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { Calendar as MiniCalendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { AirVent } from 'lucide-react';
@@ -25,6 +27,8 @@ import { setAppointments } from '@/lib/features/admin/adminSlice';
 import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking';
 
 
+// Set moment locale to ensure proper formatting
+moment.locale('en');
 const localizer = momentLocalizer(moment);
 
 const DnDCalendar = withDragAndDrop(Calendar as any);
@@ -51,8 +55,9 @@ export default function AdminBookings() {
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('today')
+  const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 5
+  const pageSize = 4
 
   const [date, setDate] = useState<Date>(new Date())
   const [view, setView] = useState<View>(Views.WEEK)
@@ -124,16 +129,33 @@ export default function AdminBookings() {
   }, [statusFilter, loadAppointments, loadBlockedDates]);
 
   // Reset page when filter changes or when data updates
-  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, appointments.length])
+  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, searchQuery, appointments.length])
 
   // Derived filtered, sorted and paginated appointments
   const filteredAppointments = appointments.filter((a: any) => {
-    if (dateFilter === 'all') return true
-    const apptDate = moment(a.appointment_date).startOf('day')
-    const today = moment().startOf('day')
-    if (dateFilter === 'today') return apptDate.isSame(today)
-    if (dateFilter === 'incoming') return apptDate.isAfter(today)
-    if (dateFilter === 'previous') return apptDate.isBefore(today)
+    // Date filter
+    if (dateFilter !== 'all') {
+      const apptDate = moment(a.appointment_date).startOf('day')
+      const today = moment().startOf('day')
+      if (dateFilter === 'today' && !apptDate.isSame(today)) return false
+      if (dateFilter === 'incoming' && !apptDate.isAfter(today)) return false
+      if (dateFilter === 'previous' && !apptDate.isBefore(today)) return false
+    }
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const clientName = (a.clients?.name || '').toLowerCase()
+      const city = (a.client_locations?.cities?.name || '').toLowerCase()
+      const barangay = (a.client_locations?.barangays?.name || '').toLowerCase()
+      const serviceName = (a.services?.name || '').toLowerCase()
+      
+      return clientName.includes(query) || 
+             city.includes(query) || 
+             barangay.includes(query) ||
+             serviceName.includes(query)
+    }
+    
     return true
   })
 
@@ -146,67 +168,6 @@ export default function AdminBookings() {
   const startIndex = (currentPage - 1) * pageSize
   const paginatedAppointments = sortedAppointments.slice(startIndex, startIndex + pageSize)
 
-  // Build calendar events from filtered appointments
-  // useEffect(() => {
-  //   const mapped: BookingEvent[] = []
-  //   let hourCursor = 9
-  //   filteredAppointments.forEach((a: any) => {
-  //     const baseDate = new Date(a.appointment_date)
-  //     let start = new Date(baseDate)
-  //     let end = new Date(baseDate)
-
-  //     // If appointment_time exists, honor it; else use rolling 9am + 1h blocks
-  //     if (a.appointment_time) {
-  //       const parsed = moment(a.appointment_time, 'hh:mm A')
-  //       start.setHours(parsed.hour(), parsed.minute(), 0, 0)
-  //       end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
-  //     } else {
-  //       start.setHours(hourCursor, 0, 0, 0)
-  //       end.setHours(hourCursor + 1, 0, 0, 0)
-  //       hourCursor += 1
-  //       if (hourCursor >= 17) hourCursor = 9
-  //     }
-
-  //     const city = a.client_locations?.cities?.name || ''
-  //     const brgy = a.client_locations?.barangays?.name || ''
-  //     const date = a.appointment_date || ''
-  //     const title = `${a.clients?.name || 'Client'}`
-  //     mapped.push({
-  //       title,
-  //       start,
-  //       end,
-  //       status: a.status,
-  //       draggable: a.status === 'confirmed',
-  //       clientName: a.clients?.name || 'Client',
-  //       city,
-  //       barangay: brgy,
-  //       appointmentDate: date,
-  //       appointmentId: a.id,
-  //     })
-  //   })
-
-  //   // Add blocked dates as full-day red events covering 12:00 AM to 11:59 PM
-  //   blockedDates.forEach((b) => {
-  //     const from = moment(b.from_date).startOf('day')
-  //     const to = moment(b.to_date).startOf('day')
-  //     const day = from.clone()
-  //     while (day.isSameOrBefore(to)) {
-  //       const start = day.clone().startOf('day').toDate()
-  //       const end = day.clone().endOf('day').toDate()
-  //       mapped.push({
-  //         title: `Blocked: ${b.name}`,
-  //         start,
-  //         end,
-  //         status: 'blocked',
-  //         draggable: false,
-  //         blockedName: b.name,
-  //         blockedReason: b.reason,
-  //       })
-  //       day.add(1, 'day')
-  //     }
-  //   })
-  //   setEvents(mapped)
-  // }, [filteredAppointments, blockedDates])
 
   const mappedEvents = useMemo(() => {
   const mapped: BookingEvent[] = []
@@ -275,33 +236,75 @@ useEffect(() => {
 
 
   return (
-    <div className="flex space-x-6 p-4">
-      {/* Left Sidebar */}
-      <Card className="w-80 p-4 space-y-6">
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 pb-6">
+      {/* COMMENTED OUT: Left Sidebar - Appointment list functionality moved to AdminAppointments */}
+      {/*
+      <Card className="w-100 p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-semibold">Appointment Calendar</h3>
-          {/* Calendar navigation controls */}
         </div>
 
-        {/* Status Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm">Status:</span>
-          <Button size="sm" variant={statusFilter==='all'?'default':'outline'} onClick={()=>setStatusFilter('all')}>All</Button>
-          <Button size="sm" variant={statusFilter==='confirmed'?'default':'outline'} onClick={()=>setStatusFilter('confirmed')}>Confirmed</Button>
-          <Button size="sm" variant={statusFilter==='completed'?'default':'outline'} onClick={()=>setStatusFilter('completed')}>Completed</Button>
-        </div>
-        {/* Date Filter */}
-        <div className="flex items-center gap-2">
-          
-          <Button size="sm" variant={dateFilter==='all'?'default':'outline'} onClick={()=>setDateFilter('all')}>All</Button>
-          <Button size="sm" variant={dateFilter==='today'?'default':'outline'} onClick={()=>setDateFilter('today')}>Today</Button>
-          <Button size="sm" variant={dateFilter==='incoming'?'default':'outline'} onClick={()=>setDateFilter('incoming')}>Incoming</Button>
-          <Button size="sm" variant={dateFilter==='previous'?'default':'outline'} onClick={()=>setDateFilter('previous')}>Prev</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="flex items-center gap-2 h-8">
+                <Settings size={14} />
+                Status
+                <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? 'bg-accent' : ''}>
+                All
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('confirmed')} className={statusFilter === 'confirmed' ? 'bg-accent' : ''}>
+                Confirmed
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('completed')} className={statusFilter === 'completed' ? 'bg-accent' : ''}>
+                Completed
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="flex items-center gap-2 h-8">
+                <CalendarIcon size={14} />
+                Show by
+                <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setDateFilter('all')} className={dateFilter === 'all' ? 'bg-accent' : ''}>
+                All
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter('today')} className={dateFilter === 'today' ? 'bg-accent' : ''}>
+                Today
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter('incoming')} className={dateFilter === 'incoming' ? 'bg-accent' : ''}>
+                Incoming
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter('previous')} className={dateFilter === 'previous' ? 'bg-accent' : ''}>
+                Previous
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* Appointment List */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input 
+              placeholder="Search..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full h-8"
+            />
+          </div>
+        </div>
+
         <div>
-          
           <div className="space-y-3">
             {sortedAppointments.length === 0 && <div className="text-sm text-gray-500">No appointments</div>}
             {paginatedAppointments.map((a, idx) => {
@@ -311,12 +314,14 @@ useEffect(() => {
               const globalIdx = startIndex + idx
               const start = moment(a.appointment_date).hour(9 + (globalIdx % 8)).minute(0)
               const end = moment(start).add(1, 'hour')
+              const serviceName = a.services?.name || 'N/A'
               return (
                 <div key={a.id} className="space-y-2">
                   <div className="flex items-start">
                     <div className="flex-1">
                       <p className="font-medium">{fullTitle}</p>
                       <p className="text-sm text-gray-400">{city}, {brgy}</p>
+                      <p className="text-sm text-blue-600 font-medium">{serviceName}</p>
                       <p className="text-sm text-gray-400">{a.appointment_date} [{start.format('hh:mm A')} - {end.format('hh:mm A')}]</p>
                       <div className="mt-2 flex gap-2">
                         <Button
@@ -345,7 +350,6 @@ useEffect(() => {
                       </div>
                     </div>
                   </div>
-                  {startIndex + idx < sortedAppointments.length - 1 && <Separator className="my-2" />}
                 </div>
               )
             })}
@@ -364,9 +368,10 @@ useEffect(() => {
           )}
         </div>
       </Card>
+      */}
 
-      {/* Main Calendar View */}
-      <div className="flex-1 space-y-4">
+      {/* Main Calendar View - Now Full Width */}
+      <div className="w-full space-y-4">
         {/* Top Controls */}
         <div className="flex justify-between items-center">
           
@@ -390,12 +395,12 @@ useEffect(() => {
             </div>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline"><Search size={16} className="mr-2" /> Search</Button>
+            {/* Search is now in the left sidebar */}
           </div>
         </div>
 
-        {/* The Calendar component itself */}
-        <div className="bg-white rounded-lg p-4 shadow-md h-[calc(95vh-160px)]">
+        {/* The Calendar component itself - Expanded */}
+        <div className="bg-white rounded-lg p-4 shadow-md h-[calc(100vh-160px)]">
           <DnDCalendar
             localizer={localizer}
             events={events}
@@ -496,6 +501,9 @@ useEffect(() => {
                   {selectedAppt.client_locations?.barangays?.name && (selectedAppt.client_locations?.cities?.name ? ', ' : '')}
                   {(selectedAppt.client_locations?.cities?.name || '')}
                   {selectedAppt.client_locations?.cities?.province ? `, ${selectedAppt.client_locations?.cities?.province}` : ''}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Service:</span> {selectedAppt.services?.name || 'N/A'}
                 </p>
                 <p className="text-sm text-gray-600">
                   {selectedAppt.status === 'confirmed' ? 'Appointment date' + ': ' + moment(selectedAppt.appointment_date).format('MMM DD, YYYY') : 'Last appointment date' + ': ' + moment(selectedAppt.appointment_date).format('MMM DD, YYYY') } ({selectedTimeRange})
@@ -675,6 +683,7 @@ useEffect(() => {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

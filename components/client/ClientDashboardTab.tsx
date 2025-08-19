@@ -668,6 +668,37 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setModalServiceName(null);
   };
 
+  // --- Additional Units State ---
+const [showAdditionalUnits, setShowAdditionalUnits] = useState(false);
+const [additionalUnits, setAdditionalUnits] = useState<Array<{
+  brand_id: UUID | null;
+  ac_type_id: UUID | null;
+  horsepower_id: UUID | null;
+  quantity: number;
+  appointment_date: string;
+}>>([]);
+
+const handleAddAdditionalUnit = () => {
+  setAdditionalUnits(prev => [...prev, {
+    brand_id: null,
+    ac_type_id: null,
+    horsepower_id: null,
+    quantity: 1,
+    appointment_date: bookingDate, // default to selected booking date
+  }]);
+};
+
+const handleRemoveAdditionalUnit = (index: number) => {
+  setAdditionalUnits(prev => prev.filter((_, i) => i !== index));
+};
+
+const handleUpdateAdditionalUnit = (index: number, field: string, value: any) => {
+  setAdditionalUnits(prev => prev.map((unit, i) =>
+    i === index ? { ...unit, [field]: value } : unit
+  ));
+};
+
+
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
@@ -1207,7 +1238,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       discountAmount = (subtotal * discount.value) / 100;
     }
     const total = subtotal - discountAmount;
-    
     return {
       subtotal,
       discount: discountValue,
@@ -1370,64 +1400,60 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         />
       </div>
       
-       <BookingModal
-         isOpen={isBookingModalOpen}
-         onClose={handleCloseBookingModal}
-         locations={locations}
-         selectedLocationId={selectedLocationId}
-         allServices={allServices}
-         allBrands={allBrands}
-         allACTypes={allACTypes}
-         allHorsepowerOptions={allHorsepowerOptions}
-         customSettings={customSettings}
-         devices={devices}
-         appointments={appointments}
-         deviceIdToAppointmentId={deviceIdToAppointmentId}
-         bookingDate={bookingDate}
-         setBookingDate={(v: string) => {
-           const blockedInfo = blockedDatesApi.isDateBlocked(v, availableBlockedDates);
-           if (blockedInfo) {
-             setShowBlockedDateModal(blockedInfo);
-           } else {
-             setBookingDate(v);
-           }
-         }}
-         selectedServiceId={selectedServiceId}
-         setSelectedServiceId={(id) => {
-           setSelectedServiceId(id);
-           setSelectedDevices([]);
-           const locationDevices = devices.filter(d => d.location_id === selectedLocationId);
-           if (locationDevices.length === 0) setShowNewUnitsForm(true);
-         }}
-         selectedDevices={selectedDevices}
-         onToggleDevice={handleToggleDevice}
-         onSelectAllDevices={handleSelectAllDevices}
-         showAdditionalService={showAdditionalService}
-         setShowAdditionalService={setShowAdditionalService}
-         additionalServiceId={additionalServiceId}
-         setAdditionalServiceId={setAdditionalServiceId}
-         additionalServiceDevices={additionalServiceDevices}
-         onToggleAdditionalServiceDevice={handleToggleAdditionalServiceDevice}
-         onSelectAllAdditionalServiceDevices={handleSelectAllAdditionalServiceDevices}
-         additionalServiceDate={additionalServiceDate}
-         setAdditionalServiceDate={setAdditionalServiceDate}
-         showNewUnitsForm={showNewUnitsForm}
-         setShowNewUnitsForm={setShowNewUnitsForm}
-         newUnits={newUnits}
-         onAddNewUnit={handleAddNewUnit}
-         onRemoveNewUnit={handleRemoveNewUnit}
-         onUpdateNewUnit={handleUpdateNewUnit}
-         onNewUnitsSubmit={handleNewUnitsSubmit}
-         availableBlockedDates={availableBlockedDates}
-         onDateBlocked={(bd) => setShowBlockedDateModal(bd)}
-         calculateDevicePrice={calculateDevicePrice}
-         calculateDiscount={calculateDiscount}
-         calculateTotalPrice={calculateTotalPrice}
-         calculateAdditionalServicePrice={calculateAdditionalServicePrice}
-         calculateCombinedTotalPrice={calculateCombinedTotalPrice}
-         onCheckSummary={handleOpenSummaryModal}
-         getAvailableDevices={getAvailableDevices}
-       />
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={handleCloseBookingModal}
+        locations={locations}
+        selectedLocationId={selectedLocationId}
+        allServices={allServices}
+        allBrands={allBrands}
+        allACTypes={allACTypes}
+        allHorsepowerOptions={allHorsepowerOptions}
+        customSettings={customSettings}
+        devices={devices}
+        appointments={appointments}
+        deviceIdToAppointmentId={deviceIdToAppointmentId}
+        bookingDate={bookingDate}
+        setBookingDate={setBookingDate}
+        selectedServiceId={selectedServiceId}
+        setSelectedServiceId={setSelectedServiceId}
+        selectedDevices={selectedDevices}
+        onToggleDevice={handleToggleDevice}
+        onSelectAllDevices={handleSelectAllDevices}
+        showAdditionalService={showAdditionalService}
+        setShowAdditionalService={setShowAdditionalService}
+        additionalServiceId={additionalServiceId}
+        setAdditionalServiceId={setAdditionalServiceId}
+        additionalServiceDevices={additionalServiceDevices}
+        onToggleAdditionalServiceDevice={handleToggleAdditionalServiceDevice}
+        onSelectAllAdditionalServiceDevices={handleSelectAllAdditionalServiceDevices}
+        additionalServiceDate={additionalServiceDate}
+        setAdditionalServiceDate={setAdditionalServiceDate}
+        showNewUnitsForm={showNewUnitsForm}
+        setShowNewUnitsForm={setShowNewUnitsForm}
+        newUnits={newUnits}
+        onAddNewUnit={handleAddNewUnit}
+        onRemoveNewUnit={handleRemoveNewUnit}
+        onUpdateNewUnit={handleUpdateNewUnit}
+        onNewUnitsSubmit={handleNewUnitsSubmit}
+        // 🔽 NEW PROPS
+        showAdditionalUnits={showAdditionalUnits}
+        setShowAdditionalUnits={setShowAdditionalUnits}
+        additionalUnits={additionalUnits}
+        onAddAdditionalUnit={handleAddAdditionalUnit}
+        onRemoveAdditionalUnit={handleRemoveAdditionalUnit}
+        onUpdateAdditionalUnit={handleUpdateAdditionalUnit}
+        availableBlockedDates={availableBlockedDates}
+        onDateBlocked={setShowBlockedDateModal}
+        calculateDevicePrice={calculateDevicePrice}
+        calculateDiscount={calculateDiscount}
+        calculateTotalPrice={calculateTotalPrice}
+        calculateAdditionalServicePrice={calculateAdditionalServicePrice}
+        calculateCombinedTotalPrice={calculateCombinedTotalPrice}
+        onCheckSummary={handleOpenSummaryModal}
+        getAvailableDevices={getAvailableDevices}
+      />
+
 
       <DetailsModal
         isOpen={isDetailsModalOpen && !!modalLocation && !!modalStatusType}

@@ -12,7 +12,7 @@ import AdminBlockedDates from './AdminBlockedDates'
 
 export default function AdminMasterData() {
   return (
-    <div>
+    <div className="h-full">
       <Tabs defaultValue="brands" className="w-full h-full" orientation="vertical">
         <div className="grid grid-cols-12 gap-4 h-full">
           <div className="col-span-12 md:col-span-3 h-full">
@@ -43,7 +43,7 @@ export default function AdminMasterData() {
             </div>
           </div>
           <div className="col-span-12 md:col-span-9 h-full">
-            <div className="h-full bg-white rounded-xl shadow p-4 overflow-auto">
+            <div className="h-full bg-white rounded-xl shadow">
               <TabsContent value="brands" className="m-0 h-full"><AdminBrand /></TabsContent>
               <TabsContent value="horsepower" className="m-0 h-full"><AdminHP /></TabsContent>
               <TabsContent value="types" className="m-0 h-full"><AdminTypes /></TabsContent>

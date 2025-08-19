@@ -208,6 +208,136 @@ export interface AdminUser {
   updated_at: Timestamp;
 }
 
+// Dashboard Analytics Types
+export interface DashboardStats {
+  totalSales: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+  };
+  bookingStatusBreakdown: {
+    pending: number;
+    confirmed: number;
+    completed: number;
+    voided: number;
+  };
+  devicesData: {
+    dueWithin30Days: number;
+    churnRisk: number;
+  };
+  clientStats: {
+    newThisMonth: number;
+    returningClients: number;
+  };
+}
+
+export interface MonthlySalesData {
+  month: string;
+  sales: number;
+  bookings: number;
+}
+
+export interface UpcomingAppointment {
+  id: UUID;
+  client_name: string;
+  client_mobile: string;
+  appointment_date: DateString;
+  appointment_time: TimeString | null;
+  service_name: string;
+  location_name: string;
+  amount: number;
+}
+
+export interface TopClient {
+  id: UUID;
+  name: string;
+  mobile: string;
+  totalSpend: number;
+  appointmentCount: number;
+}
+
+export interface ClientsByArea {
+  area: string;
+  city: string;
+  clientCount: number;
+  totalRevenue: number;
+}
+
+export interface DeviceDueSoon {
+  id: UUID;
+  name: string;
+  client_name: string;
+  location_name: string;
+  brand_name?: string;
+  ac_type_name?: string;
+  due_date: DateString;
+  due_type: '3_months' | '4_months' | '6_months';
+}
+
+export interface ForecastData {
+  month: string;
+  projectedRevenue: number;
+  projectedBookings: number;
+  devicesScheduled: number;
+}
+
+export interface ChurnRiskClient {
+  id: UUID;
+  name: string;
+  mobile: string;
+  deviceCount: number;
+  lastAppointment: DateString | null;
+  daysSinceLastAppointment: number;
+}
+
+// Pagination interface
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+// Extended appointment type with related data for admin view
+export interface AppointmentWithDetails extends Appointment {
+  clients?: {
+    id: string;
+    name: string;
+    mobile: string;
+  };
+  services?: {
+    id: string;
+    name: string;
+    description: string | null;
+    base_price: number;
+  };
+  client_locations?: {
+    id: string;
+    name: string;
+    address_line1: string | null;
+    street: string | null;
+    barangay_id: UUID | null;
+    city_id: UUID | null;
+    cities?: { name: string; province: string } | null;
+    barangays?: { name: string } | null;
+  };
+  appointment_devices?: Array<{
+    id: string;
+    device_id: string;
+    devices?: {
+      id: string;
+      name: string;
+      last_cleaning_date: DateString | null;
+      due_3_months: DateString | null;
+      due_4_months: DateString | null;
+      due_6_months: DateString | null;
+      brands?: { name: string } | null;
+      horsepower_options?: { value: number; display_name: string } | null;
+      ac_types?: { name: string } | null;
+    };
+  }>;
+}
+
 // Supabase Database Type Definition
 export type Json =
   | string

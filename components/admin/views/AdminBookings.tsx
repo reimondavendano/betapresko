@@ -54,7 +54,7 @@ export default function AdminBookings() {
   const [events, setEvents] = useState<BookingEvent[]>([]);
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed'>('all')
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('today')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'incoming' | 'previous'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 4

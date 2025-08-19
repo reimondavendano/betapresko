@@ -101,6 +101,16 @@ export default async function handler(
         }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
+        type RawUpcomingAppointment = {
+          id: string;
+          appointment_date: string;
+          appointment_time: string | null;
+          amount: number;
+          clients: { name: string; mobile: string } | null;
+          client_locations: { name: string } | null;
+          services: { name: string } | null;
+        };
+
       // Upcoming appointments (next 30 days, confirmed status)
       const { data: upcomingAppointmentsData } = await supabase
         .from('appointments')
@@ -119,16 +129,17 @@ export default async function handler(
         .order('appointment_date')
         .limit(10);
 
-      const upcomingAppointments: UpcomingAppointment[] = upcomingAppointmentsData?.map(apt => ({
-        id: apt.id,
-        client_name: apt.clients?.name || 'Unknown',
-        client_mobile: apt.clients?.mobile || '',
-        appointment_date: apt.appointment_date,
-        appointment_time: apt.appointment_time,
-        service_name: apt.services?.name || 'Unknown Service',
-        location_name: apt.client_locations?.name || 'Unknown Location',
-        amount: apt.amount
-      })) || [];
+      const upcomingAppointments: UpcomingAppointment[] =
+        (upcomingAppointmentsData as RawUpcomingAppointment[] | null)?.map((apt) => ({
+          id: apt.id,
+          client_name: apt.clients?.name || "Unknown",
+          client_mobile: apt.clients?.mobile || "",
+          appointment_date: apt.appointment_date,
+          appointment_time: apt.appointment_time,
+          service_name: apt.services?.name || "Unknown Service",
+          location_name: apt.client_locations?.name || "Unknown Location",
+          amount: apt.amount ?? 0,
+        })) || [];
 
       // 🔹 Clients & Retention Data
       
@@ -150,30 +161,47 @@ export default async function handler(
       });
       const returningClientsCount = Array.from(clientCounts.values()).filter(count => count > 1).length;
 
+      type RawTopClientAppointment = {
+        client_id: string;
+        amount: number;
+        clients: {
+          id: string;
+          name: string;
+          mobile: string;
+        } | null;
+      };
+
       // Top clients by spend
       const { data: topClientsData } = await supabase
-        .from('appointments')
+        .from("appointments")
         .select(`
           client_id,
           amount,
-          clients (id, name, mobile)
+          clients ( id, name, mobile )
         `)
-        .eq('status', 'completed');
+        .eq("status", "completed");
 
-      const clientSpendMap = new Map();
-      topClientsData?.forEach(apt => {
+      const clientSpendMap = new Map<string, {
+        id: string;
+        name: string;
+        mobile: string;
+        totalSpend: number;
+        appointmentCount: number;
+      }>();
+
+      (topClientsData as RawTopClientAppointment[] | null)?.forEach((apt) => {
         const clientId = apt.client_id;
         if (!clientSpendMap.has(clientId)) {
           clientSpendMap.set(clientId, {
             id: clientId,
-            name: apt.clients?.name || 'Unknown',
-            mobile: apt.clients?.mobile || '',
+            name: apt.clients?.name || "Unknown",
+            mobile: apt.clients?.mobile || "",
             totalSpend: 0,
-            appointmentCount: 0
+            appointmentCount: 0,
           });
         }
-        const client = clientSpendMap.get(clientId);
-        client.totalSpend += apt.amount;
+        const client = clientSpendMap.get(clientId)!;
+        client.totalSpend += apt.amount ?? 0;
         client.appointmentCount += 1;
       });
 
@@ -190,38 +218,67 @@ export default async function handler(
           client_id
         `);
 
-      // Get appointments data separately to avoid complex joins
-      const { data: appointmentsRevenue } = await supabase
-        .from('appointments')
-        .select('client_id, amount, status')
-        .eq('status', 'completed');
+      
+        type AppointmentRevenueRow = {
+          client_id: string;
+          amount: number;
+          status: string;
+        };
 
-      const areaMap = new Map();
-      const clientRevenueMap = new Map();
-      
-      // Build client revenue mapping
-      appointmentsRevenue?.forEach(apt => {
-        const current = clientRevenueMap.get(apt.client_id) || 0;
-        clientRevenueMap.set(apt.client_id, current + apt.amount);
-      });
-      
-      clientsByAreaData?.forEach(location => {
-        const areaKey = `${location.barangays?.name || 'Unknown'}, ${location.cities?.name || 'Unknown'}`;
-        if (!areaMap.has(areaKey)) {
-          areaMap.set(areaKey, {
-            area: location.barangays?.name || 'Unknown',
-            city: location.cities?.name || 'Unknown',
-            clientCount: new Set(),
-            totalRevenue: 0
-          });
-        }
-        const area = areaMap.get(areaKey);
-        if (location.client_id) {
-          area.clientCount.add(location.client_id);
-          const clientRevenue = clientRevenueMap.get(location.client_id) || 0;
-          area.totalRevenue += clientRevenue;
-        }
-      });
+        type ClientLocationRow = {
+          client_id: string | null;
+          barangays: { name: string } | null;
+          cities: { name: string } | null;
+        };
+
+      // Get appointments data separately to avoid complex joins
+        const { data: appointmentsRevenue } = await supabase
+          .from("appointments")
+          .select("client_id, amount, status")
+          .eq("status", "completed");
+
+        const areaMap = new Map<
+          string,
+          {
+            area: string;
+            city: string;
+            clientCount: Set<string>;
+            totalRevenue: number;
+          }
+        >();
+
+        const clientRevenueMap = new Map<string, number>();
+
+        // Build client revenue mapping
+        (appointmentsRevenue as AppointmentRevenueRow[] | null)?.forEach((apt) => {
+          const current = clientRevenueMap.get(apt.client_id) || 0;
+          clientRevenueMap.set(apt.client_id, current + (apt.amount ?? 0));
+        });
+
+        // Aggregate revenue per area
+        (clientsByAreaData as ClientLocationRow[] | null)?.forEach((location) => {
+          const areaKey = `${location.barangays?.name || "Unknown"}, ${
+            location.cities?.name || "Unknown"
+          }`;
+
+          if (!areaMap.has(areaKey)) {
+            areaMap.set(areaKey, {
+              area: location.barangays?.name || "Unknown",
+              city: location.cities?.name || "Unknown",
+              clientCount: new Set(),
+              totalRevenue: 0,
+            });
+          }
+
+          const area = areaMap.get(areaKey)!;
+
+          if (location.client_id) {
+            area.clientCount.add(location.client_id);
+
+            const clientRevenue = clientRevenueMap.get(location.client_id) || 0;
+            area.totalRevenue += clientRevenue;
+          }
+        });
 
       const clientsByArea: ClientsByArea[] = Array.from(areaMap.values())
         .map(area => ({
@@ -234,6 +291,17 @@ export default async function handler(
 
       // 🔹 Devices & Maintenance Forecast
 
+      type RawDeviceDue = {
+          id: string;
+          name: string;
+          due_3_months: string | null;
+          due_4_months: string | null;
+          due_6_months: string | null;
+          clients: { name: string } | null;
+          client_locations: { name: string } | null;
+          brands: { name: string } | null;
+          ac_types: { name: string } | null;
+        };
       // Devices due soon (within 30 days)
       const { data: devicesDueData } = await supabase
         .from('devices')
@@ -250,16 +318,16 @@ export default async function handler(
         `);
 
       const devicesDueSoon: DeviceDueSoon[] = [];
-      const next30DaysISO = next30Days.toISOString().split('T')[0];
+      const next30DaysISO = next30Days.toISOString().split("T")[0];
 
-      devicesDueData?.forEach(device => {
+      (devicesDueData as RawDeviceDue[] | null)?.forEach((device) => {
         const dueDates = [
-          { date: device.due_3_months, type: '3_months' as const },
-          { date: device.due_4_months, type: '4_months' as const },
-          { date: device.due_6_months, type: '6_months' as const }
+          { date: device.due_3_months, type: "3_months" as const },
+          { date: device.due_4_months, type: "4_months" as const },
+          { date: device.due_6_months, type: "6_months" as const },
         ];
 
-        dueDates.forEach(due => {
+        dueDates.forEach((due) => {
           if (due.date && due.date <= next30DaysISO && due.date >= todayISO) {
             devicesDueSoon.push({
               id: device.id,

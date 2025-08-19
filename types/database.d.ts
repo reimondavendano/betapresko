@@ -248,6 +248,8 @@ export interface UpcomingAppointment {
   amount: number;
 }
 
+
+
 export interface TopClient {
   id: UUID;
   name: string;

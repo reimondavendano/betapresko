@@ -18,7 +18,10 @@ import {
   Loader2,
   AlertCircle,
   X,
-  Check
+  Check,
+  SprayCan,
+  HardHat,
+  Zap
 } from 'lucide-react';
 
 // Import UI components
@@ -120,14 +123,16 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [isBookingModalOpen, setIsBookingModal] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<UUID | null>(null);
   const [selectedDevices, setSelectedDevices] = useState<UUID[]>([]);
-  const [bookingDate, setBookingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+ const [bookingDate, setBookingDate] = useState<string>(
+    format(addDays(new Date(), 1), "yyyy-MM-dd")
+  );
 
   // --- NEW: Enhanced Booking Modal State ---
   const [selectedServiceId, setSelectedServiceId] = useState<UUID | null>(null);
   const [showAdditionalService, setShowAdditionalService] = useState(false);
   const [additionalServiceId, setAdditionalServiceId] = useState<UUID | null>(null);
   const [additionalServiceDevices, setAdditionalServiceDevices] = useState<UUID[]>([]);
-  const [additionalServiceDate, setAdditionalServiceDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [additionalServiceDate, setAdditionalServiceDate] = useState<string>(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
   // --- NEW: New Units Modal State (for locations with 0 devices) ---
@@ -165,12 +170,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setSelectedLocationId(locationId);
     setIsBookingModal(true);
     setSelectedDevices([]);
-    setBookingDate(format(new Date(), 'yyyy-MM-dd'));
+    setBookingDate(format(addDays(new Date(), 1), "yyyy-MM-dd"));
     setSelectedServiceId(null);
     setShowAdditionalService(false);
     setAdditionalServiceId(null);
     setAdditionalServiceDevices([]);
-    setAdditionalServiceDate(format(new Date(), 'yyyy-MM-dd'));
+    setAdditionalServiceDate(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   };
 
 
@@ -207,20 +212,15 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   };
 
 
-
   const handleCloseSummaryModal = () => {
     setIsSummaryModalOpen(false);
   };
-
 
 
   const handleCloseSuccessModal = () => {
     setIsSuccessModalOpen(false);
   };
 
-
-
-  // --- New Units Form Handlers ---
 
   const handleAddNewUnit = () => {
     setNewUnits(prev => [...prev, {
@@ -388,8 +388,34 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     }
   };
 
+  const handleRescheduleAppointment = async (appointmentId: UUID, newDate: string) => {
+    try {
+      const updated = await appointmentApi.updateAppointment(appointmentId, {
+        appointment_date: newDate,
+      });
+
+      setAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointmentId ? { ...appt, appointment_date: newDate } : appt
+        )
+      );
+
+      return updated;
+    } catch (err) {
+      console.error("Failed to reschedule appointment:", err);
+      alert("Failed to update appointment date. Please try again.");
+      throw err;
+    }
+  };
+
+
   const handleConfirmBooking = async () => {
-    if (!client || !selectedLocationId || !selectedServiceId || (selectedDevices.length === 0 && newUnits.length === 0)) {
+    if (
+      !client ||
+      !selectedLocationId ||
+      !selectedServiceId ||
+      (selectedDevices.length === 0 && newUnits.length === 0 && additionalUnits.length === 0)
+    ) {
       handleCloseBookingModal();
       return;
     }
@@ -399,43 +425,16 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       let totalUnits = selectedDevices.length;
       let amount = 0;
       let newDeviceIds: UUID[] = [];
+      let additionalDeviceIds: UUID[] = [];
 
-      if (selectedDevices.length > 0) {
-        const pricing = calculateTotalPrice();
-        amount = pricing.total;
-      } else if (newUnits.length > 0) {
-        const totalPrice = newUnits.reduce((total, unit) => {
-          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return total;
-          const acType = allACTypes.find(t => t.id === unit.ac_type_id);
-          const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id);
+      // --- Pricing ---
+      const pricing = calculateTotalPrice();
+      amount = pricing.total;
+      totalUnits = selectedDevices.length + 
+                   newUnits.reduce((sum, unit) => sum + unit.quantity, 0) +
+                   additionalUnits.reduce((sum, unit) => sum + unit.quantity, 0);
 
-          if (!acType || !horsepower) return total;
-
-          let basePrice = 0;
-          const acTypeName = acType.name.toLowerCase();
-          const hpValue = horsepower.value;
-
-          if (acTypeName.includes('split') || acTypeName.includes('u-shaped')) {
-            basePrice = customSettings.splitTypePrice;
-            if (hpValue > 2) {
-              basePrice += customSettings.surcharge;
-            }
-          } else if (acTypeName.includes('window')) {
-            basePrice = customSettings.windowTypePrice;
-            if (hpValue > 1.5) {
-              basePrice += customSettings.surcharge;
-            }
-          }
-          return total + (basePrice * unit.quantity);
-        }, 0);
-
-        const discount = calculateDiscount();
-        const discountAmount = (totalPrice * discount.value) / 100;
-        amount = totalPrice - discountAmount;
-        totalUnits = newUnits.reduce((sum, unit) => sum + unit.quantity, 0);
-      }
-
-      // Create main appointment
+      // --- Create main appointment ---
       const newAppointment = await appointmentApi.createAppointment({
         client_id: client.id,
         location_id: selectedLocationId,
@@ -444,41 +443,68 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         appointment_time: null,
         amount,
         total_units: totalUnits,
-        notes: 'Client panel booking',
+        notes: "Client panel booking",
       });
 
+      // --- Insert new devices for newUnits ---
+      for (const unit of newUnits) {
+        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
+        const brand = allBrands.find((b) => b.id === unit.brand_id)?.name || "Unknown";
+        const acType = allACTypes.find((t) => t.id === unit.ac_type_id)?.name || "Unknown";
+        const deviceName = `${brand} ${acType}`;
 
-      if (newUnits.length > 0) {
-        const devicesToInsert = [];
-        for (const unit of newUnits) {
-          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
-          const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'Unknown';
-          const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'Unknown';
-          const deviceName = `${brand} ${acType}`;
-
-          // Create multiple devices based on quantity
-          for (let i = 0; i < unit.quantity; i++) {
-            const newDevice = await deviceApi.createDevice({
-              client_id: client.id,
-              location_id: selectedLocationId,
-              name: deviceName,
-              brand_id: unit.brand_id,
-              ac_type_id: unit.ac_type_id,
-              horsepower_id: unit.horsepower_id,
-              last_cleaning_date: null,
-            })
-            newDeviceIds.push(newDevice.id);
-          }
+        for (let i = 0; i < unit.quantity; i++) {
+          const newDevice = await deviceApi.createDevice({
+            client_id: client.id,
+            location_id: selectedLocationId,
+            name: deviceName,
+            brand_id: unit.brand_id,
+            ac_type_id: unit.ac_type_id,
+            horsepower_id: unit.horsepower_id,
+            last_cleaning_date: null,
+          });
+          newDeviceIds.push(newDevice.id);
         }
       }
-      // Create join rows in appointment_devices for each selected device
-      const joinRows = selectedDevices.map((deviceId) => ({ appointment_id: newAppointment.id, device_id: deviceId }));
-      const newDeviceJoinRows = newDeviceIds.map((deviceId) => ({ appointment_id: newAppointment.id, device_id: deviceId }));
 
-      // Combine all join rows
-      const allJoinRows = [...joinRows, ...newDeviceJoinRows];
-      await appointmentDevicesApi.createMany(allJoinRows as any);
-      // Create additional service appointment if selected
+      // --- Insert new devices for additionalUnits ---
+      for (const unit of additionalUnits) {
+        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
+        const brand = allBrands.find((b) => b.id === unit.brand_id)?.name || "Unknown";
+        const acType = allACTypes.find((t) => t.id === unit.ac_type_id)?.name || "Unknown";
+        const deviceName = `${brand} ${acType}`;
+
+        for (let i = 0; i < unit.quantity; i++) {
+          const newDevice = await deviceApi.createDevice({
+            client_id: client.id,
+            location_id: selectedLocationId,
+            name: deviceName,
+            brand_id: unit.brand_id,
+            ac_type_id: unit.ac_type_id,
+            horsepower_id: unit.horsepower_id,
+            last_cleaning_date: null,
+          });
+          additionalDeviceIds.push(newDevice.id);
+        }
+      }
+
+      // --- Create appointment_devices joins ---
+      const joinRows = selectedDevices.map((deviceId) => ({
+        appointment_id: newAppointment.id,
+        device_id: deviceId,
+      }));
+      const newDeviceJoinRows = newDeviceIds.map((deviceId) => ({
+        appointment_id: newAppointment.id,
+        device_id: deviceId,
+      }));
+      const additionalJoinRows = additionalDeviceIds.map((deviceId) => ({
+        appointment_id: newAppointment.id,
+        device_id: deviceId,
+      }));
+
+      await appointmentDevicesApi.createMany([...joinRows, ...newDeviceJoinRows, ...additionalJoinRows] as any);
+
+      // --- Additional Service appointment (separate) ---
       if (showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0) {
         const additionalPricing = calculateAdditionalServicePrice();
         const additionalAmount = additionalPricing.total;
@@ -490,28 +516,25 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           appointment_time: null,
           amount: additionalAmount,
           total_units: additionalServiceDevices.length,
-          notes: 'Client panel booking - Additional service',
+          notes: "Client panel booking - Additional service",
         });
 
-        // Create join rows for additional service devices
-        const additionalJoinRows = additionalServiceDevices.map((deviceId) => ({ 
-          appointment_id: additionalAppointment.id, 
-          device_id: deviceId 
+        const additionalJoinRows = additionalServiceDevices.map((deviceId) => ({
+          appointment_id: additionalAppointment.id,
+          device_id: deviceId,
         }));
 
         await appointmentDevicesApi.createMany(additionalJoinRows as any);
       }
 
-      // Update device fields if needed (location/name/horsepower) - BUT DON'T UPDATE last_cleaning_date
+      // --- Update device fields for existing devices if needed ---
       const deviceUpdatePromises = selectedDevices.map(async (deviceId) => {
-        const device = devices.find(d => d.id === deviceId);
+        const device = devices.find((d) => d.id === deviceId);
         if (!device) return Promise.resolve();
         const updatePayload: Partial<Device> = {};
-        // Sync location to the selected location for this booking
         if (selectedLocationId && device.location_id !== selectedLocationId) {
           updatePayload.location_id = selectedLocationId;
         }
-
         if (Object.keys(updatePayload).length > 0) {
           await deviceApi.updateDevice(deviceId, updatePayload);
         }
@@ -519,11 +542,11 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
       await Promise.all(deviceUpdatePromises);
 
-      // Create notification entry
+      // --- Create notification entry ---
       try {
         let isReferral = false;
-        const referralId = sessionStorage.getItem('referralId');
-        if (referralId && referralId.trim() !== '') {
+        const referralId = sessionStorage.getItem("referralId");
+        if (referralId && referralId.trim() !== "") {
           isReferral = true;
         }
 
@@ -534,44 +557,33 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           is_referral: isReferral,
           date: appointmentDate,
         };
-        
+
         await notificationApi.createNotification(notificationData);
-        console.log('Notification created successfully');
-
-        if (referralId) {
-          sessionStorage.removeItem('referralId');
-          console.log('[SESSION] Referral ID removed from session storage.');
-        }
+        if (referralId) sessionStorage.removeItem("referralId");
       } catch (notificationError) {
+        console.error("Error creating notification:", notificationError);
+      }
 
-        console.error('Error creating notification:', notificationError);
-      }      // Refresh local state
-       const [fetchedDevices, fetchedAppointments] = await Promise.all([
-         deviceApi.getByClientId(client.id),
-         appointmentApi.getByClientId(client.id),
-       ]);
-       setDevices(fetchedDevices);
-       setAppointments(fetchedAppointments);
-       
-       // Reset new units state
-       setNewUnits([{
-         brand_id: null,
-         ac_type_id: null,
-         horsepower_id: null,
-         quantity: 1
-       }]);
+      // --- Refresh local state ---
+      const [fetchedDevices, fetchedAppointments] = await Promise.all([
+        deviceApi.getByClientId(client.id),
+        appointmentApi.getByClientId(client.id),
+      ]);
+      setDevices(fetchedDevices);
+      setAppointments(fetchedAppointments);
 
+      // Reset forms
+      setNewUnits([{ brand_id: null, ac_type_id: null, horsepower_id: null, quantity: 1 }]);
+      setAdditionalUnits([]);
     } catch (err) {
-      console.error('Failed to confirm booking:', err);
+      console.error("Failed to confirm booking:", err);
     } finally {
       handleCloseBookingModal();
       handleCloseSummaryModal();
-      // Show success modal/toast
-      setTimeout(() => {
-        setIsSuccessModalOpen(true);
-      }, 10);
+      setTimeout(() => setIsSuccessModalOpen(true), 10);
     }
   };
+
   
   // --- Edit Device Handlers ---
   const handleEditDevice = (device: Device) => {
@@ -687,6 +699,13 @@ const handleAddAdditionalUnit = () => {
     appointment_date: bookingDate, // default to selected booking date
   }]);
 };
+
+  const handleToggleAdditionalUnitsForm = (shouldShow: boolean) => {
+    setShowAdditionalUnits(shouldShow);
+    if (shouldShow && additionalUnits.length === 0) {
+      handleAddAdditionalUnit();
+    }
+  };
 
 const handleRemoveAdditionalUnit = (index: number) => {
   setAdditionalUnits(prev => prev.filter((_, i) => i !== index));
@@ -1213,31 +1232,84 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     }
   };
 
-  // Calculate total price for selected devices
+  // Calculate total price for selected devices, new units, and additional units
   const calculateTotalPrice = () => {
     const serviceName = allServices.find(s => s.id === selectedServiceId)?.name?.toLowerCase() || '';
+    const isRepair = serviceName.includes('repair');
 
-    // Pricing per device
-    const perDevicePrice = (device: Device) => {
-      if (serviceName.includes('repair')) {
-        return customSettings.repairPrice || 0;
-      }
-      return calculateDevicePrice(device);
-    };
-
-    const subtotal = selectedDevices.reduce((total, deviceId) => {
+    // 1. Price for existing selected devices
+    const selectedDevicesSubtotal = selectedDevices.reduce((total, deviceId) => {
       const device = devices.find(d => d.id === deviceId);
-      return total + (device ? perDevicePrice(device) : 0);
+      if (!device) return total;
+      return total + (isRepair ? (customSettings.repairPrice || 0) : calculateDevicePrice(device));
+    }, 0);
+
+    // 2. Price for newly added units in the modal
+    const newUnitsSubtotal = newUnits.reduce((total, unit) => {
+      if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return total;
+      
+      if (isRepair) {
+        return total + (customSettings.repairPrice || 0) * unit.quantity;
+      }
+
+      const acType = allACTypes.find(t => t.id === unit.ac_type_id);
+      const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id);
+      if (!acType || !horsepower) return total;
+
+      let basePrice = 0;
+      const acTypeName = acType.name.toLowerCase();
+      const hpValue = horsepower.value;
+
+      if (acTypeName.includes('split') || acTypeName.includes('u-shaped')) {
+        basePrice = customSettings.splitTypePrice;
+        if (hpValue > 2) basePrice += customSettings.surcharge;
+      } else if (acTypeName.includes('window')) {
+        basePrice = customSettings.windowTypePrice;
+        if (hpValue > 1.5) basePrice += customSettings.surcharge;
+      }
+      return total + (basePrice * unit.quantity);
     }, 0);
     
+    // 3. Price for additional units to existing service
+    const additionalUnitsSubtotal = additionalUnits.reduce((total, unit) => {
+        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return total;
+
+        if (isRepair) {
+          return total + (customSettings.repairPrice || 0) * unit.quantity;
+        }
+
+        const acType = allACTypes.find((t) => t.id === unit.ac_type_id);
+        const horsepower = allHorsepowerOptions.find((h) => h.id === unit.horsepower_id);
+        if (!acType || !horsepower) return total;
+
+        let basePrice = 0;
+        const acTypeName = acType.name.toLowerCase();
+        const hpValue = horsepower.value;
+
+        if (acTypeName.includes("split") || acTypeName.includes("u-shaped")) {
+          basePrice = customSettings.splitTypePrice;
+          if (hpValue > 2) basePrice += customSettings.surcharge;
+        } else if (acTypeName.includes("window")) {
+          basePrice = customSettings.windowTypePrice;
+          if (hpValue > 1.5) basePrice += customSettings.surcharge;
+        }
+
+        return total + basePrice * unit.quantity;
+      }, 0);
+
+
+    const subtotal = selectedDevicesSubtotal + newUnitsSubtotal + additionalUnitsSubtotal;
+
     let discountValue = 0;
     let discountAmount = 0;
-    if (!serviceName.includes('repair')) {
+    if (!isRepair) {
       const discount = calculateDiscount();
       discountValue = discount.value;
       discountAmount = (subtotal * discount.value) / 100;
     }
+    
     const total = subtotal - discountAmount;
+
     return {
       subtotal,
       discount: discountValue,
@@ -1249,9 +1321,10 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
   // Calculate total price for additional service devices
   const calculateAdditionalServicePrice = () => {
     const serviceName = allServices.find(s => s.id === additionalServiceId)?.name?.toLowerCase() || '';
+    const isRepair = serviceName.includes('repair');
 
     const perDevicePrice = (device: Device) => {
-      if (serviceName.includes('repair')) {
+      if (isRepair) {
         return customSettings.repairPrice || 0;
       }
       return calculateDevicePrice(device);
@@ -1264,7 +1337,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     
     let discountValue = 0;
     let discountAmount = 0;
-    if (!serviceName.includes('repair')) {
+    if (!isRepair) {
       const discount = calculateDiscount();
       discountValue = discount.value;
       discountAmount = (subtotal * discount.value) / 100;
@@ -1281,52 +1354,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
   // Calculate combined total price for both services
   const calculateCombinedTotalPrice = () => {
-    let mainPricing;
-    
-    if (selectedDevices.length > 0) {
-      mainPricing = calculateTotalPrice();
-    } else if (newUnits.length > 0) {
-      // Calculate pricing for new units
-      const totalPrice = newUnits.reduce((total, unit) => {
-        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return total;
-        
-        const acType = allACTypes.find(t => t.id === unit.ac_type_id);
-        const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id);
-        
-        if (!acType || !horsepower) return total;
-        
-        let basePrice = 0;
-        const acTypeName = acType.name.toLowerCase();
-        const hpValue = horsepower.value;
-        
-        if (acTypeName.includes('split') || acTypeName.includes('u-shaped')) {
-          basePrice = customSettings.splitTypePrice;
-          if (hpValue > 2) {
-            basePrice += customSettings.surcharge;
-          }
-        } else if (acTypeName.includes('window')) {
-          basePrice = customSettings.windowTypePrice;
-          if (hpValue > 1.5) {
-            basePrice += customSettings.surcharge;
-          }
-        }
-        
-        return total + (basePrice * unit.quantity);
-      }, 0);
-      
-      const discount = calculateDiscount();
-      const discountAmount = (totalPrice * discount.value) / 100;
-      const total = totalPrice - discountAmount;
-      
-      mainPricing = {
-        subtotal: totalPrice,
-        discount: discount.value,
-        discountAmount,
-        total
-      };
-    } else {
-      mainPricing = { subtotal: 0, discount: 0, discountAmount: 0, total: 0 };
-    }
+    const mainPricing = calculateTotalPrice();
     
     const additionalPricing = showAdditionalService && additionalServiceDevices.length > 0 
       ? calculateAdditionalServicePrice() 
@@ -1334,7 +1362,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     
     return {
       subtotal: mainPricing.subtotal + additionalPricing.subtotal,
-      discount: mainPricing.discount,
+      discount: mainPricing.discount, // Assuming same discount applies, or adjust as needed
       discountAmount: mainPricing.discountAmount + additionalPricing.discountAmount,
       total: mainPricing.total + additionalPricing.total
     };
@@ -1358,6 +1386,17 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     if (!selectedServiceId) return getActiveServices();
     return getActiveServices().filter(service => service.id !== selectedServiceId);
   };
+
+  const getServiceIcon = (serviceName: string) => {
+    const lowerCaseName = serviceName.toLowerCase();
+    if (lowerCaseName.includes('cleaning')) {
+      return <SprayCan className="w-5 h-5 mr-2 text-blue-500" />;
+    } else if (lowerCaseName.includes('repair')) {
+      return <HardHat className="w-5 h-5 mr-2 text-red-500" />;
+    } else {
+      return <Zap className="w-5 h-5 mr-2 text-yellow-500" />;
+    }
+  }
 
 
   return (
@@ -1438,7 +1477,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         onNewUnitsSubmit={handleNewUnitsSubmit}
         // 🔽 NEW PROPS
         showAdditionalUnits={showAdditionalUnits}
-        setShowAdditionalUnits={setShowAdditionalUnits}
+        setShowAdditionalUnits={handleToggleAdditionalUnitsForm}
         additionalUnits={additionalUnits}
         onAddAdditionalUnit={handleAddAdditionalUnit}
         onRemoveAdditionalUnit={handleRemoveAdditionalUnit}
@@ -1476,134 +1515,119 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         setEditedDeviceData={setEditedDeviceData}
         getProgressBarValue={getProgressBarValue}
         getProgressColorClass={getProgressColorClass}
+        onRescheduleAppointment={handleRescheduleAppointment}
       />
 
-             {/* NEW: Summary Modal */}
+            {/* NEW: Summary Modal */}
        {isSummaryModalOpen && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
-             <button 
-               onClick={handleCloseSummaryModal} 
-               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-             >
-               <X className="w-6 h-6" />
-             </button>
-             
-             <h2 className="text-2xl font-bold mb-6 text-gray-800">Check Summary</h2>
-             
-             <div className="space-y-6">
-               {/* Main Service Summary */}
-               <div className="p-4 border rounded-lg">
-                 <h3 className="text-lg font-semibold mb-3 text-gray-700">
-                   {selectedServiceId ? allServices.find(s => s.id === selectedServiceId)?.name : 'Service'}
-                 </h3>
-                 <div className="space-y-2">
-                   <div className="text-sm text-gray-600">
-                     <span className="font-medium">Devices:</span>
-                     {selectedDevices.length > 0 ? (
-                       <ul className="list-disc pl-5 mt-1 text-gray-700">
-                         {selectedDevices.map(deviceId => {
-                           const device = devices.find(d => d.id === deviceId);
-                           if (!device) return null;
-                           const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                           const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                           const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                           return (
-                             <li key={device.id}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>
-                           );
-                         })}
-                       </ul>
-                     ) : newUnits.length > 0 ? (
-                       <ul className="list-disc pl-5 mt-1 text-gray-700">
-                         {newUnits.map((unit, index) => {
-                           const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
-                           const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
-                           const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
-                           return (
-                             <li key={index}>{`${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>
-                           );
-                         })}
-                       </ul>
-                     ) : (
-                       <span className="ml-1">-</span>
-                     )}
-                   </div>
-                   <p className="text-sm text-gray-600">
-                     <span className="font-medium">Date:</span> {format(new Date(bookingDate), 'MMM d, yyyy')}
-                   </p>
-                 </div>
-               </div>
-
-               {/* Additional Service Summary */}
-               {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
-                 <div className="p-4 border rounded-lg">
-                   <h3 className="text-lg font-semibold mb-3 text-gray-700">
-                     {allServices.find(s => s.id === additionalServiceId)?.name}
-                   </h3>
-                   <div className="space-y-2">
-                     <div className="text-sm text-gray-600">
-                       <span className="font-medium">Devices:</span>
-                       <ul className="list-disc pl-5 mt-1 text-gray-700">
-                         {additionalServiceDevices.map(deviceId => {
-                           const device = devices.find(d => d.id === deviceId);
-                           if (!device) return null;
-                           const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                           const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                           const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                           return (
-                             <li key={device.id}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>
-                           );
-                         })}
-                       </ul>
-                     </div>
-                     <p className="text-sm text-gray-600">
-                       <span className="font-medium">Date:</span> {format(new Date(additionalServiceDate), 'MMM d, yyyy')}
-                     </p>
-                   </div>
-                 </div>
-               )}
-
-               {/* Pricing Summary */}
-               <div className="p-4 bg-gray-50 rounded-lg">
-                 <h3 className="text-lg font-semibold mb-3 text-gray-700">Pricing Summary</h3>
-                 {(() => {
-                   const pricing = calculateCombinedTotalPrice();
-                   return (
-                     <div className="space-y-2">
-                       <div className="flex justify-between">
-                         <span>Subtotal:</span>
-                         <span>P{pricing.subtotal.toLocaleString()}</span>
-                       </div>
-                       <div className="flex justify-between">
-                         <span>Discount ({pricing.discount}% - {(() => {
-                           const discount = calculateDiscount();
-                           return discount.type;
-                         })()}):</span>
-                         <span className="text-red-600">-P{pricing.discountAmount.toLocaleString()}</span>
-                       </div>
-                       <div className="border-t pt-2 mt-2">
-                         <div className="flex justify-between font-bold">
-                           <span>Total Amount:</span>
-                           <span className="text-blue-600">P{pricing.total.toLocaleString()}</span>
-                         </div>
-                       </div>
-                     </div>
-                   );
-                 })()}
-               </div>
-
-             </div>
-             <div className="flex justify-end mt-6 space-x-4">
-               <Button onClick={handleCloseSummaryModal} variant="outline">
-                 Cancel
-               </Button>
-               <Button onClick={handleConfirmBooking} className="bg-blue-600 hover:bg-blue-700">
-                 Confirm
-               </Button>
-             </div>
-           </div>
-         </div>
-       )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
+            <button onClick={handleCloseSummaryModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Booking Summary ✨</h2>
+            <div className="space-y-6">
+              <div className="p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center mb-2">
+                  
+                  {getServiceIcon(allServices.find(s => s.id === selectedServiceId)?.name || 'N/A')}
+                  <h3 className="text-xl font-bold text-blue-800">{allServices.find(s => s.id === selectedServiceId)?.name}</h3>
+                </div>
+                <div className="flex items-center text-gray-600 mb-4">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <span className="font-medium text-gray-700">{format(new Date(bookingDate), 'MMMM d, yyyy')}</span>
+                </div>
+                <div className="text-gray-600">
+                  <span className="font-bold">Devices:</span>
+                  {(selectedDevices.length > 0 || newUnits.length > 0 || additionalUnits.length > 0) ? (
+                    <ul className="list-disc pl-5 mt-2 text-gray-700 space-y-1">
+                      {selectedDevices.map(deviceId => {
+                        const device = devices.find(d => d.id === deviceId);
+                        if (!device) return null;
+                        const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                        const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                        const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                        return (<li key={`sel-${device.id}`}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
+                      })}
+                      {newUnits.map((unit, index) => {
+                        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                        const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                        const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                        const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                        return (<li key={`new-${index}`}>{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
+                      })}
+                      {additionalUnits.map((unit, index) => {
+                        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                        const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                        const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                        const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                        return (<li key={`additional-${index}`}>{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
+                      })}
+                    </ul>
+                  ) : (<span className="ml-1">-</span>)}
+                </div>
+              </div>
+              {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
+                <div className="p-6 bg-purple-50 rounded-lg border-2 border-purple-200">
+                  <div className="flex items-center mb-2">
+                    {getServiceIcon(allServices.find(s => s.id === additionalServiceId)?.name || 'N/A')}
+                    <h3 className="text-xl font-bold text-purple-800">{allServices.find(s => s.id === additionalServiceId)?.name}</h3>
+                  </div>
+                  <div className="flex items-center text-gray-600 mb-4">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-gray-700">{format(new Date(additionalServiceDate), 'MMMM d, yyyy')}</span>
+                  </div>
+                  <div className="text-gray-600">
+                    <span className="font-bold">Devices:</span>
+                    <ul className="list-disc pl-5 mt-2 text-gray-700 space-y-1">
+                      {additionalServiceDevices.map(deviceId => {
+                        const device = devices.find(d => d.id === deviceId);
+                        if (!device) return null;
+                        const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                        const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                        const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                        return (<li key={device.id}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              <div className="p-6 bg-gray-100 rounded-xl">
+                <h3 className="text-2xl font-bold mb-4 text-gray-800">Price Breakdown 💸</h3>
+                {(() => {
+                  const pricing = calculateCombinedTotalPrice();
+                  return (
+                    <div className="space-y-3 text-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="font-semibold text-gray-800">₱{pricing.subtotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Discount ({pricing.discount}%):</span>
+                        <span className="font-semibold text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="border-t-2 border-gray-300 pt-4 mt-4">
+                        <div className="flex justify-between items-center text-xl font-extrabold">
+                          <span className="text-gray-800">Total Amount:</span>
+                          <span className="text-blue-600">₱{pricing.total.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="flex justify-end mt-8 space-x-4">
+              <Button onClick={handleCloseSummaryModal} variant="outline" className="text-gray-600 hover:bg-gray-100">
+                Go Back
+              </Button>
+              <Button onClick={handleConfirmBooking} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-all transform hover:scale-105">
+                Confirm Booking
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
        {/* NEW: Success Modal */}
        {isSuccessModalOpen && (

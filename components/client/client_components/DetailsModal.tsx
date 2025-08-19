@@ -2,6 +2,17 @@
 
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,6 +30,7 @@ import {
   HorsepowerOption,
   UUID,
 } from "../../../types/database";
+import { appointmentApi } from "@/pages/api/appointments/appointmentApi";
 
 interface DetailsModalProps {
   isOpen: boolean;
@@ -41,7 +53,7 @@ interface DetailsModalProps {
   setEditedDeviceData: (data: Partial<Device>) => void;
   getProgressBarValue: (device: Device, dueInMonths: number) => number;
   getProgressColorClass: (value: number) => string;
-  onRescheduleAppointment?: (appointmentId: UUID, newDate: string) => Promise<void>;
+  onRescheduleAppointment?: (appointmentId: UUID, newDate: string) => Promise<Appointment>;
 }
 
 export function DetailsModal({
@@ -80,12 +92,21 @@ export function DetailsModal({
   };
 
   const handleRescheduleSubmit = async (appointmentId: UUID) => {
-    if (onRescheduleAppointment && rescheduleDate) {
-      // Ensure the date is in yyyy-MM-dd format
-      const formattedDate = format(new Date(rescheduleDate), "yyyy-MM-dd");
+  if (onRescheduleAppointment && rescheduleDate) {
+    // Ensure the date is in yyyy-MM-dd format
+    const formattedDate = format(new Date(rescheduleDate), "yyyy-MM-dd");
+
+    try {
+      // 🔑 Call the parent handler, not appointmentApi directly
       await onRescheduleAppointment(appointmentId, formattedDate);
+
+      // ✅ close reschedule form after success
       setReschedulingAppointmentId(null);
+    } catch (err) {
+      console.error("Failed to reschedule appointment:", err);
+      alert("Failed to update appointment date. Please try again.");
     }
+  }
   };
 
   const handleRescheduleCancel = () => {
@@ -296,7 +317,6 @@ export function DetailsModal({
                               )}
                             </div>
                           </div>
-                          
                           {/* Appointment Info */}
                           {deviceAppointment && serviceName && serviceName !== 'No Service' && statusType !== 'due' && statusType !== 'well-maintained' && statusType !== 'repair' && (
                             <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -321,13 +341,14 @@ export function DetailsModal({
                                     id="rescheduleDate"
                                     type="date"
                                     min={format(addDays(new Date(), 1), "yyyy-MM-dd")}
-                                    value={
-                                      rescheduleDate
-                                        ? (format(new Date(rescheduleDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
-                                            ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
-                                            : format(new Date(rescheduleDate), "yyyy-MM-dd"))
-                                        : ""
-                                    }
+                                    // value={
+                                    //   rescheduleDate
+                                    //     ? (format(new Date(rescheduleDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                                    //         ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
+                                    //         : format(new Date(rescheduleDate), "yyyy-MM-dd"))
+                                    //     : ""
+                                    // }
+                                    value= {rescheduleDate ? format(new Date(rescheduleDate), "yyyy-MM-dd") : ""}
                                     onChange={(e) => {
                                       const raw = e.target.value;
                                       if (raw) {
@@ -349,14 +370,26 @@ export function DetailsModal({
                                   >
                                     Cancel
                                   </Button>
-                                  <Button 
-                                    onClick={() => handleRescheduleSubmit(confirmedAppt.id)}
-                                    size="sm"
-                                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                                    disabled={!rescheduleDate}
-                                  >
-                                    Update Date
-                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button 
+                                        size="sm"
+                                        className="bg-orange-600 hover:bg-orange-700 text-white"
+                                        disabled={!rescheduleDate}
+                                      >
+                                        Update Date
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure you want to reschedule booking?</AlertDialogTitle>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>No</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleRescheduleSubmit(confirmedAppt.id)}>Yes</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </div>
                               </div>
                             </div>

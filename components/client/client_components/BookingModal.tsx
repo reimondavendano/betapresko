@@ -236,7 +236,13 @@ export function BookingModal(props: BookingModalProps) {
               />
               {bookingDate && (
                 <Badge className="bg-green-100 text-green-800 border-green-300">
-                  {format(new Date(bookingDate), 'MMM dd, yyyy')}
+                  {
+                  bookingDate
+                    ? (format(new Date(bookingDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                        ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
+                        : format(new Date(bookingDate), "yyyy-MM-dd"))
+                    : ""
+                }
                 </Badge>
               )}
             </div>

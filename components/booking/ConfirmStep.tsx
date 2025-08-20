@@ -285,7 +285,7 @@ export function ConfirmStep() {
         const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
         const smsTemplate =
               smsTemplateSetting?.setting_value ||
-              
+
               `Hi {0},
 
               Your booking with us is confirmed!
@@ -300,12 +300,13 @@ export function ConfirmStep() {
               Thank you for choosing Presko!`;
 
        
-        const smsMessage = smsTemplate
-          .replace('{0}', clientInfo.name)
-          .replace('{1}', appointmentDate)
-          .replace('{2}', selectedDevices.reduce((sum, d) => sum + d.quantity, 0).toString())
-          .replace('{3}', totalAmount.toLocaleString())
-          .replace('{4}', currentClientId);
+       const smsMessage = formatSmsTemplate(smsTemplate, [
+          clientInfo.name,
+          appointmentDate,
+          selectedDevices.reduce((sum, d) => sum + d.quantity, 0),
+          totalAmount.toLocaleString(),
+          currentClientId,
+        ]);
 
       
         const smsResponse = await fetch('/api/sms/send-sms', {

@@ -73,6 +73,20 @@ export const appointmentApi = {
     return data as Appointment;
   },
 
+  getAppointment: async (appointmentId: UUID): Promise<Appointment | null> => {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('id', appointmentId)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching appointment ${appointmentId}:`, error);
+      return null;
+    }
+    return data as Appointment;
+  },
+
   /**
    * Updates appointment status and sets device cleaning dates when status becomes 'completed'
    */

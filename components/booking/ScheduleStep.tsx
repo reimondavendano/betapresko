@@ -290,9 +290,8 @@ export function ScheduleStep() {
             <div>
               <h4 className="font-medium text-orange-900 mb-2">Important Notes:</h4>
               <ul className="text-sm text-orange-800 space-y-1">
-                <li>• Please ensure someone is available at the scheduled time</li>
+                <li>• Please ensure someone is available at the scheduled date</li>
                 <li>• Rescheduling must be done at least 24 hours in advance</li>
-                <li>• Our technicians will arrive within the scheduled time slot</li>
               </ul>
             </div>
           </div>

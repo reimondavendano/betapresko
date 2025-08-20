@@ -280,51 +280,53 @@ export function ConfirmStep() {
       setClientDashboardUrl(dashboardUrl);
       setIsSubmitting(false);
 
-      try {
+
+      /* SMS functionality, uncomment when production deployment is ready*/
+      
+      // try {
        
-        const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
-        const smsTemplate =
-              smsTemplateSetting?.setting_value ||
+      //   const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
+      //   const smsTemplate =
+      //         smsTemplateSetting?.setting_value ||
+      //         `Hi {0},
 
-              `Hi {0},
+      //         Your booking with us is confirmed!
 
-              Your booking with us is confirmed!
+      //         Cleaning Date: {1}
+      //         Total Aircon Units: {2}
+      //         Amount: {3}
 
-              Cleaning Date: {1}
-              Total Aircon Units: {2}
-              Amount: {3}
+      //         To check your booking, please scan your Presko QR Code or visit:
+      //         https://betapresko.vercel.app/client/{4}
 
-              To check your booking, please scan your Presko QR Code or visit:
-              https://betapresko.vercel.app/client/{4}
-
-              Thank you for choosing Presko!`;
+      //         Thank you for choosing Presko!`;
 
        
-       const smsMessage = formatSmsTemplate(smsTemplate, [
-          clientInfo.name,
-          appointmentDate,
-          selectedDevices.reduce((sum, d) => sum + d.quantity, 0),
-          totalAmount.toLocaleString(),
-          currentClientId,
-        ]);
+      //  const smsMessage = formatSmsTemplate(smsTemplate, [
+      //     clientInfo.name,
+      //     appointmentDate,
+      //     selectedDevices.reduce((sum, d) => sum + d.quantity, 0),
+      //     totalAmount.toLocaleString(),
+      //     currentClientId,
+      //   ]);
 
       
-        const smsResponse = await fetch('/api/sms/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            number: `0${mobileDigits}`, // ✅ keep in PH format
-            message: smsMessage,
-            type: 'normal',
-          }),
-        });
+      //   const smsResponse = await fetch('/api/sms/send-sms', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({
+      //       number: `0${mobileDigits}`, // ✅ keep in PH format
+      //       message: smsMessage,
+      //       type: 'normal',
+      //     }),
+      //   });
 
-        if (!smsResponse.ok) {
-          console.error('SMS sending failed:', await smsResponse.json());
-        }
-      } catch (smsError) {
-        console.error('Failed to send SMS confirmation:', smsError);
-      }
+      //   if (!smsResponse.ok) {
+      //     console.error('SMS sending failed:', await smsResponse.json());
+      //   }
+      // } catch (smsError) {
+      //   console.error('Failed to send SMS confirmation:', smsError);
+      // }
 
 
       setIsCompleted(true);

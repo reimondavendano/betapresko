@@ -1177,9 +1177,9 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     const hpValue = horsepower.value;
     let surcharge = 0;
     
-    if (acType.name.toLowerCase() === 'split type' && hpValue > 2.00) {
+    if (acType.name.toLowerCase() === 'split type' && hpValue > 1.50) {
       surcharge = customSettings.surcharge || 0;
-    } else if (acType.name.toLowerCase() === 'u-shaped' && hpValue > 2.00) {
+    } else if (acType.name.toLowerCase() === 'u-shaped' && hpValue > 1.50) {
       surcharge = customSettings.surcharge || 0;
     } else if (acType.name.toLowerCase() === 'window type' && hpValue > 1.50) {
       surcharge = customSettings.surcharge || 0;
@@ -1262,7 +1262,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
       if (acTypeName.includes('split') || acTypeName.includes('u-shaped')) {
         basePrice = customSettings.splitTypePrice;
-        if (hpValue > 2) basePrice += customSettings.surcharge;
+        if (hpValue > 1.5) basePrice += customSettings.surcharge;
       } else if (acTypeName.includes('window')) {
         basePrice = customSettings.windowTypePrice;
         if (hpValue > 1.5) basePrice += customSettings.surcharge;
@@ -1288,7 +1288,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
         if (acTypeName.includes("split") || acTypeName.includes("u-shaped")) {
           basePrice = customSettings.splitTypePrice;
-          if (hpValue > 2) basePrice += customSettings.surcharge;
+          if (hpValue > 1.5) basePrice += customSettings.surcharge;
         } else if (acTypeName.includes("window")) {
           basePrice = customSettings.windowTypePrice;
           if (hpValue > 1.5) basePrice += customSettings.surcharge;
@@ -1516,6 +1516,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         getProgressBarValue={getProgressBarValue}
         getProgressColorClass={getProgressColorClass}
         onRescheduleAppointment={handleRescheduleAppointment}
+        availableBlockedDates={availableBlockedDates}
       />
 
             {/* NEW: Summary Modal */}
@@ -1846,7 +1847,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                      
                      if (acTypeName.includes('split') || acTypeName.includes('u-shaped')) {
                        basePrice = customSettings.splitTypePrice;
-                       if (hpValue > 2) {
+                       if (hpValue > 1.5) {
                          basePrice += customSettings.surcharge;
                        }
                      } else if (acTypeName.includes('window')) {

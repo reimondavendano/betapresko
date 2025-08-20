@@ -24,6 +24,8 @@ import {
 } from "../../../types/database";
 import { customSettingsApi } from "@/pages/api/custom_settings/customSettingsApi";
 import { Sparkles, Wrench, Settings, Home } from "lucide-react";
+import { BlockedDateModal } from "./BlockedDateModal";
+import { blockedDatesApi } from "@/pages/api/dates/blockedDatesApi";
 
 const serviceIcons: Record<string, React.ElementType> = {
   Cleaning: Sparkles,
@@ -118,6 +120,8 @@ export function BookingModal(props: BookingModalProps) {
     onRemoveNewUnit,
     onUpdateNewUnit,
     onNewUnitsSubmit,
+    availableBlockedDates,
+    onDateBlocked,
     calculateDevicePrice,
     calculateDiscount,
     calculateCombinedTotalPrice,
@@ -128,7 +132,8 @@ export function BookingModal(props: BookingModalProps) {
   } = props;
 
    const [customSettings, setCustomSettings] = useState<CustomSetting[]>([])
-  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+   const [showBlockedDateModal, setShowBlockedDateModal] = useState<BlockedDate | null>(null);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -141,6 +146,23 @@ export function BookingModal(props: BookingModalProps) {
     }
     fetchSettings();
   }, []);
+
+    const isDateBlocked = (date: string) => {
+      return blockedDatesApi.isDateBlocked(date, availableBlockedDates);
+    };
+
+
+    useEffect(() => {
+    if (bookingDate) {
+      let date = new Date(bookingDate);
+      while (isDateBlocked(format(date, "yyyy-MM-dd"))) {
+      date = addDays(date, 1);
+    }
+    if (format(date, "yyyy-MM-dd") !== bookingDate) {
+      setBookingDate(format(date, "yyyy-MM-dd"));
+      }
+    }
+    }, [bookingDate, availableBlockedDates]);
 
   if (!isOpen) return null;
 
@@ -216,33 +238,34 @@ export function BookingModal(props: BookingModalProps) {
                 id="bookingDate"
                 type="date"
                 min={format(addDays(new Date(), 1), "yyyy-MM-dd")}
-                value={
-                  bookingDate
-                    ? (format(new Date(bookingDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
-                        ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
-                        : format(new Date(bookingDate), "yyyy-MM-dd"))
-                    : ""
-                }
+                // value={
+                //   bookingDate
+                //     ? (format(new Date(bookingDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                //         ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
+                //         : format(new Date(bookingDate), "yyyy-MM-dd"))
+                //     : ""
+                // }
+                value={bookingDate ? format(new Date(bookingDate), "yyyy-MM-dd") : ""}
+
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw) {
                     const formatted = format(new Date(raw), "yyyy-MM-dd");
-                    setBookingDate(formatted); // store exact picked date
+                    const blocked = isDateBlocked(formatted);
+                  if (blocked) {
+                    setShowBlockedDateModal(blocked);
+                  } else {
+                    setBookingDate(formatted);
+                  }
                   } else {
                     setBookingDate("");
                   }
                 }}
-                className="text-base font-semibold border-2 border-blue-300 focus:border-blue-500 w-48"
+                 className="text-base font-semibold border-2 border-blue-300 focus:border-blue-500 w-48"
               />
               {bookingDate && (
                 <Badge className="bg-green-100 text-green-800 border-green-300">
-                  {
-                  bookingDate
-                    ? (format(new Date(bookingDate), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
-                        ? format(addDays(new Date(), 1), "yyyy-MM-dd") // force tomorrow if today
-                        : format(new Date(bookingDate), "yyyy-MM-dd"))
-                    : ""
-                }
+                  {bookingDate ? format(new Date(bookingDate), "yyyy-MM-dd") : ""}
                 </Badge>
               )}
             </div>
@@ -559,6 +582,13 @@ export function BookingModal(props: BookingModalProps) {
               <Button onClick={onNewUnitsSubmit}>Continue</Button>
             </div>
           </div>
+        )}
+
+        {showBlockedDateModal && (
+        <BlockedDateModal
+          blockedDate={showBlockedDateModal}
+          onClose={() => setShowBlockedDateModal(null)}
+          />
         )}
 
         {(selectedDevices.length > 0 || additionalServiceDevices.length > 0 || props.additionalUnits.some(unit => unit.brand_id && unit.ac_type_id && unit.horsepower_id)) && (() => {

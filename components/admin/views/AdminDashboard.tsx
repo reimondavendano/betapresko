@@ -155,7 +155,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* 🔹 Sales & Bookings Section */}
+        {/* Sales & Bookings Section */}
         <section className="space-y-6">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             💰 Sales & Bookings
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
           <UpcomingAppointmentsTable appointments={analytics.upcomingAppointments} />
         </section>
 
-        {/* 🔹 Clients & Retention Section */}
+        {/* Clients & Retention Section */}
         <section className="space-y-6">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             👥 Clients & Retention
@@ -183,7 +183,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 🔹 Devices & Maintenance Section */}
+        {/* Devices & Maintenance Section */}
         <section className="space-y-6">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             🔧 Devices & Maintenance Forecast
@@ -195,7 +195,7 @@ export default function AdminDashboard() {
           />
         </section>
 
-        {/* 🔹 Forecast & Projections Section */}
+        {/* Forecast & Projections Section */}
         <section className="space-y-6">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             📈 Forecast & Projections

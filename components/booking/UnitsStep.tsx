@@ -143,7 +143,7 @@ export function UnitsStep() {
 
     if (acType.name === 'Split Type' || acType.name === 'U-shaped') {
       // Split Type and U-shaped pricing logic
-      if (hpValue <= 2) { // 2HP and below
+      if (hpValue <= 1.5) { // 2HP and below
         unitPrice = customPricingSettings.splitTypePrice;
       } else { // Above 2HP
         unitPrice = customPricingSettings.splitTypePrice + customPricingSettings.surcharge;

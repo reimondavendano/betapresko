@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -29,8 +29,11 @@ import {
   ACType,
   HorsepowerOption,
   UUID,
+  BlockedDate,
 } from "../../../types/database";
 import { appointmentApi } from "@/pages/api/appointments/appointmentApi";
+import { BlockedDateModal } from "./BlockedDateModal";
+import { blockedDatesApi } from "@/pages/api/dates/blockedDatesApi";
 
 interface DetailsModalProps {
   isOpen: boolean;
@@ -54,6 +57,7 @@ interface DetailsModalProps {
   getProgressBarValue: (device: Device, dueInMonths: number) => number;
   getProgressColorClass: (value: number) => string;
   onRescheduleAppointment?: (appointmentId: UUID, newDate: string) => Promise<Appointment>;
+  availableBlockedDates: BlockedDate[];
 }
 
 export function DetailsModal({
@@ -78,13 +82,35 @@ export function DetailsModal({
   getProgressBarValue,
   getProgressColorClass,
   onRescheduleAppointment,
+  availableBlockedDates,
 }: DetailsModalProps) {
   const [reschedulingAppointmentId, setReschedulingAppointmentId] = useState<UUID | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState<string>(
     format(addDays(new Date(), 1), "yyyy-MM-dd")
   );
+  const [showBlockedDateModal, setShowBlockedDateModal] = useState<BlockedDate | null>(null);
+
+  const isDateBlocked = (date: string) => {
+    return blockedDatesApi.isDateBlocked(date, availableBlockedDates);
+  };
+
+
+  useEffect(() => {
+    if (rescheduleDate) {
+      let date = new Date(rescheduleDate);
+      while (isDateBlocked(format(date, "yyyy-MM-dd"))) {
+        date = addDays(date, 1);
+      }
+      if (format(date, "yyyy-MM-dd") !== rescheduleDate) {
+        setRescheduleDate(format(date, "yyyy-MM-dd"));
+      }
+    }
+  }, [rescheduleDate, availableBlockedDates]);
 
   if (!isOpen) return null;
+
+ 
+
 
   const handleRescheduleClick = (appointmentId: UUID) => {
     setReschedulingAppointmentId(appointmentId);
@@ -248,7 +274,12 @@ export function DetailsModal({
                             const raw = e.target.value;
                             if (raw) {
                               const formatted = format(new Date(raw), "yyyy-MM-dd");
-                              setRescheduleDate(formatted);
+                              const blocked = isDateBlocked(formatted);
+                              if (blocked) {
+                              setShowBlockedDateModal(blocked);
+                              } else {
+                                setRescheduleDate(formatted);
+                              }
                             } else {
                               setRescheduleDate("");
                             }
@@ -316,6 +347,13 @@ export function DetailsModal({
               </div>
             );
           })}
+
+          {showBlockedDateModal && (
+          <BlockedDateModal
+            blockedDate={showBlockedDateModal}
+            onClose={() => setShowBlockedDateModal(null)}
+          />
+          )}
 
           {(statusType === 'well-maintained' || statusType === 'due') && devices.map((device) => {
             const brand = allBrands.find((b) => b.id === device.brand_id)?.name || 'N/A';

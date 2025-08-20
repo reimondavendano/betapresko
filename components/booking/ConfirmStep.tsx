@@ -278,9 +278,44 @@ export function ConfirmStep() {
 
       const dashboardUrl = `/client/${currentClientId}`;
       setClientDashboardUrl(dashboardUrl);
-
       setIsSubmitting(false);
+
+      try {
+        // 🔹 Get SMS template from custom settings
+        const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
+        const smsTemplate =
+          smsTemplateSetting?.setting_value ||
+          'Hi {0}, Your booking is confirmed! Date: {1}, Units: {2}, Amount: {3}, Dashboard: https://betapresko.vercel.app/client/{4}';
+
+        // 🔹 Build the dynamic message
+        const smsMessage = smsTemplate
+          .replace('{0}', clientInfo.name)
+          .replace('{1}', appointmentDate)
+          .replace('{2}', selectedDevices.reduce((sum, d) => sum + d.quantity, 0).toString())
+          .replace('{3}', totalAmount.toLocaleString())
+          .replace('{4}', currentClientId);
+
+        // 🔹 Call your API route securely (no API key exposed)
+        const smsResponse = await fetch('/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number: `0${mobileDigits}`, // ✅ keep in PH format
+            message: smsMessage,
+            type: 'normal',
+          }),
+        });
+
+        if (!smsResponse.ok) {
+          console.error('SMS sending failed:', await smsResponse.json());
+        }
+      } catch (smsError) {
+        console.error('Failed to send SMS confirmation:', smsError);
+      }
+
+
       setIsCompleted(true);
+      
     } catch (err: any) {
       setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
       setIsSubmitting(false);

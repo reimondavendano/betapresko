@@ -281,13 +281,25 @@ export function ConfirmStep() {
       setIsSubmitting(false);
 
       try {
-        // 🔹 Get SMS template from custom settings
+       
         const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
         const smsTemplate =
-          smsTemplateSetting?.setting_value ||
-          'Hi {0}, Your booking is confirmed! Date: {1}, Units: {2}, Amount: {3}, Dashboard: https://betapresko.vercel.app/client/{4}';
+              smsTemplateSetting?.setting_value ||
+              
+              `Hi {0},
 
-        // 🔹 Build the dynamic message
+              Your booking with us is confirmed!
+
+              Cleaning Date: {1}
+              Total Aircon Units: {2}
+              Amount: {3}
+
+              To check your booking, please scan your Presko QR Code or visit:
+              https://betapresko.vercel.app/client/{4}
+
+              Thank you for choosing Presko!`;
+
+       
         const smsMessage = smsTemplate
           .replace('{0}', clientInfo.name)
           .replace('{1}', appointmentDate)
@@ -295,7 +307,7 @@ export function ConfirmStep() {
           .replace('{3}', totalAmount.toLocaleString())
           .replace('{4}', currentClientId);
 
-        // 🔹 Call your API route securely (no API key exposed)
+      
         const smsResponse = await fetch('/api/sms/send-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -321,6 +333,30 @@ export function ConfirmStep() {
       setIsSubmitting(false);
     }
   };
+
+  function formatSmsTemplate(
+    template: string,
+    values: (string | number)[]
+  ): string {
+    let result = template;
+
+    values.forEach((val, index) => {
+      // Replace all occurrences of {0}, {1}, etc.
+      const regex = new RegExp(`\\{${index}\\}`, 'g');
+      result = result.replace(regex, String(val));
+    });
+
+    // Normalize line endings to \n so they render properly in SMS
+    result = result.replace(/\r\n/g, '\n');
+
+    // Trim trailing spaces on each line
+    result = result
+      .split('\n')
+      .map(line => line.trimEnd())
+      .join('\n');
+
+    return result;
+  }
 
 
   const handleGoToExistingClientDashboard = () => {

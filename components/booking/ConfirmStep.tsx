@@ -296,7 +296,7 @@ export function ConfirmStep() {
           .replace('{4}', currentClientId);
 
         // 🔹 Call your API route securely (no API key exposed)
-        const smsResponse = await fetch('/api/send-sms', {
+        const smsResponse = await fetch('/api/sms/send-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

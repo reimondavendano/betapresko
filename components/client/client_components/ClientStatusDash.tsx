@@ -16,13 +16,17 @@ import {
   Home,
   Edit,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   ClientLocation,
   UUID
 } from '../../../types/database';
+import { Dialog, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { useState } from 'react';
 
 // Helper function to format the full address
 const formatAddress = (location: ClientLocation) => {
@@ -41,8 +45,6 @@ interface CleaningStatusEntry {
   wellMaintainedDevices: number;
   scheduledDevices: number;
   totalDevices: number;
-  lastServiceDate: string | null;
-  // New: Device details with service information
   devices: Array<{
     device: any;
     appointment: any;
@@ -53,6 +55,8 @@ interface CleaningStatusEntry {
     horsepower: string;
   }>;
 }
+
+
 
 interface ClientStatusDashProps {
   cleaningStatuses: CleaningStatusEntry[];
@@ -71,6 +75,7 @@ interface ClientStatusDashProps {
   totalPages: number;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  onEditLocation: (location: ClientLocation) => void;
   
 }
 
@@ -89,8 +94,11 @@ export function ClientStatusDash({
   currentPage,
   totalPages,
   onNextPage,
-  onPreviousPage
+  onPreviousPage,
+  onEditLocation
 }: ClientStatusDashProps) {
+
+
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
@@ -179,6 +187,13 @@ export function ClientStatusDash({
                          Primary
                        </Badge>
                      )}
+                     {/* Edit button */}
+                      <button
+                        onClick={() => onEditLocation(status.location)}
+                        className="ml-2 text-gray-500 hover:text-blue-600"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
                    </div>
                    <p className="text-sm text-gray-500">Total Devices: {status.totalDevices}</p>
                  </div>
@@ -189,105 +204,159 @@ export function ClientStatusDash({
 
               {/* Services Section */}
               <div className="space-y-3">
-                {/* Group devices by service type */}
                 {(() => {
-                  const serviceGroups = new Map<string, typeof status.devices>();
-                  
+                  const serviceGroups = new Map<
+                    string,
+                    { devices: any[]; lastServiceDate: string | null }
+                  >();
+
                   status.devices.forEach(device => {
-                    const serviceName = device.service?.name || 'No Service';
+                    const serviceName =
+                      device.service?.name || device.appointment?.service?.name || "No Service";
+
                     if (!serviceGroups.has(serviceName)) {
-                      serviceGroups.set(serviceName, []);
+                      serviceGroups.set(serviceName, { devices: [], lastServiceDate: null });
                     }
-                    serviceGroups.get(serviceName)!.push(device);
+
+                    const group = serviceGroups.get(serviceName)!;
+                    group.devices.push(device);
+
+                    // ✅ For Cleaning: try appointment first, fallback to device.last_cleaning_date
+                    if (serviceName.toLowerCase().includes("clean")) {
+                      let candidateDate: string | null = null;
+
+                      if (device.appointment?.status === "completed") {
+                        candidateDate = device.appointment.appointment_date;
+                      } else if (device.device?.last_cleaning_date) {
+                        candidateDate = device.device.last_cleaning_date;
+                      }
+
+                      if (candidateDate) {
+                        const apptTime = new Date(candidateDate).getTime();
+                        if (!group.lastServiceDate || apptTime > new Date(group.lastServiceDate).getTime()) {
+                          group.lastServiceDate = candidateDate;
+                        }
+                      }
+                    }
                   });
 
-                    return Array.from(serviceGroups.entries()).map(([serviceName, devices]) => (
-                     <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
-                       <div className="flex justify-between items-start mb-2">
-                         <h4 className="font-semibold text-gray-800">
-                            {serviceName === 'No Service'
-                              ? serviceName
-                              : serviceName.toLowerCase().includes('repair')
-                                ? serviceName
-                                : `${serviceName} ${
-                                    status.lastServiceDate
-                                      ? `(Last Serviced: ${format(new Date(status.lastServiceDate), 'MMM d, yyyy')})`
-                                      : '(No Service Record Yet)'
-                                  }`}
-                          </h4>
+                  return Array.from(serviceGroups.entries()).map(([serviceName, group]) => (
+                    <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-gray-800">
+                          {serviceName === "No Service"
+                            ? serviceName
+                            : serviceName.toLowerCase().includes("repair")
+                            ? serviceName // 🚨 don't show lastServiceDate for repair
+                            : `${serviceName} ${
+                                group.lastServiceDate
+                                  ? `(Last Serviced: ${format(
+                                      new Date(group.lastServiceDate),
+                                      "MMM d, yyyy"
+                                    )})`
+                                  : "(No Service Record Yet)"
+                              }`}
+                        </h4>
+                      </div>
 
-                         
-                       </div>
-                      
-                      {/* Group by status within each service */}
+                      {/* Group by status */}
                       {(() => {
-                         if (serviceName.toLowerCase().includes('repair') || serviceName.toLowerCase().includes('maintenance')) {
-                           const repairDevices = devices.filter(d => d.status === 'repair');
-                           if (repairDevices.length === 0) return null;
-                           
-                           return (
-                             <div key="repair" className="text-sm mb-2">
-                               <span className="text-purple-600 font-medium">
-                                 Repair: {repairDevices.length} Unit{repairDevices.length > 1 ? 's' : ''}
-                               </span>
-                               <Button
-                                 variant="link"
-                                 size="sm"
-                                 className="p-0 h-auto text-blue-600 ml-2"
-                                 onClick={() => handleOpenDetailsModal(status.location.id, 'repair', serviceName)}
-                               >
-                                 [View Details]
-                               </Button>
-                             </div>
-                           );
-                         }
-                        
-                        // For other services, group by status
+                        const devices = group.devices;
+
+                        if (
+                          serviceName.toLowerCase().includes("repair") ||
+                          serviceName.toLowerCase().includes("maintenance")
+                        ) {
+                          const repairDevices = devices.filter(d => d.status === "repair");
+                          if (repairDevices.length === 0) return null;
+
+                          return (
+                            <div key="repair" className="text-sm mb-2">
+                              <span className="text-purple-600 font-medium">
+                                Repair: {repairDevices.length} Unit
+                                {repairDevices.length > 1 ? "s" : ""}
+                              </span>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 h-auto text-blue-600 ml-2"
+                                onClick={() =>
+                                  handleOpenDetailsModal(status.location.id, "repair", serviceName)
+                                }
+                              >
+                                [View Details]
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        // For Cleaning + other services
                         const statusGroups = {
-                          'well-maintained': devices.filter(d => d.status === 'well-maintained'),
-                          'due': devices.filter(d => d.status === 'due'),
-                          'scheduled': devices.filter(d => d.status === 'scheduled'),
-                          'no-service': devices.filter(d => d.status === 'no-service')
+                          "well-maintained": devices.filter(d => d.status === "well-maintained"),
+                          due: devices.filter(d => d.status === "due"),
+                          scheduled: devices.filter(d => d.status === "scheduled"),
+                          "no-service": devices.filter(d => d.status === "no-service"),
                         };
 
-                        return Object.entries(statusGroups).map(([statusKey, statusDevices]) => {
-                          if (statusDevices.length === 0) return null;
+                        return Object.entries(statusGroups)
+                          .map(([statusKey, statusDevices]) => {
+                            if (statusDevices.length === 0) return null;
 
-                          const statusLabels = {
-                            'well-maintained': 'Up to date',
-                            'due': 'Due',
-                            'scheduled': 'Booked',
-                            'no-service': 'No Service'
-                          };
+                            const statusLabels = {
+                              "well-maintained": "Up to date",
+                              due: "Due",
+                              scheduled: "Booked",
+                              "no-service": "No Service",
+                            };
 
-                          const statusColors = {
-                            'well-maintained': 'text-green-600',
-                            'due': 'text-red-600',
-                            'scheduled': 'text-blue-600',
-                            'no-service': 'text-gray-600'
-                          };
+                            const statusColors = {
+                              "well-maintained": "text-green-600",
+                              due: "text-red-600",
+                              scheduled: "text-blue-600",
+                              "no-service": "text-gray-600",
+                            };
 
-                              return (
-                             <div key={statusKey} className="text-sm mb-2">
-                               <span className={`${statusColors[statusKey as keyof typeof statusColors]} font-medium`}>
-                                 {statusLabels[statusKey as keyof typeof statusLabels]}: {statusDevices.length} Unit{statusDevices.length > 1 ? 's' : ''}
-                               </span>
-                               <Button
-                                 variant="link"
-                                 size="sm"
-                                 className="p-0 h-auto text-blue-600 ml-2"
-                                 onClick={() => handleOpenDetailsModal(status.location.id, statusKey as 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName)}
-                               >
-                                 [View Details]
-                               </Button>
-                             </div>
-                           );
-                        }).filter(Boolean);
+                            return (
+                              <div key={statusKey} className="text-sm mb-2">
+                                <span
+                                  className={`${
+                                    statusColors[statusKey as keyof typeof statusColors]
+                                  } font-medium`}
+                                >
+                                  {statusLabels[statusKey as keyof typeof statusLabels]}:{" "}
+                                  {statusDevices.length} Unit
+                                  {statusDevices.length > 1 ? "s" : ""}
+                                </span>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 h-auto text-blue-600 ml-2"
+                                  onClick={() =>
+                                    handleOpenDetailsModal(
+                                      status.location.id,
+                                      statusKey as
+                                        | "scheduled"
+                                        | "due"
+                                        | "well-maintained"
+                                        | "repair"
+                                        | "no-service",
+                                      serviceName
+                                    )
+                                  }
+                                >
+                                  [View Details]
+                                </Button>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean);
                       })()}
                     </div>
                   ));
                 })()}
               </div>
+
+
             </div>
           ))
                  ) : (

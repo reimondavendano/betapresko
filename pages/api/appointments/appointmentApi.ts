@@ -119,16 +119,33 @@ export const appointmentApi = {
       }
       const deviceIds = (joins ?? []).map((j: any) => j.device_id);
       if (deviceIds.length > 0) {
-        const { error: deviceUpdateError } = await supabase
-          .from('devices')
-          .update({
-            last_cleaning_date: appointment.appointment_date,
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', deviceIds);
-        if (deviceUpdateError) {
-          console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
-          throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+
+        const { data: service, error: serviceError } = await supabase
+        .from('services')
+        .select('id, name')
+        .eq('id', appointment.service_id)
+        .single();
+
+        if (serviceError) {
+          console.error(`Error fetching service for appointment ${appointmentId}:`, serviceError);
+          throw new Error(serviceError.message);
+        }
+
+        if(service) {
+             if (service.name.toLowerCase().includes('clean')) {
+            // ✅ Cleaning → update last_cleaning_date
+            const { error: deviceUpdateError } = await supabase
+              .from('devices')
+              .update({
+                last_cleaning_date: appointment.appointment_date,
+                updated_at: new Date().toISOString(),
+              })
+              .in('id', deviceIds);
+            if (deviceUpdateError) {
+              console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
+              throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
+            }
+          } 
         }
       }
     }

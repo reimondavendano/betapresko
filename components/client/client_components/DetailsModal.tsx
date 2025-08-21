@@ -479,6 +479,7 @@ export function DetailsModal({
                           </div>
                         </div>
                       )}
+
                     </>
                   )}
                 </CardContent>

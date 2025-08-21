@@ -131,6 +131,7 @@ export interface Device {
   ac_type_id: UUID | null;
   horsepower_id: UUID | null;
   last_cleaning_date: DateString | null;
+  last_repair_date: DateString | null;
   due_3_months: DateString | null; // GENERATED ALWAYS AS date
   due_4_months: DateString | null; // GENERATED ALWAYS AS date
   due_6_months: DateString | null; // GENERATED ALWAYS AS date

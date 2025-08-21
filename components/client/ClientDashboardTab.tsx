@@ -61,7 +61,9 @@ import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi';
 
 // Import types
 
-import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID, BlockedDate } from '../../types/database';
+import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID, BlockedDate, City } from '../../types/database';
+import { barangayApi } from '@/pages/api/barangays/barangayApi';
+import { cityApi } from '@/pages/api/cities/cityApi';
 
 interface ClientDashboardTabProps {
   clientId: string;
@@ -165,6 +167,135 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [selectedPrimaryLocationId, setSelectedPrimaryLocationId] = useState<UUID | null>(null);
   const [availableBlockedDates, setAvailableBlockedDates] = useState<BlockedDate[]>([]);
   const [showBlockedDateModal, setShowBlockedDateModal] = useState<BlockedDate | null>(null);
+  const [isEditLocationModalOpen, setIsEditLocationModalOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<ClientLocation | null>(null);
+  const [isSavingLocation, setIsSavingLocation] = useState(false);
+  const [citySearchTerm, setCitySearchTerm] = useState("");
+  const [cities, setCities] = useState<any[]>([]);
+  const [barangays, setBarangays] = useState<any[]>([]);
+  const [selectedCity, setSelectedCity] = useState<any | null>(null);
+  const [selectedBarangay, setSelectedBarangay] = useState<any | null>(null);
+ const [isFetchingCities, setIsFetchingCities] = useState(false);
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+
+  const [locationForm, setLocationForm] = useState<{
+    name: string;
+    address_line1: string;
+    street: string;
+    landmark: string;
+    city_id: UUID | null;
+    barangay_id: UUID | null;
+  }>({
+    name: '',
+    address_line1: '',
+    street: '',
+    landmark: '',
+    city_id: null,
+    barangay_id: null,
+  });
+
+  const filteredCities = cities.filter(city =>
+    city.name.toLowerCase().includes(citySearchTerm.toLowerCase())
+  );
+
+  const handleBarangaySelect = (value: string) => {
+    const barangay = barangays.find(b => b.id === value) || null;
+    setSelectedBarangay(barangay);
+
+    setLocationForm(f => ({
+      ...f,
+      barangay_id: value || null,
+    }));
+  };
+
+  const handleCitySelect = async (city: { id: string; name: string }) => {
+    setSelectedCity(city);
+    setCitySearchTerm(city.name);
+    setIsCityDropdownOpen(false);
+
+    // ✅ update form state
+    setLocationForm(f => ({
+      ...f,
+      city_id: city.id,
+      barangay_id: null, // reset barangay when city changes
+    }));
+
+    // ✅ fetch barangays for this city
+    const fetchedBarangays = await barangayApi.getBarangaysByCity(city.id as UUID);
+    setBarangays(fetchedBarangays);
+    setSelectedBarangay(null);
+  };
+  
+
+  const openEditLocation = async (loc: ClientLocation) => {
+    setEditingLocation(loc);
+    setLocationForm({
+      name: loc.name || '',
+      address_line1: loc.address_line1 || '',
+      street: loc.street || '',
+      landmark: loc.landmark || '',
+      city_id: (loc as any).city_id || null,
+      barangay_id: (loc as any).barangay_id || null,
+    });
+
+    // ✅ Fetch cities if not already loaded
+    let fetchedCities = cities;
+    if (cities.length === 0) {
+      fetchedCities = await cityApi.getCities();
+      setCities(fetchedCities);
+    }
+
+    // ✅ Select default city
+    const city = fetchedCities.find(c => c.id === loc.city_id) || null;
+    setSelectedCity(city);
+    setCitySearchTerm(city?.name ?? "");
+
+    // ✅ Fetch barangays for this city
+    if (loc.city_id) {
+      const fetchedBarangays = await barangayApi.getBarangaysByCity(loc.city_id as UUID);
+      setBarangays(fetchedBarangays);
+
+      // ✅ Select default barangay
+      const barangay = fetchedBarangays.find(b => b.id === loc.barangay_id) || null;
+      setSelectedBarangay(barangay);
+    }
+
+    setIsEditLocationModalOpen(true);
+  };
+
+
+  const closeEditLocation = () => {
+    setIsEditLocationModalOpen(false);
+    setEditingLocation(null);
+  };
+
+  const saveEditLocation = async () => {
+    if (!editingLocation) return;
+    try {
+      setIsSavingLocation(true);
+
+      // Adjust this if your API uses a different method name/signature.
+      await clientLocationApi.updateClientLocation(editingLocation.id, {
+        name: locationForm.name,
+        address_line1: locationForm.address_line1,
+        street: locationForm.street,
+        landmark: locationForm.landmark,
+        city_id: locationForm.city_id,
+        barangay_id: locationForm.barangay_id,
+      });
+
+      // Re-fetch so the UI recomputes totals/grouping with the new location info
+      await fetchLocations();
+
+      // Close modal
+      closeEditLocation();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update location. Please try again.');
+    } finally {
+      setIsSavingLocation(false);
+    }
+  };
 
   const handleOpenBookingModal = (locationId: UUID) => {
     setSelectedLocationId(locationId);
@@ -462,6 +593,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             ac_type_id: unit.ac_type_id,
             horsepower_id: unit.horsepower_id,
             last_cleaning_date: null,
+            last_repair_date: null,
           });
           newDeviceIds.push(newDevice.id);
         }
@@ -483,6 +615,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             ac_type_id: unit.ac_type_id,
             horsepower_id: unit.horsepower_id,
             last_cleaning_date: null,
+            last_repair_date: null,
           });
           additionalDeviceIds.push(newDevice.id);
         }
@@ -532,9 +665,23 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         const device = devices.find((d) => d.id === deviceId);
         if (!device) return Promise.resolve();
         const updatePayload: Partial<Device> = {};
+        
         if (selectedLocationId && device.location_id !== selectedLocationId) {
           updatePayload.location_id = selectedLocationId;
         }
+
+        const service = allServices.find(s => s.id === selectedServiceId);
+        if (service) {
+          if (service.name.toLowerCase().includes("clean")) {
+            updatePayload.last_cleaning_date = appointmentDate;
+          } else if (
+            service.name.toLowerCase().includes("repair") ||
+            service.name.toLowerCase().includes("maintenance")
+          ) {
+            updatePayload.last_repair_date = appointmentDate;
+          }
+        }
+
         if (Object.keys(updatePayload).length > 0) {
           await deviceApi.updateDevice(deviceId, updatePayload);
         }
@@ -851,12 +998,15 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       location: ClientLocation,
       totalDevices: number,
       lastServiceDate: string | null,
+      lastCleaningDate: string | null;
+      lastRepairDate: string | null;
       serviceGroups: Array<{
         service: Service,
         scheduledDevices: number,
         dueDevices: number, 
         wellMaintainedDevices: number,
         repairDevices: number,
+        lastServiceDate: string | null,
         devices: Array<{
           device: Device;
           appointment: Appointment | undefined;
@@ -876,6 +1026,8 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         location,
         totalDevices: 0,
         lastServiceDate: null,
+        lastCleaningDate:  null,
+        lastRepairDate:  null,
         serviceGroups: [],
       });
     });
@@ -888,7 +1040,8 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
       locationStatus.totalDevices++;
 
-      if (device.last_cleaning_date) {
+      const cleaningService = allServices.find(s => s.name.toLowerCase().includes('clean'));
+      if (device.last_cleaning_date && cleaningService) {
         const lastCleanDate = new Date(device.last_cleaning_date);
         if (!locationStatus.lastServiceDate || lastCleanDate > new Date(locationStatus.lastServiceDate)) {
           locationStatus.lastServiceDate = device.last_cleaning_date;
@@ -908,7 +1061,10 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
       const latestCompleted = completedAppts.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())[0];
 
-      const hasLastCleaning = !!device.last_cleaning_date;
+      const hasLastCleaning = !!device.last_cleaning_date && completedAppts.some(a => {
+        const service = allServices.find(s => s.id === a.service_id);
+        return service?.name.toLowerCase().includes("clean");
+      });
       const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
       const isDue = [device.due_3_months, device.due_4_months, device.due_6_months]
         .filter(Boolean)
@@ -928,12 +1084,13 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               dueDevices: 0,
               wellMaintainedDevices: 0,
               repairDevices: 0,
+              lastServiceDate: null,
               devices: []
             };
             locationStatus.serviceGroups.push(serviceGroup);
           }
           serviceGroup.repairDevices++;
-          serviceGroup.devices.push({ device, appointment: appt, status: 'repair', brand, acType, horsepower });
+          serviceGroup.devices.push({ device, appointment: appt, status: 'repair', brand, acType, horsepower});
         }
       });
 
@@ -956,6 +1113,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               dueDevices: 0,
               wellMaintainedDevices: 0,
               repairDevices: 0,
+              lastServiceDate: null,
               devices: []
             };
             locationStatus.serviceGroups.push(serviceGroup);
@@ -965,20 +1123,45 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         });
       } else {
         // No confirmed cleaning appointment → fallback to last cleaning / due logic
-        let deviceStatus: 'due' | 'well-maintained' | 'no-service' = 'no-service';
+        let deviceStatus: 'scheduled' | 'due' | 'well-maintained' | 'no-service' = 'no-service';
         let serviceToUse: Service | undefined = undefined;
         let appointmentToUse: Appointment | undefined = undefined;
 
-        if (latestCompleted && hasLastCleaning && hasDueDates) {
-          deviceStatus = isDue ? 'due' : 'well-maintained';
-          serviceToUse = allServices.find(s => s.id === latestCompleted.service_id);
-          appointmentToUse = latestCompleted;
-        } else if (hasLastCleaning) {
-          deviceStatus = 'well-maintained';
-          serviceToUse = allServices.find(s => s.name.toLowerCase().includes('cleaning'));
+        const latestCompletedCleaning = completedAppts
+          .map(a => {
+            const service = allServices.find(s => s.id === a.service_id);
+            return { appt: a, service };
+          })
+          .filter(x => x.service?.name.toLowerCase().includes("clean"))
+          .sort((a, b) => new Date(b.appt.appointment_date).getTime() - new Date(a.appt.appointment_date).getTime())[0];
+
+        // Find any confirmed CLEANING appointment
+        const confirmedCleaningAppt = confirmedAppts.find(appt => {
+          const service = allServices.find(s => s.id === appt.service_id);
+          return service?.name.toLowerCase().includes("clean");
+        });
+
+        if (confirmedCleaningAppt) {
+          // scheduled Cleaning
+          deviceStatus = "scheduled";
+          serviceToUse = allServices.find(s => s.id === confirmedCleaningAppt.service_id);
+          appointmentToUse = confirmedCleaningAppt;
+
+        } else if (latestCompletedCleaning) {
+          // Completed Cleaning → decide due vs well-maintained
+          if (hasDueDates) {
+            deviceStatus = isDue ? "due" : "well-maintained";
+          } else {
+            deviceStatus = "well-maintained";
+          }
+          serviceToUse = latestCompletedCleaning.service!;
+          appointmentToUse = latestCompletedCleaning.appt;
+
         } else {
-          serviceToUse = allServices.find(s => s.name.toLowerCase().includes('cleaning'));
-          if (serviceToUse) deviceStatus = 'well-maintained';
+          // 🚨 No cleaning appointments at all → don't push into cleaning groups
+          deviceStatus = "no-service";
+          serviceToUse = undefined;
+          appointmentToUse = undefined;
         }
 
         if (serviceToUse) {
@@ -990,6 +1173,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               dueDevices: 0,
               wellMaintainedDevices: 0,
               repairDevices: 0,
+              lastServiceDate: null,
               devices: []
             };
             locationStatus.serviceGroups.push(serviceGroup);
@@ -1003,34 +1187,67 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       }
     });
 
-    return Array.from(statusByLocation.values()).map(locationStatus => {
+   return Array.from(statusByLocation.values()).map(locationStatus => {
       const allDeviceEntries: any[] = [];
+      const uniqueDeviceIds = new Set<string>(); // ✅ track unique device ids
+
       let totalScheduled = 0;
       let totalDue = 0;
       let totalWellMaintained = 0;
 
+      let lastCleaningDate: string | null = null;
+
       locationStatus.serviceGroups.forEach(serviceGroup => {
+        const isRepair =
+          serviceGroup.service.name.toLowerCase().includes("repair") ||
+          serviceGroup.service.name.toLowerCase().includes("maintenance");
+
+        // Track lastCleaningDate only for cleaning
+        if (!isRepair) {
+          serviceGroup.devices.forEach(deviceEntry => {
+            if (deviceEntry.appointment?.status === "completed") {
+              const apptDate = new Date(deviceEntry.appointment.appointment_date).getTime();
+              if (!lastCleaningDate || apptDate > new Date(lastCleaningDate).getTime()) {
+                lastCleaningDate = deviceEntry.appointment.appointment_date;
+              }
+            }
+          });
+        }
+
+        if (isRepair) {
+          // do not affect cleaning counts
+          serviceGroup.devices.forEach(deviceEntry => {
+            uniqueDeviceIds.add(deviceEntry.device.id); // ✅ add unique device
+            allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service });
+          });
+          return;
+        }
+
         totalScheduled += serviceGroup.scheduledDevices;
         totalDue += serviceGroup.dueDevices;
         totalWellMaintained += serviceGroup.wellMaintainedDevices;
-        serviceGroup.devices.forEach(deviceEntry => allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service }));
+
+        serviceGroup.devices.forEach(deviceEntry => {
+          uniqueDeviceIds.add(deviceEntry.device.id); // ✅ add unique device
+          allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service });
+        });
       });
 
       return {
         location: locationStatus.location,
-        totalDevices: locationStatus.totalDevices,
+        totalDevices: uniqueDeviceIds.size, // ✅ only unique devices
         scheduledDevices: totalScheduled,
         dueDevices: totalDue,
         wellMaintainedDevices: totalWellMaintained,
-        lastServiceDate: locationStatus.lastServiceDate,
         devices: allDeviceEntries,
-        serviceGroups: locationStatus.serviceGroups
+        serviceGroups: locationStatus.serviceGroups,
       };
     }).sort((a, b) => {
       if (a.location.is_primary && !b.location.is_primary) return -1;
       if (!a.location.is_primary && b.location.is_primary) return 1;
       return a.location.name.localeCompare(b.location.name);
     });
+
   };
   
   const cleaningStatuses = getDeviceCleaningStatus();
@@ -1421,6 +1638,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           totalPages={cleaningStatusTotalPages}
           onNextPage={handleCleaningStatusNextPage}
           onPreviousPage={handleCleaningStatusPreviousPage}
+          onEditLocation={openEditLocation}
         />
 
         <AddLocationButton onClick={handleOpenLocationModal} />
@@ -1645,6 +1863,130 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
            </div>
          </div>
        )}
+
+       {isEditLocationModalOpen && editingLocation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative">
+              <h3 className="text-lg font-semibold mb-4">Edit Location</h3>
+
+              <div className="space-y-3">
+                {/* Location Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Location Name</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={locationForm.name}
+                    onChange={e => setLocationForm(f => ({ ...f, name: e.target.value }))}
+                  />
+                </div>
+
+                {/* Address Line */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Address Line</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={locationForm.address_line1}
+                    onChange={e => setLocationForm(f => ({ ...f, address_line1: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Street</label>
+                    <input
+                      className="w-full border rounded-md px-3 py-2"
+                      value={locationForm.street}
+                      onChange={e => setLocationForm(f => ({ ...f, street: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Landmark</label>
+                    <input
+                      className="w-full border rounded-md px-3 py-2"
+                      value={locationForm.landmark}
+                      onChange={e => setLocationForm(f => ({ ...f, landmark: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* City Selector */}
+                <div className="space-y-2 relative">
+                  <label className="block text-sm font-medium">City</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={citySearchTerm}
+                    onChange={e => {
+                      setCitySearchTerm(e.target.value);
+                      setIsCityDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsCityDropdownOpen(true)}
+                  />
+                  {isCityDropdownOpen && !isFetchingCities && filteredCities.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {filteredCities.map(city => (
+                        <div
+                          key={city.id}
+                          className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            handleCitySelect(city);
+                            setCitySearchTerm(city.name); // ✅ lock in selected name
+                            setIsCityDropdownOpen(false);
+                          }}
+                        >
+                          {city.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isCityDropdownOpen && !isFetchingCities && filteredCities.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4">
+                      {citySearchTerm ? 'No cities found.' : 'Start typing to search for a city.'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Barangay Selector */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Barangay</label>
+                  <Select
+                    value={locationForm.barangay_id ?? ''}
+                    onValueChange={handleBarangaySelect}
+                    disabled={!locationForm.city_id}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a barangay" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {barangays.length > 0 ? (
+                        barangays.map(barangay => (
+                          <SelectItem key={barangay.id} value={barangay.id}>
+                            {barangay.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-barangays-found" disabled>
+                          No barangays found
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={closeEditLocation}>Cancel</Button>
+                <Button onClick={saveEditLocation} disabled={isSavingLocation}>
+                  {isSavingLocation ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
 
        {/* Location Modal */}
        {isLocationModalOpen && (

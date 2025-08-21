@@ -213,14 +213,14 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setCitySearchTerm(city.name);
     setIsCityDropdownOpen(false);
 
-    // ✅ update form state
+    //  update form state
     setLocationForm(f => ({
       ...f,
       city_id: city.id,
       barangay_id: null, // reset barangay when city changes
     }));
 
-    // ✅ fetch barangays for this city
+    //  fetch barangays for this city
     const fetchedBarangays = await barangayApi.getBarangaysByCity(city.id as UUID);
     setBarangays(fetchedBarangays);
     setSelectedBarangay(null);
@@ -238,24 +238,24 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       barangay_id: (loc as any).barangay_id || null,
     });
 
-    // ✅ Fetch cities if not already loaded
+    //  Fetch cities if not already loaded
     let fetchedCities = cities;
     if (cities.length === 0) {
       fetchedCities = await cityApi.getCities();
       setCities(fetchedCities);
     }
 
-    // ✅ Select default city
+    //  Select default city
     const city = fetchedCities.find(c => c.id === loc.city_id) || null;
     setSelectedCity(city);
     setCitySearchTerm(city?.name ?? "");
 
-    // ✅ Fetch barangays for this city
+    //  Fetch barangays for this city
     if (loc.city_id) {
       const fetchedBarangays = await barangayApi.getBarangaysByCity(loc.city_id as UUID);
       setBarangays(fetchedBarangays);
 
-      // ✅ Select default barangay
+      //  Select default barangay
       const barangay = fetchedBarangays.find(b => b.id === loc.barangay_id) || null;
       setSelectedBarangay(barangay);
     }
@@ -672,17 +672,18 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
         const service = allServices.find(s => s.id === selectedServiceId);
         if (service) {
-          if (service.name.toLowerCase().includes("cleaning")) {
-            updatePayload.last_cleaning_date = appointmentDate;
-          } else if (
-            service.name.toLowerCase().includes("repair") ||
-            service.name.toLowerCase().includes("maintenance")
-          ) {
+           const serviceName = service.name.toLowerCase();
+          if (serviceName.includes("repair") || serviceName.includes("maintenance")) {
+            //  Repair or maintenance
             updatePayload.last_repair_date = appointmentDate;
+          } else if (serviceName.includes("cleaning")) {
+            //  Pure cleaning
+            updatePayload.last_cleaning_date = appointmentDate;
           }
         }
 
         if (Object.keys(updatePayload).length > 0) {
+          console.log(updatePayload);
           await deviceApi.updateDevice(deviceId, updatePayload);
         }
       });
@@ -755,12 +756,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     try {
       const updatedDevice = await deviceApi.updateDevice(editingDeviceId, updatePayload);
 
-      // ✅ Update global devices state
+      //  Update global devices state
       setDevices((prevDevices) =>
         prevDevices.map((d) => (d.id === updatedDevice.id ? updatedDevice : d))
       );
 
-      // ✅ Update modalDevices state so the modal reflects changes instantly
+      //  Update modalDevices state so the modal reflects changes instantly
       setModalDevices((prev) =>
         modalLocation && updatedDevice.location_id !== modalLocation.id
           ? prev.filter((d) => d.id !== updatedDevice.id) // remove if moved location
@@ -1204,7 +1205,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
             serviceGroup.service.name.toLowerCase().includes('repair') ||
             serviceGroup.service.name.toLowerCase().includes('maintenance');
 
-          // ✅ Only consider CLEANING appointments for lastCleaningDate
+          //  Only consider CLEANING appointments for lastCleaningDate
           if (!isRepair) {
           serviceGroup.devices.forEach(deviceEntry => {
             if (
@@ -1944,7 +1945,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                           className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer"
                           onClick={() => {
                             handleCitySelect(city);
-                            setCitySearchTerm(city.name); // ✅ lock in selected name
+                            setCitySearchTerm(city.name); //  lock in selected name
                             setIsCityDropdownOpen(false);
                           }}
                         >

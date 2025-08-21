@@ -88,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from('appointments')
         .update(updatePayload)
         .eq('id', id)
-        .select('id, status, appointment_date, client_id')
+        .select('id, status, appointment_date, client_id, service_id')
         .single()
 
       if (updateErr) return handleSupabaseError(updateErr, res)
@@ -106,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { data: service, error: serviceErr } = await supabase
           .from("services")
           .select("id, name")
-          .eq("id", appt.id)
+          .eq("id", appt.service_id)
           .single();
 
         if (serviceErr) return handleSupabaseError(serviceErr, res);
@@ -123,12 +123,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (deviceIds.length > 0 && service) {
           const serviceName = service.name.toLowerCase();
+         
 
           let updatePayload: any = {
             updated_at: new Date().toISOString(),
           };
 
-          if (serviceName.includes("clean")) {
+           console.log(serviceName);
+
+          if (serviceName.includes("cleaning")) {
+            console.log('aaa');
             updatePayload.last_cleaning_date = completedDate;
           } else if (
             serviceName.includes("repair") ||

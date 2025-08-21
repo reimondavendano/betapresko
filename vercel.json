@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/cron/reminders.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

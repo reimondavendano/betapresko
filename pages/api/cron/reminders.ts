@@ -8,7 +8,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // --- Load reminder template from custom_settings ---
     const { data: settings, error: settingsErr } = await supabase
       .from("custom_settings")
       .select("setting_value")
@@ -36,7 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (devErr) return res.status(500).json({ error: devErr.message });
 
-    // --- Group devices per client ---
     const clientsMap: Record<
       string,
       {
@@ -60,13 +58,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!dueLabel) continue;
 
-      // Build unit description
       const brand = (dev as any).brands?.name || "";
       const type = (dev as any).ac_types?.name || "";
       const hp = (dev as any).horsepower_options?.display_name || "";
       const unitDesc = `1× ${brand} ${type} ${hp} – ${dueLabel}`;
 
-      // Group by client + location
       if (!clientsMap[client.id]) {
         clientsMap[client.id] = {
           name: client.name,
@@ -88,7 +84,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const clientName = info.name || "Customer";
       const clientMobile = info.mobile;
 
-      // Build location/unit text
       let unitDetails = "";
       let totalUnits = 0;
       for (const [loc, units] of Object.entries(info.locations)) {

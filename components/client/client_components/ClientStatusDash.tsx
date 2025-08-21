@@ -216,20 +216,15 @@ export function ClientStatusDash({
                     <Badge className="bg-purple-50 text-purple-700 text-xs">
                       Repair: {status.devices.filter(d => d.status === "repair").length}
                     </Badge>
-
-
                      <Button
                       className="ml-4 bg-blue-600 hover:bg-blue-700 rounded-lg"
                       onClick={() => handleOpenBookingModal(status.location.id)}
                     >
                       <Plus className="w-4 h-4 mr-2" /> Add Booking
                     </Button>
-
+                  </div>
                   </div>
 
-                  </div>
-
-                  
               {/* Services Section */}
               <div className="space-y-3">
                 {(() => {
@@ -251,22 +246,27 @@ export function ClientStatusDash({
 
                     // ✅ For Cleaning: try appointment first, fallback to device.last_cleaning_date
                     if (serviceName.toLowerCase().includes("clean")) {
-                      let candidateDate: string | null = null;
+                        let candidateDate: string | null = null;
 
-                      if (device.appointment?.status === "completed") {
-                        candidateDate = device.appointment.appointment_date;
-                      } else if (device.device?.last_cleaning_date) {
-                        candidateDate = device.device.last_cleaning_date;
-                      }
+                        // ✅ only count completed CLEANING appointments
+                        if (
+                          device.appointment?.status === "completed" &&
+                          device.appointment?.service?.name?.toLowerCase().includes("clean")
+                        ) {
+                          candidateDate = device.appointment.appointment_date;
+                        } else if (device.device?.last_cleaning_date) {
+                          candidateDate = device.device.last_cleaning_date;
+                        }
 
-                      if (candidateDate) {
-                        const apptTime = new Date(candidateDate).getTime();
-                        if (!group.lastServiceDate || apptTime > new Date(group.lastServiceDate).getTime()) {
-                          group.lastServiceDate = candidateDate;
+                        if (candidateDate) {
+                          if (!group.lastServiceDate || candidateDate > group.lastServiceDate) {
+                            group.lastServiceDate = candidateDate;
+                          }
                         }
                       }
-                    }
-                  });
+                    });
+
+                   
 
                   return Array.from(serviceGroups.entries()).map(([serviceName, group]) => (
                     <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
@@ -275,7 +275,7 @@ export function ClientStatusDash({
                           {serviceName === "No Service"
                             ? serviceName
                             : serviceName.toLowerCase().includes("repair")
-                            ? serviceName // 🚨 don't show lastServiceDate for repair
+                            ? serviceName 
                             : `${serviceName} ${
                                 group.lastServiceDate
                                   ? `(Last Serviced: ${format(

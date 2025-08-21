@@ -96,61 +96,91 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // If marked completed, update linked devices' last_cleaning_date to the date it was marked
       if (status === 'completed' && appt) {
         // Build yyyy-mm-dd for "date it marked"
-        const now = new Date()
-        const yyyy = now.getFullYear()
-        const mm = String(now.getMonth() + 1).padStart(2, '0')
-        const dd = String(now.getDate()).padStart(2, '0')
-        const completedDate = `${yyyy}-${mm}-${dd}`
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const completedDate = `${yyyy}-${mm}-${dd}`;
+
+        // ✅ Fetch the service linked to this appointment
+        const { data: service, error: serviceErr } = await supabase
+          .from("services")
+          .select("id, name")
+          .eq("id", appt.id)
+          .single();
+
+        if (serviceErr) return handleSupabaseError(serviceErr, res);
 
         // Find device ids linked to this appointment
         const { data: joins, error: joinErr } = await supabase
-          .from('appointment_devices')
-          .select('device_id')
-          .eq('appointment_id', appt.id)
+          .from("appointment_devices")
+          .select("device_id")
+          .eq("appointment_id", appt.id);
 
-        if (joinErr) return handleSupabaseError(joinErr, res)
-        const deviceIds = (joins || []).map((j: any) => j.device_id)
-        if (deviceIds.length > 0) {
-          const { error: devUpdateErr } = await supabase
-            .from('devices')
-            .update({ last_cleaning_date: completedDate, updated_at: new Date().toISOString() })
-            .in('id', deviceIds)
-          if (devUpdateErr) return handleSupabaseError(devUpdateErr, res)
+        if (joinErr) return handleSupabaseError(joinErr, res);
+
+        const deviceIds = (joins || []).map((j: any) => j.device_id);
+
+        if (deviceIds.length > 0 && service) {
+          const serviceName = service.name.toLowerCase();
+
+          let updatePayload: any = {
+            updated_at: new Date().toISOString(),
+          };
+
+          if (serviceName.includes("clean")) {
+            updatePayload.last_cleaning_date = completedDate;
+          } else if (
+            serviceName.includes("repair") ||
+            serviceName.includes("maintenance")
+          ) {
+            updatePayload.last_repair_date = completedDate;
+          }
+
+          if (Object.keys(updatePayload).length > 1) {
+            const { error: devUpdateErr } = await supabase
+              .from("devices")
+              .update(updatePayload)
+              .in("id", deviceIds);
+
+            if (devUpdateErr) return handleSupabaseError(devUpdateErr, res);
+          }
         }
 
-        // Referral logic: award point to referrer if present, then clear ref_id
+        // --- Referral logic (unchanged) ---
         if (appt.client_id) {
           const { data: client, error: clientErr } = await supabase
-            .from('clients')
-            .select('id, ref_id, points')
-            .eq('id', appt.client_id)
-            .single()
-          if (clientErr) return handleSupabaseError(clientErr, res)
+            .from("clients")
+            .select("id, ref_id, points")
+            .eq("id", appt.client_id)
+            .single();
+
+          if (clientErr) return handleSupabaseError(clientErr, res);
 
           if (client?.ref_id) {
-            // Find referrer by id == ref_id
             const { data: referrer, error: refErr } = await supabase
-              .from('clients')
-              .select('id, points')
-              .eq('id', client.ref_id)
-              .single()
-            if (refErr) return handleSupabaseError(refErr, res)
+              .from("clients")
+              .select("id, points")
+              .eq("id", client.ref_id)
+              .single();
+            if (refErr) return handleSupabaseError(refErr, res);
 
             if (referrer?.id) {
-              // Increment referrer's points by 1
               const { error: incErr } = await supabase
-                .from('clients')
-                .update({ points: (referrer.points || 0) + 1, updated_at: new Date().toISOString() as any })
-                .eq('id', referrer.id)
-              if (incErr) return handleSupabaseError(incErr, res)
+                .from("clients")
+                .update({
+                  points: (referrer.points || 0) + 1,
+                  updated_at: new Date().toISOString() as any,
+                })
+                .eq("id", referrer.id);
+              if (incErr) return handleSupabaseError(incErr, res);
             }
 
-            // Clear ref_id on original client so it won't be reused
             const { error: clearErr } = await supabase
-              .from('clients')
+              .from("clients")
               .update({ ref_id: null, updated_at: new Date().toISOString() as any })
-              .eq('id', client.id)
-            if (clearErr) return handleSupabaseError(clearErr, res)
+              .eq("id", client.id);
+            if (clearErr) return handleSupabaseError(clearErr, res);
           }
         }
       }

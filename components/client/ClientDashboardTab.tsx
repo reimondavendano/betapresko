@@ -672,7 +672,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
         const service = allServices.find(s => s.id === selectedServiceId);
         if (service) {
-          if (service.name.toLowerCase().includes("clean")) {
+          if (service.name.toLowerCase().includes("cleaning")) {
             updatePayload.last_cleaning_date = appointmentDate;
           } else if (
             service.name.toLowerCase().includes("repair") ||
@@ -1158,7 +1158,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           appointmentToUse = latestCompletedCleaning.appt;
 
         } else {
-          // 🚨 No cleaning appointments at all → don't push into cleaning groups
+          //  No cleaning appointments at all → don't push into cleaning groups
           deviceStatus = "no-service";
           serviceToUse = undefined;
           appointmentToUse = undefined;
@@ -1187,62 +1187,76 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       }
     });
 
-   return Array.from(statusByLocation.values()).map(locationStatus => {
-      const allDeviceEntries: any[] = [];
-      const uniqueDeviceIds = new Set<string>(); // ✅ track unique device ids
+        return Array.from(statusByLocation.values()).map(locationStatus => {
+        const allDeviceEntries: any[] = [];
+        const uniqueDeviceIds = new Set<string>();
+        let totalScheduled = 0;
+        let totalDue = 0;
+        let totalWellMaintained = 0;
+        
 
-      let totalScheduled = 0;
-      let totalDue = 0;
-      let totalWellMaintained = 0;
+        // track as timestamp to avoid re-parsing
+        let lastCleaningDateTs: number | null = null;
+        let lastCleaningDate: string | null = null;
 
-      let lastCleaningDate: string | null = null;
+        locationStatus.serviceGroups.forEach(serviceGroup => {
+          const isRepair =
+            serviceGroup.service.name.toLowerCase().includes('repair') ||
+            serviceGroup.service.name.toLowerCase().includes('maintenance');
 
-      locationStatus.serviceGroups.forEach(serviceGroup => {
-        const isRepair =
-          serviceGroup.service.name.toLowerCase().includes("repair") ||
-          serviceGroup.service.name.toLowerCase().includes("maintenance");
-
-        // Track lastCleaningDate only for cleaning
-        if (!isRepair) {
+          // ✅ Only consider CLEANING appointments for lastCleaningDate
+          if (!isRepair) {
           serviceGroup.devices.forEach(deviceEntry => {
-            if (deviceEntry.appointment?.status === "completed") {
-              const apptDate = new Date(deviceEntry.appointment.appointment_date).getTime();
-              if (!lastCleaningDate || apptDate > new Date(lastCleaningDate).getTime()) {
-                lastCleaningDate = deviceEntry.appointment.appointment_date;
+            if (
+              deviceEntry.appointment &&
+              deviceEntry.appointment.status === "completed" &&
+              serviceGroup.service?.name?.toLowerCase().includes("clean")
+            ) {
+              const candidateDate = deviceEntry.appointment.appointment_date;
+
+              if (candidateDate) {
+                if (!lastCleaningDate || candidateDate > lastCleaningDate) {
+                  lastCleaningDate = candidateDate; // stays as yyyy-mm-dd
+                }
               }
             }
           });
         }
 
-        if (isRepair) {
-          // do not affect cleaning counts
+        serviceGroup.lastServiceDate = lastCleaningDate;
+
+
+          // keep your existing counting & collection
+          if (isRepair) {
+            serviceGroup.devices.forEach(deviceEntry => {
+              uniqueDeviceIds.add(deviceEntry.device.id);
+              allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service });
+            });
+            return;
+          }
+
+          totalScheduled += serviceGroup.scheduledDevices;
+          totalDue += serviceGroup.dueDevices;
+          totalWellMaintained += serviceGroup.wellMaintainedDevices;
+
           serviceGroup.devices.forEach(deviceEntry => {
-            uniqueDeviceIds.add(deviceEntry.device.id); // ✅ add unique device
+            uniqueDeviceIds.add(deviceEntry.device.id);
             allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service });
           });
-          return;
-        }
-
-        totalScheduled += serviceGroup.scheduledDevices;
-        totalDue += serviceGroup.dueDevices;
-        totalWellMaintained += serviceGroup.wellMaintainedDevices;
-
-        serviceGroup.devices.forEach(deviceEntry => {
-          uniqueDeviceIds.add(deviceEntry.device.id); // ✅ add unique device
-          allDeviceEntries.push({ ...deviceEntry, service: serviceGroup.service });
         });
-      });
 
-      return {
-        location: locationStatus.location,
-        totalDevices: uniqueDeviceIds.size, // ✅ only unique devices
-        scheduledDevices: totalScheduled,
-        dueDevices: totalDue,
-        wellMaintainedDevices: totalWellMaintained,
-        devices: allDeviceEntries,
-        serviceGroups: locationStatus.serviceGroups,
-      };
-    }).sort((a, b) => {
+        return {
+          location: locationStatus.location,
+          totalDevices: uniqueDeviceIds.size,
+          scheduledDevices: totalScheduled,
+          dueDevices: totalDue,
+          wellMaintainedDevices: totalWellMaintained,
+          devices: allDeviceEntries,
+          serviceGroups: locationStatus.serviceGroups,
+          // ⚠️ if you need it here too
+          lastCleaningDate: lastCleaningDateTs ? new Date(lastCleaningDateTs).toISOString() : null,
+        };
+      }).sort((a, b) => {
       if (a.location.is_primary && !b.location.is_primary) return -1;
       if (!a.location.is_primary && b.location.is_primary) return 1;
       return a.location.name.localeCompare(b.location.name);

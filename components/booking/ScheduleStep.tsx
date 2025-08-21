@@ -13,6 +13,7 @@ import { format, isAfter, isBefore, startOfDay, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { addDays } from "date-fns";
 
 // Custom Calendar component
 interface CalendarProps {
@@ -178,19 +179,19 @@ export function ScheduleStep() {
   // ** UPDATED FUNCTION **
   // This function visually disables past dates only, leaving today and future dates enabled.
   const isDateVisuallyDisabled = (date: Date) => {
-    const today = startOfDay(new Date());
-    // Disable dates that are before today
-    return isBefore(date, today);
+    const tomorrow = startOfDay(addDays(new Date(), 1));
+    // Disable all dates before tomorrow
+    return isBefore(date, tomorrow);
   };
 
   const isDateActuallyUnavailable = (date: Date) => {
-    if (isBefore(date, startOfDay(new Date()))) {
+    const tomorrow = startOfDay(addDays(new Date(), 1));
+    // Block if date is before tomorrow
+    if (isBefore(date, tomorrow)) {
       return true;
     }
-    if (date.getDay() === 0) {
-      return true;
-    }
-    return blockedDatesApi.isDateBlocked(format(date, 'yyyy-MM-dd'), availableBlockedDates) !== null;
+    // Block if date is in blockedDates
+    return blockedDatesApi.isDateBlocked(format(date, "yyyy-MM-dd"), availableBlockedDates) !== null;
   };
 
 

@@ -26,9 +26,9 @@ export function StatsOverview({ points, bookingsCount, devicesCount }: StatsOver
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {items.map((it) => (
-        <Card key={it.label} className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-white">
+        <Card key={it.label} className="rounded-xl shadow-lg p-6 flex items-center justify-between bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0]">
           <div>
-            <p className="text-sm font-medium text-gray-600">{it.label}</p>
+            <p className="text-sm font-medium text-white">{it.label}</p>
             <p className={`text-3xl font-bold ${it.accentClass}`}>{it.value}</p>
           </div>
           {it.icon}

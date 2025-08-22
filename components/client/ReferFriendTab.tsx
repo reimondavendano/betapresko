@@ -93,7 +93,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
             onClick={handleCopyLink}
             variant="outline"
             size="sm"
-            className="flex-shrink-0 w-full sm:w-auto"
+            className="flex-shrink-0 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md shadow-md"
           >
             <Link className="w-4 h-4 mr-2" />
             Copy Link
@@ -106,7 +106,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
         <div className="flex flex-col sm:flex-row gap-4 w-full">
             <a href={facebookShareLink} target="_blank" rel="noopener noreferrer" className="w-full">
                 <Button
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center"
+                    className="rounded-lg w-full border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md shadow-md flex items-center justify-center"
                 >
                     <Facebook className="w-5 h-5 mr-3" />
                     Share on Facebook

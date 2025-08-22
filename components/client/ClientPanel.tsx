@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { User, LayoutDashboard, Briefcase, Gift, Menu, X, Home, Bell } from 'lucide-react'
+import { User, LayoutDashboard, Briefcase, Gift, Menu, X, Home, Bell, LogOut } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,6 +11,17 @@ import { ClientDashboardTab } from './ClientDashboardTab'
 import { ClientInfoTab } from './ClientInfoTab'
 import { BookServiceTab } from './BookServiceTab'
 import { ReferFriendTab } from './ReferFriendTab'
+import {
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
+AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 // import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
 
 const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={150} height={50} />
@@ -115,7 +126,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                         notifications.map((n, idx) => (
                           <li
                             key={idx}
-                            className="px-3 py-2 hover:bg-gray-100 border-b last:border-b-0"
+                            className="px-3 py-2 hover:opacity-90 border-b last:border-b-0"
                           >
                             <div className="text-sm text-gray-800">
                               {n.display_message || 'New notification'}
@@ -169,8 +180,8 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 onClick={() => handleTabClick('dashboard')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
                   activeTab === 'dashboard'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
                 }`}
               >
                 <LayoutDashboard className="w-5 h-5 mr-3" />
@@ -181,8 +192,8 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 onClick={() => handleTabClick('clientInfo')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
                   activeTab === 'clientInfo'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
                 }`}
               >
                 <User className="w-5 h-5 mr-3" />
@@ -193,8 +204,8 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 onClick={() => handleTabClick('clientAddLocation')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
                   activeTab === 'clientAddLocation'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
                 }`}
               >
                 <Home className="w-5 h-5 mr-3" />
@@ -205,8 +216,8 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 onClick={() => handleTabClick('bookService')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
                   activeTab === 'bookService'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
                 }`}
               >
                 <Briefcase className="w-5 h-5 mr-3" />
@@ -217,13 +228,45 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 onClick={() => handleTabClick('referFriend')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
                   activeTab === 'referFriend'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
                 }`}
               >
                 <Gift className="w-5 h-5 mr-3" />
                 Refer A Friend
               </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-200"
+                >
+                  <LogOut className="w-5 h-5 mr-3" />
+                  Logout
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure you want to logout?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove your saved client session and redirect you to the booking page.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      localStorage.removeItem("confirmedClientId");
+                      window.location.href = "/booking"; // pre-booking route
+                    }}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    Logout
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             </CardContent>
           </Card>
 

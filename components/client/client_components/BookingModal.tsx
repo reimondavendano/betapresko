@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, X, Calendar, MapPin } from "lucide-react";
+import { Plus, X, Calendar, MapPin, Trash } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
   ClientLocation,
@@ -446,23 +446,23 @@ export function BookingModal(props: BookingModalProps) {
             <Button 
               variant="outline" 
               onClick={() => props.setShowAdditionalUnits(!props.showAdditionalUnits)} 
-              className="w-full"
+              className="w-full rounded-lg rounded-lg border-teal-400 text-teal-600 shadow-md"
             >
               {props.showAdditionalUnits ? 'Remove Additional Units' : 'Add Another Unit +'}
             </Button>
 
             {/* Additional Units Form */}
             {props.showAdditionalUnits && (
-              <div className="mt-4 p-4 border rounded-lg space-y-4">
+              <div className="mt-4 p-4 border rounded-lg space-y-4 bg-gradient-to-r from-green-50 to-green-50 border border-green-200">
                 <div className="flex items-center justify-between">
                   <h4 className="text-md font-semibold">Additional Units for {allServices.find(s => s.id === selectedServiceId)?.name}</h4>
-                  <Button variant="outline" size="sm" onClick={props.onAddAdditionalUnit}>
+                  <Button variant="outline" size="sm" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" onClick={props.onAddAdditionalUnit}>
                     <Plus className="w-4 h-4 mr-2" /> Add Unit
                   </Button>
                 </div>
 
                 {props.additionalUnits.map((unit, idx) => (
-                  <div key={idx} className="space-y-4 p-4 border rounded-lg">
+                  <div key={idx} className="space-y-4 p-4 border rounded-lg bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                       <div>
                         <Label>Brand</Label>
@@ -508,7 +508,9 @@ export function BookingModal(props: BookingModalProps) {
                         <Input type="number" min={1} value={unit.quantity} onChange={(e) => props.onUpdateAdditionalUnit(idx, 'quantity', Number(e.target.value))} className="mt-1" />
                       </div>
                       <div>
-                        <Button variant="outline" onClick={() => props.onRemoveAdditionalUnit(idx)}>Remove</Button>
+                        <Button variant="outline" className = "bg-red-200 text-white hover:bg-red-900 hover:text-white " onClick={() => props.onRemoveAdditionalUnit(idx)}>
+                          <Trash className="w-6 h-6" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -522,13 +524,13 @@ export function BookingModal(props: BookingModalProps) {
           <div className="mt-4 p-4 border rounded-lg space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">New Units</h3>
-              <Button variant="outline" size="sm" onClick={onAddNewUnit}>
+              <Button variant="outline" size="sm" className = "rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" onClick={onAddNewUnit}>
                 <Plus className="w-4 h-4 mr-2" /> Add Unit
               </Button>
             </div>
 
             {newUnits.map((unit, idx) => (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end  ">
                 <div>
                   <Label>Brand</Label>
                   <Select value={unit.brand_id || ''} onValueChange={(v) => onUpdateNewUnit(idx, 'brand_id', v)}>
@@ -573,13 +575,15 @@ export function BookingModal(props: BookingModalProps) {
                     <Label>Quantity</Label>
                     <Input type="number" min={1} value={unit.quantity} onChange={(e) => onUpdateNewUnit(idx, 'quantity', Number(e.target.value))} className="mt-1" />
                   </div>
-                  <Button variant="outline" onClick={() => onRemoveNewUnit(idx)}>Remove</Button>
+                  <Button variant="outline" className="bg-red-200 text-white hover:bg-red-900 hover:text-white" onClick={() => onRemoveNewUnit(idx)}>
+                    <Trash className="w-6 h-6" />
+                  </Button>
                 </div>
               </div>
             ))}
 
             <div className="flex justify-end">
-              <Button onClick={onNewUnitsSubmit}>Continue</Button>
+              <Button variant="outline" onClick={onNewUnitsSubmit} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">Continue</Button>
             </div>
           </div>
         )}
@@ -602,10 +606,10 @@ export function BookingModal(props: BookingModalProps) {
           return (
             <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
               <div className="flex justify-end mt-4 space-x-4">
-                <Button onClick={onClose} variant="outline">Cancel</Button>
+                <Button onClick={onClose} variant="outline" className="rounded-lg bg-gray-to-r from-gray-500 to-gray-500 hover:opacity-90 text-gray-900">Cancel</Button>
                 <Button 
                   onClick={onCheckSummary} 
-                  className="bg-blue-600 hover:bg-blue-700" 
+                  className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" 
                   disabled={selectedDevices.length === 0 && !props.additionalUnits.some(unit => unit.brand_id && unit.ac_type_id && unit.horsepower_id)}
                 >
                   Check Summary

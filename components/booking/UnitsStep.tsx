@@ -242,7 +242,7 @@ export function UnitsStep() {
         <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
         <p className="text-red-700 text-lg mb-2">Error loading data:</p>
         <p className="text-red-600 text-sm">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => window.location.reload()} className="mt-4 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 hover:bg-white bg-white shadow-md">
           Retry
         </Button>
       </div>
@@ -395,7 +395,7 @@ export function UnitsStep() {
         <Button
           onClick={addDevice}
           variant="outline"
-          className="w-full py-3 border-dashed border-2 hover:border-blue-500 hover:text-blue-600"
+          className="w-full py-3 border-dashed border-2 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 hover:bg-white bg-white shadow-md"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Another Unit
@@ -414,7 +414,7 @@ export function UnitsStep() {
             if (!isRepairService && customPricingSettings.discount > 0) {
               const discountAmount = calculateDiscountAmount();
               return (
-                <div className="flex justify-between items-center text-lg">
+                <div className="flex justify-between items-center text-lg text-red-600">
                   <span>Discount ({customPricingSettings.discount}%):</span>
                   <span className="font-semibold text-red-600">- ₱{discountAmount.toLocaleString()}</span>
                 </div>
@@ -436,7 +436,7 @@ export function UnitsStep() {
         <Button
           onClick={handleBack}
           variant="outline"
-          className="px-6 py-3 w-full md:w-auto"
+          className="px-6 py-3 rounded-lg w-full sm:w-auto bg-gray-to-r border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
           Back to Services
@@ -445,7 +445,8 @@ export function UnitsStep() {
         <Button
           onClick={handleNext}
           disabled={!isFormValid()}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 w-full md:w-auto"
+          variant="outline"
+          className="px-8 py-3 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 hover:bg-white bg-white shadow-md"
         >
           Continue to Schedule
           <ChevronRight className="w-4 h-4 ml-2" />

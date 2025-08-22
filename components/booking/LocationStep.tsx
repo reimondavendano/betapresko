@@ -401,9 +401,10 @@ export function LocationStep() {
             <div id="map" className="w-full h-80 rounded-lg shadow-inner mb-4"></div>
 
             <Button
+             variant="outline"
               onClick={handleUseCurrentLocation}
               disabled={isGettingLocation || !isMapReady}
-              className="w-full flex items-center justify-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md p-3"
+              className="flex items-center justify-center space-x-2 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md p-3"
             >
               {isGettingLocation ? (
                 <>
@@ -558,8 +559,9 @@ export function LocationStep() {
         <div className="flex justify-center mt-8">
           <Button
             onClick={handleNext}
+            variant="outline"
             disabled={!locationInfo.address_line1 || !locationInfo.barangay_id || !locationInfo.city_id || !locationInfo.name || !locationInfo.landmark}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
+            className="px-8 py-3 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
           >
             Continue to Services
             <ChevronRight className="w-4 h-4 ml-2" />
@@ -577,7 +579,7 @@ export function LocationStep() {
                     {locationErrorMessage}
                 </DialogDescription>
             </DialogHeader>
-            <Button onClick={() => setIsModalOpen(false)}>Okay</Button>
+            <Button  variant="outline" className = "rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md" onClick={() => setIsModalOpen(false)}>Okay</Button>
         </DialogContent>
       </Dialog>
     </div>

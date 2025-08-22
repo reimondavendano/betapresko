@@ -33,10 +33,10 @@ export function BookingHeader() {
                 <div className="flex flex-col items-center">
                   <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 ${ /* Adjusted size for mobile */
                     currentStep > step.id 
-                      ? 'bg-green-500 border-green-500 text-white' 
+                      ? 'bg-green-500 border-green-500 text-white shadow-md' 
                       : currentStep === step.id
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                      ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] hover:opacity-90 text-white shadow-md'
+                      : 'bg-gray-100 border-gray-300 text-gray-400 shadow-md'
                   }`}>
                     {currentStep > step.id ? (
                       <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> 

@@ -14,7 +14,7 @@ export function AddLocationButton({ onClick }: AddLocationButtonProps) {
       <CardContent className="p-0">
         <Button
           variant="outline"
-          className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 py-4 text-lg font-medium"
+          className="w-full rounded-lg w-full rounded-lg border-teal-400 text-teal-600 shadow-md py-4"
           onClick={onClick}
         >
           <Plus className="w-5 h-5 mr-2" />

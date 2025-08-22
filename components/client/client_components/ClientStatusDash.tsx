@@ -56,12 +56,14 @@ interface CleaningStatusEntry {
   }>;
 }
 
-
-
 interface ClientStatusDashProps {
   cleaningStatuses: CleaningStatusEntry[];
   handleOpenBookingModal: (locationId: UUID) => void;
-  handleOpenDetailsModal: (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName?: string,) => void;
+  handleOpenDetailsModal: (
+    locationId: UUID,
+    statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service',
+    serviceName?: string,
+  ) => void;
   // Primary location editing props
   locations: ClientLocation[];
   isEditingPrimaryLocation: boolean;
@@ -76,13 +78,11 @@ interface ClientStatusDashProps {
   onNextPage: () => void;
   onPreviousPage: () => void;
   onEditLocation: (location: ClientLocation) => void;
-  
 }
 
-
-export function ClientStatusDash({ 
-  cleaningStatuses, 
-  handleOpenBookingModal, 
+export function ClientStatusDash({
+  cleaningStatuses,
+  handleOpenBookingModal,
   handleOpenDetailsModal,
   locations,
   isEditingPrimaryLocation,
@@ -98,15 +98,16 @@ export function ClientStatusDash({
   onEditLocation
 }: ClientStatusDashProps) {
 
-
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
         <div className="flex justify-between items-center">
           <CardTitle className="text-xl font-bold flex items-center">
             <Clock className="w-5 h-5 mr-2 text-gray-700" />
-            Cleaning Status
+            Booking Status
           </CardTitle>
+
+          {/* EDIT PRIMARY LOCATION */}
           {locations.length > 1 && (
             <div className="flex items-center space-x-2">
               {isEditingPrimaryLocation ? (
@@ -122,7 +123,7 @@ export function ClientStatusDash({
                   <Button
                     onClick={onUpdatePrimaryLocation}
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-xs"
+                    className="rounded-lg bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md"
                   >
                     Update Primary
                   </Button>
@@ -132,7 +133,7 @@ export function ClientStatusDash({
                   onClick={onStartEditPrimaryLocation}
                   variant="outline"
                   size="sm"
-                  className="ml-4 bg-green-600 hover:bg-green-700 rounded-lg text-white"
+                  className="w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md"
                 >
                   <Edit className="w-4 h-4 mr-2 text-white" />
                   Edit Primary Location
@@ -142,7 +143,8 @@ export function ClientStatusDash({
           )}
         </div>
       </CardHeader>
-      <CardContent className="p-0 space-y-4">
+
+      <CardContent className="p-0 space-y-6">
         {/* Primary Location Selection */}
         {isEditingPrimaryLocation && (
           <div className="p-4 border rounded-lg bg-gray-50">
@@ -173,60 +175,64 @@ export function ClientStatusDash({
           </div>
         )}
 
+        {/* Per-location Status */}
         {cleaningStatuses.length > 0 ? (
           cleaningStatuses.map(status => (
-            <div key={status.location.id} className="border-b last:border-b-0 py-4">
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <Home className="w-5 h-5 text-blue-600" />
-                        <p className="font-semibold text-lg text-gray-800">
-                          {status.location.name}
-                        </p>
-                        {status.location.is_primary && (
-                          <Badge className="bg-blue-100 text-blue-700 text-xs">Primary</Badge>
-                        )}
-                        {/* Edit button */}
-                        <button
-                          onClick={() => onEditLocation(status.location)}
-                          className="ml-2 text-gray-400 hover:text-blue-600 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-400">{formatAddress(status.location)}</p>
+            <div key={status.location.id} className="space-y-6">
 
-                      <p className="font-medium text-gray-700 mt-1">
-                        Total Devices: <span className="font-medium font-bold">{status.totalDevices}</span>
-                      </p>
-                      
-                    </div>
-
-                  
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-blue-50 text-blue-700 text-xs">
-                      Booked: {status.scheduledDevices}
-                    </Badge>
-                    <Badge className="bg-red-50 text-red-700 text-xs">
-                      Due: {status.dueDevices}
-                    </Badge>
-                    <Badge className="bg-green-50 text-green-700 text-xs">
-                      Up to Date: {status.wellMaintainedDevices}
-                    </Badge>
-                    <Badge className="bg-purple-50 text-purple-700 text-xs">
-                      Repair: {status.devices.filter(d => d.status === "repair").length}
-                    </Badge>
-                     <Button
-                      className="ml-4 bg-blue-600 hover:bg-blue-700 rounded-lg"
-                      onClick={() => handleOpenBookingModal(status.location.id)}
+              {/* Location Header */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <Home className="w-5 h-5 text-blue-600" />
+                    <p className="font-semibold text-lg text-gray-800">{status.location.name}</p>
+                    {status.location.is_primary && (
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-50 text-xs">Primary</Badge>
+                    )}
+                    <button
+                      onClick={() => onEditLocation(status.location)}
+                      className="ml-2 text-gray-400 hover:text-blue-600 transition-colors"
                     >
-                      <Plus className="w-4 h-4 mr-2" /> Add Booking
-                    </Button>
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
-                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{formatAddress(status.location)}</p>
+                </div>
 
-              {/* Services Section */}
-              <div className="space-y-3">
+                <Button
+                  size="sm"
+                  className="rounded-lg sm:w-auto bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] hover:opacity-90 text-white shadow-md"
+                  onClick={() => handleOpenBookingModal(status.location.id)}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Add Booking
+                </Button>
+              </div>
+
+              {/* Row of Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                {/* Total Devices Card */}
+                <Card className="p-4 flex flex-col items-start">
+                  <p className="text-sm font-medium text-gray-600">Total Devices</p>
+                  <p className="text-3xl font-bold text-blue-600">{status.totalDevices}</p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
+                      {status.scheduledDevices} Booked
+                    </Badge>
+                    <Badge className="bg-red-50 text-red-700 hover:bg-red-50 text-xs">
+                      {status.dueDevices} Due
+                    </Badge>
+                    <Badge className="bg-green-50 text-green-700 hover:bg-green-50 text-xs">
+                      {status.wellMaintainedDevices} Up to Date
+                    </Badge>
+                    <Badge className="bg-purple-50 text-purple-700 hover:bg-purple-50 text-xs">
+                      {status.devices.filter(d => d.status === "repair").length} Repair
+                    </Badge>
+                  </div>
+                </Card>
+
+
+                {/* Service Groups */}
                 {(() => {
                   const serviceGroups = new Map<
                     string,
@@ -244,48 +250,47 @@ export function ClientStatusDash({
                     const group = serviceGroups.get(serviceName)!;
                     group.devices.push(device);
 
-                    // ✅ For Cleaning: try appointment first, fallback to device.last_cleaning_date
                     if (serviceName.toLowerCase().includes("clean")) {
-                        let candidateDate: string | null = null;
-
-                        // ✅ only count completed CLEANING appointments
-                        if (
-                          device.appointment?.status === "completed" &&
-                          device.appointment?.service?.name?.toLowerCase().includes("clean")
-                        ) {
-                          candidateDate = device.appointment.appointment_date;
-                        } else if (device.device?.last_cleaning_date) {
-                          candidateDate = device.device.last_cleaning_date;
-                        }
-
-                        if (candidateDate) {
-                          if (!group.lastServiceDate || candidateDate > group.lastServiceDate) {
-                            group.lastServiceDate = candidateDate;
-                          }
+                      let candidateDate: string | null = null;
+                      if (
+                        device.appointment?.status === "completed" &&
+                        device.appointment?.service?.name?.toLowerCase().includes("clean")
+                      ) {
+                        candidateDate = device.appointment.appointment_date;
+                      } else if (device.device?.last_cleaning_date) {
+                        candidateDate = device.device.last_cleaning_date;
+                      }
+                      if (candidateDate) {
+                        if (!group.lastServiceDate || candidateDate > group.lastServiceDate) {
+                          group.lastServiceDate = candidateDate;
                         }
                       }
-                    });
-
-                   
+                    }
+                  });
 
                   return Array.from(serviceGroups.entries()).map(([serviceName, group]) => (
-                    <div key={serviceName} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-gray-800">
+                    <Card key={serviceName} className="p-4">
+                      <h4 className="font-semibold text-gray-800 mb-1">
                           {serviceName === "No Service"
                             ? serviceName
                             : serviceName.toLowerCase().includes("repair")
-                            ? serviceName 
-                            : `${serviceName} ${
-                                group.lastServiceDate
-                                  ? `(Last Serviced: ${format(
-                                      new Date(group.lastServiceDate),
-                                      "MMM d, yyyy"
-                                    )})`
-                                  : "(No Service Record Yet)"
-                              }`}
+                            ? serviceName
+                            : (
+                              <>
+                                {serviceName}
+                                {group.lastServiceDate ? (
+                                  <span className="ml-1 text-xs text-gray-500 font-normal">
+                                    (Last Serviced: {format(new Date(group.lastServiceDate), "MMM d, yyyy")})
+                                  </span>
+                                ) : (
+                                  <span className="ml-1 text-xs text-gray-400 font-normal">
+                                    (No Service Record Yet)
+                                  </span>
+                                )}
+                              </>
+                            )}
                         </h4>
-                      </div>
+
 
                       {/* Group by status */}
                       {(() => {
@@ -296,13 +301,10 @@ export function ClientStatusDash({
                           serviceName.toLowerCase().includes("maintenance")
                         ) {
                           const repairDevices = devices.filter(d => d.status === "repair");
-                          if (repairDevices.length === 0) return null;
-
                           return (
-                            <div key="repair" className="text-sm mb-2">
+                            <div className="text-sm">
                               <span className="text-purple-600 font-medium">
-                                Repair: {repairDevices.length} Unit
-                                {repairDevices.length > 1 ? "s" : ""}
+                                Repair: {repairDevices.length} Unit{repairDevices.length > 1 ? "s" : ""}
                               </span>
                               <Button
                                 variant="link"
@@ -318,7 +320,6 @@ export function ClientStatusDash({
                           );
                         }
 
-                        // For Cleaning + other services
                         const statusGroups = {
                           "well-maintained": devices.filter(d => d.status === "well-maintained"),
                           due: devices.filter(d => d.status === "due"),
@@ -345,15 +346,10 @@ export function ClientStatusDash({
                             };
 
                             return (
-                              <div key={statusKey} className="text-sm mb-2">
-                                <span
-                                  className={`${
-                                    statusColors[statusKey as keyof typeof statusColors]
-                                  } font-medium`}
-                                >
+                              <div key={statusKey} className="text-sm">
+                                <span className={`${statusColors[statusKey as keyof typeof statusColors]} font-medium`}>
                                   {statusLabels[statusKey as keyof typeof statusLabels]}:{" "}
-                                  {statusDevices.length} Unit
-                                  {statusDevices.length > 1 ? "s" : ""}
+                                  {statusDevices.length} Unit{statusDevices.length > 1 ? "s" : ""}
                                 </span>
                                 <Button
                                   variant="link"
@@ -362,12 +358,7 @@ export function ClientStatusDash({
                                   onClick={() =>
                                     handleOpenDetailsModal(
                                       status.location.id,
-                                      statusKey as
-                                        | "scheduled"
-                                        | "due"
-                                        | "well-maintained"
-                                        | "repair"
-                                        | "no-service",
+                                      statusKey as "scheduled" | "due" | "well-maintained" | "repair" | "no-service",
                                       serviceName
                                     )
                                   }
@@ -379,47 +370,45 @@ export function ClientStatusDash({
                           })
                           .filter(Boolean);
                       })()}
-                    </div>
+                    </Card>
                   ));
                 })()}
               </div>
-
-
             </div>
           ))
-                 ) : (
-           <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
-         )}
+        ) : (
+          <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
+        )}
 
-         {/* Pagination Controls */}
-         {totalPages > 1 && (
-           <div className="flex justify-between items-center mt-6 pt-4 border-t">
-             <Button
-               onClick={onPreviousPage}
-               disabled={currentPage === 1}
-               variant="outline"
-               size="sm"
-               className="flex items-center space-x-2"
-             >
-               <ChevronLeft className="w-4 h-4" />
-               <span>Previous</span>
-             </Button>
-             <span className="text-sm text-gray-700">
-               Page {currentPage} of {totalPages}
-             </span>
-             <Button
-               onClick={onNextPage}
-               disabled={currentPage === totalPages}
-               variant="outline"
-               size="sm"
-               className="flex items-center space-x-2"
-             >
-               <span>Next</span>
-               <ChevronRight className="w-4 h-4" />
-             </Button>
-           </div>
-         )}
-       </CardContent>
-     </Card>
-   );
- }
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-6 pt-4 border-t">
+            <Button
+              onClick={onPreviousPage}
+              disabled={currentPage === 1}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-2 rounded-lg border-teal-400 text-teal-600 shadow-md"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </Button>
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              onClick={onNextPage}
+              disabled={currentPage === totalPages}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-2 rounded-lg border-teal-400 text-teal-600 shadow-md"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

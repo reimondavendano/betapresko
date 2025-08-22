@@ -120,7 +120,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const itemsPerPage = 5;
   // --- Cleaning Status Pagination State ---
   const [cleaningStatusCurrentPage, setCleaningStatusCurrentPage] = useState(1);
-  const cleaningStatusItemsPerPage = 2; // Show 2 locations per page
+  const cleaningStatusItemsPerPage = 1; // Show 2 locations per page
   // --- Booking Modal State and Handlers ---
   const [isBookingModalOpen, setIsBookingModal] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<UUID | null>(null);
@@ -1323,7 +1323,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         <AlertCircle className="w-12 h-12 mb-4" />
         <h2 className="text-xl font-bold mb-2">Error Loading Dashboard</h2>
         <p className="text-center">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => window.location.reload()} className="mt-4 rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
           Retry
         </Button>
       </div>
@@ -1336,7 +1336,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         <AlertCircle className="w-12 h-12 mb-4" />
         <h2 className="text-xl font-bold mb-2">Client Not Found</h2>
         <p className="text-center">The client ID provided does not exist.</p>
-        <Button onClick={() => window.location.href = '/'} className="mt-4 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => window.location.href = '/'} className="mt-4 rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
           Go to Home
         </Button>
       </div>
@@ -1852,10 +1852,10 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               </div>
             </div>
             <div className="flex justify-end mt-8 space-x-4">
-              <Button onClick={handleCloseSummaryModal} variant="outline" className="text-gray-600 hover:bg-gray-100">
+              <Button onClick={handleCloseSummaryModal} variant="outline" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
                 Go Back
               </Button>
-              <Button onClick={handleConfirmBooking} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-all transform hover:scale-105">
+              <Button onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md text-white font-bold py-2 px-6 rounded-lg transition-all transform hover:scale-105">
                 Confirm Booking
               </Button>
             </div>
@@ -1871,7 +1871,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                <Check className="w-16 h-16 text-green-500" />
                <h2 className="text-2xl font-bold text-gray-800">Booking Confirmed!</h2>
                <p className="text-center text-gray-700">Your booking has been placed successfully. We`ll send you an update shortly.</p>
-               <Button onClick={handleCloseSuccessModal} className="w-full">
+               <Button onClick={handleCloseSuccessModal} className="w-full rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
                  OK
                </Button>
              </div>
@@ -1993,7 +1993,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               {/* Actions */}
               <div className="flex justify-end gap-2 mt-6">
                 <Button variant="outline" onClick={closeEditLocation}>Cancel</Button>
-                <Button onClick={saveEditLocation} disabled={isSavingLocation}>
+                <Button variant="outline" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" onClick={saveEditLocation} disabled={isSavingLocation}>
                   {isSavingLocation ? 'Saving…' : 'Save'}
                 </Button>
               </div>
@@ -2179,7 +2179,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                <Button
                  variant="outline"
                  onClick={handleAddNewUnit}
-                 className="w-full border-dashed border-2 border-gray-300 py-4"
+                 className="w-full border-dashed border-2 rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md py-4"
                >
                  <Plus className="w-4 h-4 mr-2" />
                  Add Another Unit
@@ -2251,7 +2251,8 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                 </Button>
                  <Button
                    onClick={handleNewUnitsSubmit}
-                   className="bg-blue-600 hover:bg-blue-700"
+                   variant="outline"
+                   className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md"
                  >
                    Continue
                  </Button>

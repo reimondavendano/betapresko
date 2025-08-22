@@ -64,10 +64,10 @@ const ClientExistsModal = ({ onClose, onGoToDashboard }: ClientExistsModalProps)
           <p className="text-gray-600 text-sm">
             Please visit the client panel page to manage your bookings.
           </p>
-          <Button onClick={onGoToDashboard} className="mt-4 bg-blue-600 hover:bg-blue-700 w-full">
+          <Button onClick={onGoToDashboard}  variant="outline" className="mt-4 rounded-lg w-full  border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md w-full">
             Go to Client Dashboard
           </Button>
-          <Button onClick={onClose} variant="outline" className="w-full">
+          <Button onClick={onClose} variant="outline" className="w-full rounded-lg w-full  bg-gray-to-r border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md">
             Close
           </Button>
         </CardContent>
@@ -330,6 +330,7 @@ export function ConfirmStep() {
 
 
       setIsCompleted(true);
+      localStorage.setItem("confirmedClientId", currentClientId);
       
     } catch (err: any) {
       setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
@@ -361,9 +362,20 @@ export function ConfirmStep() {
     return result;
   }
 
+  useEffect(() => {
+      const confirmedClientId = localStorage.getItem("confirmedClientId");
+
+      if (confirmedClientId) {
+        // 🔹 Case 1: New client just confirmed → go straight to client panel
+        window.location.href = `/client/${confirmedClientId}`;
+        return;
+      }
+    }, []);
+
 
   const handleGoToExistingClientDashboard = () => {
     if (existingClientId) {
+      localStorage.setItem("confirmedClientId", existingClientId);
       window.open(`/client/${existingClientId}`, '_blank');
       setShowClientExistsModal(false);
       dispatch(resetBooking());
@@ -408,8 +420,9 @@ export function ConfirmStep() {
             </p>
             <div className="space-y-4">
               <Button
+               variant="outline"
                 onClick={() => window.open(clientDashboardUrl)}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
               >
                 Go to Your Dashboard
               </Button>
@@ -623,7 +636,7 @@ export function ConfirmStep() {
         <Button
           onClick={handleBack}
           variant="outline"
-          className="px-6 py-3"
+          className="rounded-lg w-full sm:w-auto bg-gray-to-r border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
           disabled={isSubmitting}
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
@@ -632,8 +645,9 @@ export function ConfirmStep() {
 
         <Button
           onClick={handleSubmit}
+          variant="outline"
           disabled={!isFormValid || isSubmitting}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700"
+          className="rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
         >
           {isSubmitting ? (
             <>

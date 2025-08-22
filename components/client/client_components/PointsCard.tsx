@@ -30,7 +30,7 @@ export function PointsCard({ points, pointsExpiry, onReferClick }: PointsCardPro
             </Badge>
           )}
         </div>
-        <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50" onClick={onReferClick}>
+        <Button variant="outline" className="w-full rounded-lg border-teal-400 text-teal-600 shadow-md hover:opacity-90 shadow-md" onClick={onReferClick}>
           Refer A Friend
         </Button>
         <p className="text-xs text-gray-500 mt-2">

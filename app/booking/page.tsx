@@ -9,9 +9,20 @@ import { ServiceStep } from '@/components/booking/ServiceStep'
 import { UnitsStep } from '@/components/booking/UnitsStep'
 import { ScheduleStep } from '@/components/booking/ScheduleStep'
 import { ConfirmStep } from '@/components/booking/ConfirmStep'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function BookingPage() {
   const currentStep = useSelector((state: RootState) => state.booking.step)
+  const router = useRouter();
+
+  useEffect(() => {
+    const confirmedClientId = localStorage.getItem("confirmedClientId");
+    if (confirmedClientId) {
+      //  Prevent access to booking page if already confirmed
+      router.replace(`/client/${confirmedClientId}`);
+    }
+  }, [router]);
 
   const renderStep = () => {
     switch (currentStep) {

@@ -96,7 +96,7 @@ export function ServiceStep() {
         <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
         <p className="text-red-700 text-lg mb-2">Error loading services:</p>
         <p className="text-red-600 text-sm">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => window.location.reload()} className="rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md0">
           Retry
         </Button>
       </div>
@@ -172,7 +172,7 @@ export function ServiceStep() {
           <Button
             onClick={handleBack}
             variant="outline"
-            className="px-4 py-2 md:px-6 md:py-3 text-sm md:text-base"
+            className="rounded-lg w-full sm:w-auto bg-gray-to-r border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
           >
             <ChevronLeft className="w-4 h-4 mr-1 md:mr-2" />
             Back to Location
@@ -180,7 +180,8 @@ export function ServiceStep() {
           <Button
             onClick={handleNext}
             disabled={!selectedService}
-            className="px-4 py-2 md:px-8 md:py-3 bg-blue-600 hover:bg-blue-700 text-sm md:text-base"
+            variant="outline"
+            className="px-4 py-2 md:px-8 rounded-lg w-full sm:w-auto border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md"
           >
             Continue to Units
             <ChevronRight className="w-4 h-4 ml-1 md:ml-2" />

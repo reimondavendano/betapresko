@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/lib/store'
 import AdminSidePanel from './AdminSidePanel'
@@ -7,19 +8,13 @@ import AdminHeader from './AdminHeader'
 import AdminDashboard from '../views/AdminDashboard'
 import AdminBookings from '../views/AdminBookings'
 import AdminCustomSettings from '../views/AdminCustomSettings'
-import AdminBrand from '../views/AdminBrand'
-import AdminHP from '../views/AdminHP'
-import AdminTypes from '../views/AdminTypes'
-import AdminCity from '../views/AdminCity'
-import AdminBarangay from '../views/AdminBarangay'
-import AdminServices from '../views/AdminServices'
-import AdminBlockedDates from '../views/AdminBlockedDates'
 import AdminMasterData from '../views/AdminMasterData'
 import AdminClientInfo from '../views/AdminClientInfo'
 import AdminAppointments from '../views/AdminAppointments'
 
 export default function AdminLayout() {
   const view = useSelector((s: RootState) => s.admin.activeView)
+  const [isSideOpen, setIsSideOpen] = useState(false)
 
   const renderView = () => {
     switch (view) {
@@ -28,14 +23,13 @@ export default function AdminLayout() {
       case 'bookings':
         return <AdminBookings />
       case 'appointments':
-          return <AdminAppointments />
+        return <AdminAppointments />
       case 'clients':
-          return <AdminClientInfo />
+        return <AdminClientInfo />
       case 'master_data':
         return <AdminMasterData />
       case 'custom_settings':
-          return <AdminCustomSettings />
-     
+        return <AdminCustomSettings />
       default:
         return <AdminDashboard />
     }
@@ -43,17 +37,22 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans text-gray-900">
-      <AdminSidePanel />
-      <div className="flex flex-1 flex-col min-w-0">
-        <AdminHeader />
-        <main className="flex-1 p-6 bg-gray-50 shadow-inner overflow-hidden">
-          <div className="h-full">
+      {/* Mobile overlay */}
+      {isSideOpen && (
+        <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setIsSideOpen(false)}
+          />
+        )}
+
+        <AdminSidePanel isOpen={isSideOpen} onClose={() => setIsSideOpen(false)} />
+
+        <div className="flex flex-1 flex-col min-w-0">
+          <AdminHeader onMenuClick={() => setIsSideOpen(true)} />
+          <main className="flex-1 p-6 bg-gray-50 shadow-inner overflow-auto">
             {renderView()}
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
     </div>
-  );
+  )
 }
-
-

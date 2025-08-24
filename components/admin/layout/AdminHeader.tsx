@@ -1,14 +1,12 @@
-// components/AdminHeader.tsx
 'use client'
 
 import { useDispatch, useSelector } from 'react-redux'
 import { setNotifications, setNewNotificationsCount } from '@/lib/features/admin/adminSlice'
 import type { RootState } from '@/lib/store'
-import { Bell, Globe, Search } from 'lucide-react'
+import { Bell, Menu } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 
-export default function AdminHeader() {
+export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const dispatch = useDispatch()
   const admin = useSelector((s: RootState) => s.admin.currentAdmin)
   const activeView = useSelector((s: RootState) => s.admin.activeView)
@@ -42,8 +40,16 @@ export default function AdminHeader() {
   const headerTitle = viewLabelMap[activeView] || 'Dashboard'
 
   return (
-    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
-      <h1 className="text-xl font-bold text-gray-800">{headerTitle}</h1>
+    <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
+
+      <div className="flex items-center gap-3">
+        {/* Hamburger only on mobile */}
+        <button className="lg:hidden p-2 rounded-md hover:bg-gray-200" onClick={onMenuClick}>
+          <Menu className="w-6 h-6 text-gray-700" />
+        </button>
+        <h1 className="text-xl font-bold text-gray-800">{headerTitle}</h1>
+      </div>
+
       <div className="flex items-center">
         <div className="relative">
           <button
@@ -52,14 +58,16 @@ export default function AdminHeader() {
           >
             <Bell className="w-5 h-5 text-gray-600" />
             {newNotificationsCount > 0 && (
-             <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
+              <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
                 {notifications.length}
               </span>
             )}
           </button>
           {isOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
-              <ul className="divide-y divide-gray-200 max-h-80 overflow-y-auto">
+            <div
+              className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50"
+            >
+              <ul className="divide-y divide-gray-200 max-h-[60vh] overflow-y-auto">
                 <li className="px-3 py-2 text-sm font-semibold text-gray-800">
                   Notifications
                 </li>
@@ -85,7 +93,9 @@ export default function AdminHeader() {
               </ul>
             </div>
           )}
+
         </div>
+
         <div className="flex items-center gap-2 ml-4 cursor-pointer max-w-xs">
           <img
             src="https://placehold.co/100x100/orange/white?text=A"

@@ -1,6 +1,16 @@
 // src/api/appointmentApi.ts
 import { supabase } from '../../../lib/supabase'; // Adjust path as needed
-import { Appointment, UUID } from '../../../types/database'; // Import Appointment and UUID types
+import { Appointment, AppointmentWithDetails, UUID } from '../../../types/database'; // Import Appointment and UUID types
+
+
+interface AppointmentQuery {
+  clientId?: string;
+  status?: string;
+  dateFilter?: "all" | "today" | "incoming" | "previous";
+  specificDate?: string;
+  page?: number;
+  limit?: number;
+}
 
 export const appointmentApi = {
   /**
@@ -50,6 +60,95 @@ export const appointmentApi = {
     }
     return data as Appointment[];
   },
+
+    getAppointments: async ({
+        clientId,
+        status,
+        dateFilter,
+        page = 1,
+        limit = 10,
+      }: {
+        clientId: string;
+        status?: string;
+        dateFilter?: "all" | "today" | "incoming" | "previous" | string;
+        page?: number;
+        limit?: number;
+      }) => {
+        const offset = (page - 1) * limit;
+        const today = new Date().toISOString().split("T")[0];
+
+        let query = supabase
+          .from("appointments")
+          .select(
+            `
+              id, appointment_date, appointment_time, status, amount, total_units, notes,
+              clients:client_id(id, name, mobile, email),
+              client_locations:location_id(id, name, address_line1),
+              services:service_id(id, name),
+              appointment_devices:appointment_devices(
+                devices:device_id(
+                  id,
+                  name,
+                  brands:brand_id(id, name),
+                  ac_types(id, name),
+                  horsepower_options(id, value)
+                )
+              )
+            `,
+            { count: "exact" }
+          )
+          .eq("client_id", clientId)
+          .eq("status", status);
+
+        // Filter by status
+        if (status) {
+          query = query.eq("status", status);
+        }
+
+        // Date filters
+        if (dateFilter === "today") {
+          query = query.eq("appointment_date", today);
+        } else if (dateFilter === "incoming") {
+          query = query.gte("appointment_date", today);
+        } else if (dateFilter === "previous") {
+          query = query.lt("appointment_date", today);
+        }else if (
+          dateFilter &&
+          !["all", "today", "incoming", "previous"].includes(dateFilter)
+        ) {
+          query = query.eq("appointment_date", dateFilter); // use directly
+        }
+
+        // Pagination + ordering
+        query = query.range(offset, offset + limit - 1);
+        query = query.order("appointment_date", { ascending: false });
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        // ✅ Normalize single-object relations
+        const normalized = (data || []).map((a: any) => ({
+          ...a,
+          clients: a.clients || null,
+          client_locations: a.client_locations || null,
+          services: a.services || null,
+          appointment_devices: a.appointment_devices || [],
+        }));
+
+        return {
+          data: normalized as AppointmentWithDetails[],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+          },
+        };
+    },
+
+
+
 
   /**
    * Updates appointment fields (for general appointment updates like rescheduling)
@@ -131,8 +230,8 @@ export const appointmentApi = {
           throw new Error(serviceError.message);
         }
 
-        if(service) {
-             if (service.name.toLowerCase().includes('clean')) {
+       if (service) {
+          if (service.name.toLowerCase().includes('clean')) {
             // ✅ Cleaning → update last_cleaning_date
             const { error: deviceUpdateError } = await supabase
               .from('devices')
@@ -141,11 +240,29 @@ export const appointmentApi = {
                 updated_at: new Date().toISOString(),
               })
               .in('id', deviceIds);
+
             if (deviceUpdateError) {
               console.error(`Error updating device cleaning dates for appointment ${appointmentId}:`, deviceUpdateError);
               throw new Error(`Failed to update device cleaning dates: ${deviceUpdateError.message}`);
             }
-          } 
+          } else if (
+            service.name.toLowerCase().includes('repair') ||
+            service.name.toLowerCase().includes('maintenance')
+          ) {
+            // ✅ Repair/Maintenance → update last_repair_date
+            const { error: deviceUpdateError } = await supabase
+              .from('devices')
+              .update({
+                last_repair_date: appointment.appointment_date,
+                updated_at: new Date().toISOString(),
+              })
+              .in('id', deviceIds);
+
+            if (deviceUpdateError) {
+              console.error(`Error updating device repair dates for appointment ${appointmentId}:`, deviceUpdateError);
+              throw new Error(`Failed to update device repair dates: ${deviceUpdateError.message}`);
+            }
+          }
         }
       }
     }
@@ -161,7 +278,7 @@ export const appointmentApi = {
       .from('appointments')
       .select(`
         *,
-        clients:client_id(name, mobile),
+        clients:client_id(name, mobile, email),
         client_locations:location_id(name, address_line1, barangay_id, city_id,
           cities:city_id(name),
           barangays:barangay_id(name)

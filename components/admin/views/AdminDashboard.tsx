@@ -15,6 +15,7 @@ import TopClientsTable from '../dashboard/TopClientsTable'
 import DevicesDueCard from '../dashboard/DevicesDueCard'
 import ForecastChart from '../dashboard/ForecastChart'
 import ClientsByAreaChart from '../dashboard/ClientsByAreaChart'
+import ReturnClientsTable from "../dashboard/ReturnClientsTable";
 
 // Import types
 import {
@@ -25,7 +26,8 @@ import {
   ClientsByArea,
   DeviceDueSoon,
   ForecastData,
-  ChurnRiskClient
+  ChurnRiskClient,
+  ReturnClient
 } from '@/types/database'
 
 interface DashboardAnalytics {
@@ -34,6 +36,7 @@ interface DashboardAnalytics {
   upcomingAppointments: UpcomingAppointment[];
   topClients: TopClient[];
   clientsByArea: ClientsByArea[];
+  returnClients: ReturnClient[];
   devicesDueSoon: DeviceDueSoon[];
   forecastData: ForecastData[];
   churnRiskClients: ChurnRiskClient[];
@@ -179,6 +182,10 @@ export default function AdminDashboard() {
           
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <TopClientsTable clients={analytics.topClients} />
+            <ReturnClientsTable clients={analytics.returnClients} />
+            
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-1">
             <ClientsByAreaChart data={analytics.clientsByArea} />
           </div>
         </section>

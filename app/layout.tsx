@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Presko Aircon Services - Professional AC Cleaning',
   description: 'Professional aircon cleaning and maintenance services in Bulacan. Book your appointment today!',
+  icons: {
+    icon: "/presko_logo.ico",
+  },
 };
 
 export default function RootLayout({

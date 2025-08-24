@@ -609,7 +609,8 @@ export function BookingModal(props: BookingModalProps) {
                 <Button onClick={onClose} variant="outline" className="rounded-lg bg-gray-to-r from-gray-500 to-gray-500 hover:opacity-90 text-gray-900">Cancel</Button>
                 <Button 
                   onClick={onCheckSummary} 
-                  className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" 
+                  variant="outline"
+                  className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white" 
                   disabled={selectedDevices.length === 0 && !props.additionalUnits.some(unit => unit.brand_id && unit.ac_type_id && unit.horsepower_id)}
                 >
                   Check Summary

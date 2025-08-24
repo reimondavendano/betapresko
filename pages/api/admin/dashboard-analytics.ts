@@ -9,7 +9,8 @@ import {
   ClientsByArea,
   DeviceDueSoon,
   ForecastData,
-  ChurnRiskClient
+  ChurnRiskClient,
+  ReturnClient
 } from '../../../types/database'
 
 interface DashboardAnalytics {
@@ -17,6 +18,7 @@ interface DashboardAnalytics {
   monthlySalesData: MonthlySalesData[];
   upcomingAppointments: UpcomingAppointment[];
   topClients: TopClient[];
+  returnClients: ReturnClient[];
   clientsByArea: ClientsByArea[];
   devicesDueSoon: DeviceDueSoon[];
   forecastData: ForecastData[];
@@ -216,6 +218,41 @@ export default async function handler(
         .sort((a, b) => b.totalSpend - a.totalSpend)
         .slice(0, 10);
 
+      
+
+        // Top returning clients
+          const { data: returnClientsData, error: returnClientsErr } = await supabase
+            .from("appointments")
+            .select(`
+              client_id,
+              clients ( id, name, mobile )
+            `)
+            .eq("status", "completed");
+
+          if (returnClientsErr) throw returnClientsErr;
+
+          // Count completed appointments per client
+          const returnClientsMap: Record<string, { id: string; name: string; mobile: string; count: number }> = {};
+
+          (returnClientsData || []).forEach((appt: any) => {
+            const client = appt.clients;
+            if (!client) return;
+            if (!returnClientsMap[client.id]) {
+              returnClientsMap[client.id] = { ...client, count: 0 };
+            }
+            returnClientsMap[client.id].count++;
+          });
+
+          // ✅ Only include clients with at least 2 completed appts (returning)
+          const returnClients = Object.values(returnClientsMap)
+            .filter(c => c.count > 1)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+
+
+
+
       // Clients by area - simplified query to avoid complex joins
       const { data: clientsByAreaData } = await supabase
         .from('client_locations')
@@ -398,9 +435,6 @@ export default async function handler(
 
       // Generate forecast data for next 6 months
 
-   
-      
-
       const { data: forecastDevices, error: devErr } = await supabase
           .from('devices')
           .select('id, client_id, due_3_months, due_4_months, due_6_months')
@@ -487,6 +521,7 @@ export default async function handler(
         monthlySalesData,
         upcomingAppointments,
         topClients,
+        returnClients,
         clientsByArea,
         devicesDueSoon: devicesDueSoon.slice(0, 20), // Limit to top 20
         forecastData,

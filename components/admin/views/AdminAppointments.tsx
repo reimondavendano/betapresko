@@ -154,16 +154,16 @@ export default function AdminAppointments() {
         }
 
         return `${clientName} - ${time}
-${mobile}
-${address}
-${locationName}
-=============
-${deviceList}
-Service: ${serviceName}
-Price : ${amount}
-==============
+        ${mobile}
+        ${address}
+        ${locationName}
+        =============
+        ${deviceList}
+        Service: ${serviceName}
+        Price : ${amount}
+        ==============
 
-`;
+        `;
       }).join('');
 
       await navigator.clipboard.writeText(copyText);

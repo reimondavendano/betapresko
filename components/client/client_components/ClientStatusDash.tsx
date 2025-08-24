@@ -72,6 +72,7 @@ interface ClientStatusDashProps {
   onCancelEditPrimaryLocation: () => void;
   onUpdatePrimaryLocation: () => void;
   onPrimaryLocationChange: (locationId: UUID) => void;
+  onAddLocation: () => void;   
   // Pagination props
   currentPage: number;
   totalPages: number;
@@ -91,6 +92,7 @@ export function ClientStatusDash({
   onCancelEditPrimaryLocation,
   onUpdatePrimaryLocation,
   onPrimaryLocationChange,
+  onAddLocation,
   currentPage,
   totalPages,
   onNextPage,
@@ -379,6 +381,17 @@ export function ClientStatusDash({
         ) : (
           <p className="text-sm text-gray-500">No devices registered for this client yet.</p>
         )}
+
+       <div className="w-full mt-4 px-6 pb-4">
+        <Button
+          onClick={onAddLocation}
+          variant="outline"
+          className="w-full border-4 border-dotted border-teal-400 text-teal-600 hover:bg-teal-50 rounded-lg font-medium py-2"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Location
+        </Button>
+      </div>
 
         {/* Pagination Controls */}
         {totalPages > 1 && (

@@ -101,3 +101,7 @@
 .rbc-addons-dnd .rbc-event.rbc-dnd-movable .rbc-addons-dnd-resize-ew-anchor:before {
   width: 4px !important;
 }
+
+/* .no-print {
+  display: none !important;
+} */

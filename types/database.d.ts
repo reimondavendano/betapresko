@@ -293,6 +293,15 @@ export interface ChurnRiskClient {
   daysSinceLastAppointment: number;
 }
 
+
+export interface ReturnClient {
+  id: string;
+  name: string;
+  mobile: string;
+  count: number;
+}
+
+
 // Pagination interface
 export interface PaginationInfo {
   page: number;
@@ -307,6 +316,7 @@ export interface AppointmentWithDetails extends Appointment {
     id: string;
     name: string;
     mobile: string;
+    email: string;
   };
   services?: {
     id: string;

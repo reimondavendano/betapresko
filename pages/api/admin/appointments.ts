@@ -129,10 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             updated_at: new Date().toISOString(),
           };
 
-           console.log(serviceName);
-
           if (serviceName.includes("cleaning")) {
-            console.log('aaa');
             updatePayload.last_cleaning_date = completedDate;
           } else if (
             serviceName.includes("repair") ||
@@ -151,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // --- Referral logic (unchanged) ---
+        // --- Referral logic ---
         if (appt.client_id) {
           const { data: client, error: clientErr } = await supabase
             .from("clients")
@@ -186,6 +183,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .eq("id", client.id);
             if (clearErr) return handleSupabaseError(clearErr, res);
           }
+        }
+
+        // --- Loyalty Points logic ---
+        if (appt.client_id) {
+          const { data: loyaltyData, error: loyaltyErr } = await supabase
+            .from("loyalty_points")
+            .insert([
+              {
+                client_id: appt.client_id,
+                appointment_id: appt.id,
+                points: 1,
+                date_earned: appt.appointment_date 
+              },
+            ])
+            .select();
+
+          if (loyaltyErr) {
+            console.error("Loyalty insert failed:", loyaltyErr);
+            return handleSupabaseError(loyaltyErr, res);
+          }
+    
         }
       }
 

@@ -22,9 +22,10 @@ AlertDialogHeader,
 AlertDialogTitle,
 AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ClientInvoice } from './ClientInvoice'
 // import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
 
-const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={150} height={50} />
+const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={200} height={100} />
 
 interface ClientPanelProps {
   params: {
@@ -100,7 +101,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
     <div className="min-h-screen bg-gray-50 font-inter">
       {/* Header */}
       <header className="shadow-sm" style={{ backgroundColor: '#99BCC0' }}>
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <NewLogo />
             <div className="lg:hidden">
@@ -160,7 +161,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
       )}
 
       {/* Main Content Area */}
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Navigation */}
           <Card
@@ -224,6 +225,19 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 Book Another Service
               </Button> */}
               <Button
+                variant={activeTab === 'invoices' ? 'default' : 'ghost'}
+                onClick={() => handleTabClick('invoices')}
+                className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
+                  activeTab === 'invoices'
+                    ? 'bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md'
+                    : 'hover:opacity-90'
+                }`}
+              >
+                <Briefcase className="w-5 h-5 mr-3" />
+                Invoices
+              </Button>
+
+              <Button
                 variant={activeTab === 'referFriend' ? 'default' : 'ghost'}
                 onClick={() => handleTabClick('referFriend')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
@@ -282,6 +296,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}
             {/* {activeTab === 'clientAddLocation' && <ClientAddLocationTab clientId={clientId} />}
             {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />} */}
+            {activeTab === 'invoices' && <ClientInvoice clientId={clientId} />}
             {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />}
           </div>
         </div>

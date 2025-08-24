@@ -144,13 +144,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     ac_type_id: UUID | null;
     horsepower_id: UUID | null;
     quantity: number;
-  }>>([{
-
-    brand_id: null,
-    ac_type_id: null,
-    horsepower_id: null,
-    quantity: 1
-  }]);
+  }>>([]);
 
   // --- Details Modal State and Handlers ---
 
@@ -319,16 +313,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setAdditionalServiceId(null);
     setAdditionalServiceDevices([]);
     setShowNewUnitsForm(false);
-    setNewUnits([{
-      brand_id: null,
-      ac_type_id: null,
-      horsepower_id: null,
-      quantity: 1
-    }]);
+    setNewUnits([]);
 
   };
-
-
 
   const handleOpenSummaryModal = () => {
     setIsSummaryModalOpen(true);
@@ -578,26 +565,26 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       });
 
       // --- Insert new devices for newUnits ---
-      for (const unit of newUnits) {
-        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
-        const brand = allBrands.find((b) => b.id === unit.brand_id)?.name || "Unknown";
-        const acType = allACTypes.find((t) => t.id === unit.ac_type_id)?.name || "Unknown";
-        const deviceName = `${brand} ${acType}`;
+      // for (const unit of newUnits) {
+      //   if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
+      //   const brand = allBrands.find((b) => b.id === unit.brand_id)?.name || "Unknown";
+      //   const acType = allACTypes.find((t) => t.id === unit.ac_type_id)?.name || "Unknown";
+      //   const deviceName = `${brand} ${acType}`;
 
-        for (let i = 0; i < unit.quantity; i++) {
-          const newDevice = await deviceApi.createDevice({
-            client_id: client.id,
-            location_id: selectedLocationId,
-            name: deviceName,
-            brand_id: unit.brand_id,
-            ac_type_id: unit.ac_type_id,
-            horsepower_id: unit.horsepower_id,
-            last_cleaning_date: null,
-            last_repair_date: null,
-          });
-          newDeviceIds.push(newDevice.id);
-        }
-      }
+      //   for (let i = 0; i < unit.quantity; i++) {
+      //     const newDevice = await deviceApi.createDevice({
+      //       client_id: client.id,
+      //       location_id: selectedLocationId,
+      //       name: deviceName,
+      //       brand_id: unit.brand_id,
+      //       ac_type_id: unit.ac_type_id,
+      //       horsepower_id: unit.horsepower_id,
+      //       last_cleaning_date: null,
+      //       last_repair_date: null,
+      //     });
+      //     newDeviceIds.push(newDevice.id);
+      //   }
+      // }
 
       // --- Insert new devices for additionalUnits ---
       for (const unit of additionalUnits) {
@@ -683,7 +670,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         }
 
         if (Object.keys(updatePayload).length > 0) {
-          console.log(updatePayload);
           await deviceApi.updateDevice(deviceId, updatePayload);
         }
       });
@@ -721,7 +707,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       setAppointments(fetchedAppointments);
 
       // Reset forms
-      setNewUnits([{ brand_id: null, ac_type_id: null, horsepower_id: null, quantity: 1 }]);
+      setNewUnits([]);
       setAdditionalUnits([]);
     } catch (err) {
       console.error("Failed to confirm booking:", err);
@@ -876,7 +862,6 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           horsepowerApi.getHorsepowerOptions(),
           customSettingsApi.getCustomSettings(),
         ]);
-        console.log('Fetched custom settings:', settingsData);
         setAllServices(servicesData);
         setAllBrands(brandsData);
         setAllACTypes(acTypesData);
@@ -1427,23 +1412,17 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     const discountValue = customSettings.discount || 0;
     const familyDiscountValue = customSettings.familyDiscount || 0;
 
-    console.log('calculateDiscount debug:', {
-      clientDiscounted: client.discounted,
-      discountValue,
-      familyDiscountValue,
-      customSettings
-    });
 
     if (client.discounted) {
       // Client has discount enabled - compare discount and family_discount, choose bigger value
       if (familyDiscountValue > discountValue) {
-        console.log('Using family discount:', familyDiscountValue);
+        
         return { 
           value: familyDiscountValue, 
           type: 'Family/Friends'
         };
       } else {
-        console.log('Using standard discount:', discountValue);
+        
         return { 
           value: discountValue, 
           type: 'Standard'
@@ -1452,13 +1431,13 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     } else {
       // Client has discount disabled - apply standard discount if available
       if (discountValue > 0) {
-        console.log('Using standard discount (client not discounted):', discountValue);
+     
         return { 
           value: discountValue, 
           type: 'Standard'
         };
       } else {
-        console.log('No discount available');
+       
         return { value: 0, type: 'None' };
       }
     }
@@ -1654,9 +1633,11 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           onNextPage={handleCleaningStatusNextPage}
           onPreviousPage={handleCleaningStatusPreviousPage}
           onEditLocation={openEditLocation}
+          onAddLocation={handleOpenLocationModal}
+          
         />
 
-        <AddLocationButton onClick={handleOpenLocationModal} />
+        {/* <AddLocationButton onClick={handleOpenLocationModal} /> */}
 
         <PointsCard points={client.points} pointsExpiry={client.points_expiry} onReferClick={onReferClick} />
 
@@ -1855,7 +1836,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               <Button onClick={handleCloseSummaryModal} variant="outline" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
                 Go Back
               </Button>
-              <Button onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md text-white font-bold py-2 px-6 rounded-lg transition-all transform hover:scale-105">
+              <Button variant = "outline" onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white font-bold py-2 px-6">
                 Confirm Booking
               </Button>
             </div>
@@ -1871,7 +1852,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                <Check className="w-16 h-16 text-green-500" />
                <h2 className="text-2xl font-bold text-gray-800">Booking Confirmed!</h2>
                <p className="text-center text-gray-700">Your booking has been placed successfully. We`ll send you an update shortly.</p>
-               <Button onClick={handleCloseSuccessModal} className="w-full rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
+               <Button variant="outline" onClick={handleCloseSuccessModal} className="w-full rounded-lg w-full rounded-lg border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md">
                  OK
                </Button>
              </div>

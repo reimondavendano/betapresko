@@ -43,6 +43,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
   const clientId = params?.id
 
   const handleTabClick = (tabName: string) => {
+    console.log("Switching ClientPanel tab to:", tabName);
     setActiveTab(tabName)
     setIsMobileMenuOpen(false)
   }
@@ -290,7 +291,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
               <ClientDashboardTab
                 clientId={clientId}
                 onBookNewCleaningClick={() => handleTabClick('bookService')}
-                onReferClick={() => handleTabClick('referFriend')}
+                onReferClick={() => handleTabClick('clientInfo')}
               />
             )}
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}

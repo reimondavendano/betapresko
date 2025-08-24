@@ -1662,7 +1662,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         pointsExpiry={client?.points_expiry}
         getServiceName={getServiceName}   // you already have this in your file
         locations={locations}// ✅ now defined
-        onReferClick={() => setActiveTab("points")} // or open modal
+        onReferClick={onReferClick}  // or open modal
       />
 
       </div>

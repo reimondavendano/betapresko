@@ -91,7 +91,7 @@ export const appointmentApi = {
                   name,
                   brands:brand_id(id, name),
                   ac_types(id, name),
-                  horsepower_options(id, value)
+                  horsepower_options(id, value, display_name)
                 )
               )
             `,
@@ -112,11 +112,9 @@ export const appointmentApi = {
           query = query.gte("appointment_date", today);
         } else if (dateFilter === "previous") {
           query = query.lt("appointment_date", today);
-        }else if (
-          dateFilter &&
-          !["all", "today", "incoming", "previous"].includes(dateFilter)
-        ) {
-          query = query.eq("appointment_date", dateFilter); // use directly
+        } else if (dateFilter && dateFilter !== "all") {
+          // 👈 Only run when it's an actual date string like "2025-08-25"
+          query = query.eq("appointment_date", dateFilter);
         }
 
         // Pagination + ordering

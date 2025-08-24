@@ -64,6 +64,7 @@ import { blockedDatesApi } from '../../pages/api/dates/blockedDatesApi';
 import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, HorsepowerOption, UUID, BlockedDate, City } from '../../types/database';
 import { barangayApi } from '@/pages/api/barangays/barangayApi';
 import { cityApi } from '@/pages/api/cities/cityApi';
+import { PointsAppointments } from './client_components/PointsAppointments';
 
 interface ClientDashboardTabProps {
   clientId: string;
@@ -121,6 +122,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   // --- Cleaning Status Pagination State ---
   const [cleaningStatusCurrentPage, setCleaningStatusCurrentPage] = useState(1);
   const cleaningStatusItemsPerPage = 1; // Show 2 locations per page
+
+  const [pointsAppointmentsPage, setPage] = useState(1);
+  const [pointsAppointmentTotalPage, setTotalPages] = useState(1);
   // --- Booking Modal State and Handlers ---
   const [isBookingModalOpen, setIsBookingModal] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<UUID | null>(null);
@@ -169,7 +173,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [barangays, setBarangays] = useState<any[]>([]);
   const [selectedCity, setSelectedCity] = useState<any | null>(null);
   const [selectedBarangay, setSelectedBarangay] = useState<any | null>(null);
- const [isFetchingCities, setIsFetchingCities] = useState(false);
+  const [isFetchingCities, setIsFetchingCities] = useState(false);
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
 
   const [locationForm, setLocationForm] = useState<{
@@ -1639,7 +1643,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
         {/* <AddLocationButton onClick={handleOpenLocationModal} /> */}
 
-        <PointsCard points={client.points} pointsExpiry={client.points_expiry} onReferClick={onReferClick} />
+        {/* <PointsCard points={client.points} pointsExpiry={client.points_expiry} onReferClick={onReferClick} />
 
         <RecentAppointmentsTable
           appointments={currentAppointments}
@@ -1650,7 +1654,17 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           onPreviousPage={handlePreviousPage}
           onNextPage={handleNextPage}
           itemsPerPage={itemsPerPage}
-        />
+        /> */}
+
+       <PointsAppointments
+        appointments={appointments}
+        points={client?.points || 0}
+        pointsExpiry={client?.points_expiry}
+        getServiceName={getServiceName}   // you already have this in your file
+        locations={locations}// ✅ now defined
+        onReferClick={() => setActiveTab("points")} // or open modal
+      />
+
       </div>
       
       <BookingModal

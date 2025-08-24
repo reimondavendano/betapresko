@@ -237,7 +237,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 Invoices
               </Button>
 
-              <Button
+              {/* <Button
                 variant={activeTab === 'referFriend' ? 'default' : 'ghost'}
                 onClick={() => handleTabClick('referFriend')}
                 className={`w-full justify-start px-4 py-2 rounded-lg transition-colors duration-200 ${
@@ -248,7 +248,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
               >
                 <Gift className="w-5 h-5 mr-3" />
                 Refer A Friend
-              </Button>
+              </Button> */}
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -297,7 +297,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
             {/* {activeTab === 'clientAddLocation' && <ClientAddLocationTab clientId={clientId} />}
             {activeTab === 'bookService' && <BookServiceTab clientId={clientId} />} */}
             {activeTab === 'invoices' && <ClientInvoice clientId={clientId} />}
-            {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />}
+            {/* {activeTab === 'referFriend' && <ReferFriendTab clientId={clientId} />} */}
           </div>
         </div>
       </div>

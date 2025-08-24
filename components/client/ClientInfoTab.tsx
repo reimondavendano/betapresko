@@ -41,6 +41,8 @@ import { clientLocationApi } from '../../pages/api/clientLocation/clientLocation
 
 import { Client, ClientLocation } from '../../types/database';
 import { customSettingsApi } from '@/pages/api/custom_settings/customSettingsApi';
+import { ReferFriendTab } from './ReferFriendTab';
+
 
 interface ClientInfoTabProps {
   clientId: string;
@@ -163,7 +165,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 mx-auto">
       {/* Hero Section - Client Overview */}
       <div className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden" style={{ backgroundColor: "#99BCC0" }}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32"></div>
@@ -294,6 +296,9 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
               </div>
             </CardContent>
           </Card>
+
+                    {/* Refer a Friend Section */}
+          <ReferFriendTab clientId={clientId} />
         </div>
 
         {/* Right Column - QR Code & Stats */}

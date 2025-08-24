@@ -70,7 +70,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* The image is added here */}
-        <div className="w-full flex justify-center py-4">
+        {/* <div className="w-full flex justify-center py-4">
           <Image
             src="/assets/images/cover.png"
             alt="Presko AC Referral Cover"
@@ -78,7 +78,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
             height={300}
             className="rounded-lg shadow-md"
           />
-        </div>
+        </div> */}
         <p className="text-gray-700 text-lg">
           Share the love for clean air! Refer your friends and earn points for every successful booking they make.
         </p>
@@ -106,6 +106,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
         <div className="flex flex-col sm:flex-row gap-4 w-full">
             <a href={facebookShareLink} target="_blank" rel="noopener noreferrer" className="w-full">
                 <Button
+                variant="outline"
                     className="rounded-lg w-full border-teal-400 text-teal-600 bg-white hover:bg-white shadow-md shadow-md flex items-center justify-center"
                 >
                     <Facebook className="w-5 h-5 mr-3" />

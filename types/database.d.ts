@@ -310,6 +310,44 @@ export interface PaginationInfo {
   totalPages: number;
 }
 
+export interface LoyaltyPoint {
+  id: string;
+  points: number;
+  status: string;
+  date_earned: string;
+  date_expiry: string | null;
+
+  clients?: {
+    id: string;
+    name: string;
+  };
+
+  client_locations?: {
+    id: string;
+    name: string;
+    address_line1: string;
+    barangays?: { name: string };
+    cities?: { name: string };
+  };
+
+  appointments?: {
+    id: string;
+    service_id: string;
+    services?: { name: string };
+    appointment_devices?: {
+      devices?: {
+        id: string;
+        name: string;
+        brands?: { name: string };
+        ac_types?: { name: string };
+        horsepower_options?: { display_name: string };
+      };
+    }[];
+  };
+}
+
+
+
 // Extended appointment type with related data for admin view
 export interface AppointmentWithDetails extends Appointment {
   clients?: {

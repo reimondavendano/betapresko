@@ -22,8 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             cities:city_id(name, province),
             barangays:barangay_id(name)
           ),
-          appointment_devices:appointment_devices(id, device_id,
-            devices:device_id(id, name, last_cleaning_date, due_3_months, due_4_months, due_6_months,
+         appointment_devices:appointment_devices(
+            id, device_id,
+            devices:device_id(
+              id, name, brand_id, ac_type_id, horsepower_id,
+              last_cleaning_date, due_3_months, due_4_months, due_6_months,
               brands:brand_id(name),
               horsepower_options:horsepower_id(value, display_name),
               ac_types:ac_type_id(name)
@@ -71,24 +74,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PATCH') {
-      const { id, status, appointment_time, appointment_date } = req.body as {
+      const { id, status, appointment_time, appointment_date, amount } = req.body as {
         id: string
         status?: 'completed' | 'confirmed'
         appointment_time?: string | null
         appointment_date?: string | null
+        amount?: number
       }
 
       const updatePayload: any = { updated_at: new Date().toISOString() }
       if (typeof status !== 'undefined') updatePayload.status = status
       if (typeof appointment_time !== 'undefined') updatePayload.appointment_time = appointment_time
       if (typeof appointment_date !== 'undefined') updatePayload.appointment_date = appointment_date
+      if (typeof amount !== 'undefined') updatePayload.amount = amount
 
       // Update appointment fields and fetch needed data for downstream logic
       const { data: appt, error: updateErr } = await supabase
         .from('appointments')
         .update(updatePayload)
         .eq('id', id)
-        .select('id, status, appointment_date, client_id, service_id')
+        .select('id, status, appointment_date, client_id, service_id, amount')
         .single()
 
       if (updateErr) return handleSupabaseError(updateErr, res)

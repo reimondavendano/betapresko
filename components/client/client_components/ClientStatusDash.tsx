@@ -111,21 +111,21 @@ export function ClientStatusDash({
 
           {/* EDIT PRIMARY LOCATION */}
           {locations.length > 1 && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
               {isEditingPrimaryLocation ? (
                 <>
                   <Button
                     onClick={onCancelEditPrimaryLocation}
                     variant="outline"
                     size="sm"
-                    className="text-xs"
+                    className="w-full sm:w-auto text-xs"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={onUpdatePrimaryLocation}
                     size="sm"
-                    className="rounded-lg bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md"
+                    className="w-full sm:w-auto rounded-lg bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] text-white shadow-md"
                   >
                     Update Primary
                   </Button>
@@ -137,11 +137,12 @@ export function ClientStatusDash({
                   size="sm"
                   className="w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md"
                 >
-                  <Edit className="w-4 h-4 mr-2 text-white" />
-                  Edit Primary Location
+                  <Edit className="w-4 h-4 mr-2 text-teal-600" />
+                  Edit Primary
                 </Button>
               )}
             </div>
+
           )}
         </div>
       </CardHeader>
@@ -183,32 +184,33 @@ export function ClientStatusDash({
             <div key={status.location.id} className="space-y-6">
 
               {/* Location Header */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <Home className="w-5 h-5 text-blue-600" />
-                    <p className="font-semibold text-lg text-gray-800">{status.location.name}</p>
-                    {status.location.is_primary && (
-                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-50 text-xs">Primary</Badge>
-                    )}
-                    <button
-                      onClick={() => onEditLocation(status.location)}
-                      className="ml-2 text-gray-400 hover:text-blue-600 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{formatAddress(status.location)}</p>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+              <div>
+                <div className="flex items-center space-x-2 flex-wrap">
+                  <Home className="w-5 h-5 text-blue-600" />
+                  <p className="font-semibold text-lg text-gray-800">{status.location.name}</p>
+                  {status.location.is_primary && (
+                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-50 text-xs">Primary</Badge>
+                  )}
+                  <button
+                    onClick={() => onEditLocation(status.location)}
+                    className="ml-2 text-gray-400 hover:text-blue-600 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </div>
-
-                <Button
-                  size="sm"
-                  className="rounded-lg sm:w-auto bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] hover:opacity-90 text-white shadow-md"
-                  onClick={() => handleOpenBookingModal(status.location.id)}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Add Booking
-                </Button>
+                <p className="text-xs text-gray-500 mt-1">{formatAddress(status.location)}</p>
               </div>
+
+              <Button
+                size="sm"
+                className="w-full sm:w-auto rounded-lg bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] hover:opacity-90 text-white shadow-md"
+                onClick={() => handleOpenBookingModal(status.location.id)}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add Booking
+              </Button>
+            </div>
+
 
               {/* Row of Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -404,7 +406,7 @@ export function ClientStatusDash({
               className="flex items-center space-x-2 rounded-lg border-teal-400 text-teal-600 shadow-md"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Previous</span>
+              <span>Prev</span>
             </Button>
             <span className="text-sm text-gray-700">
               Page {currentPage} of {totalPages}

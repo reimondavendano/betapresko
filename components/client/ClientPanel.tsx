@@ -22,6 +22,11 @@ AlertDialogHeader,
 AlertDialogTitle,
 AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { ClientInvoice } from './ClientInvoice'
 // import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
 
@@ -99,74 +104,107 @@ export default function ClientPanel({ params }: ClientPanelProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-inter">
+    <div className="min-h-screen bg-gray-50 font-inter overflow-x-hidden">
       {/* Header */}
-      <header className="shadow-sm" style={{ backgroundColor: '#99BCC0' }}>
-        <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <NewLogo />
-            <div className="lg:hidden">
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </Button>
-            </div>
-            <div className="hidden lg:flex items-center gap-4 text-sm text-gray-500 relative">
-              <div className="relative">
-                <button onClick={() => setIsNotifOpen(!isNotifOpen)}>
-                  <Bell className="w-6 h-6 text-blue-500 cursor-pointer" />
-                  {notifications.length > 0 && (
-                    <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
-                      {notifications.length}
-                    </span>
-                  )}
-                </button>
-                {isNotifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
-                    <div className="p-3 border-b font-semibold">Notifications</div>
-                    <ul className="max-h-64 overflow-y-auto">
-                      {notifications.length > 0 ? (
-                        notifications.map((n, idx) => (
-                          <li
-                            key={idx}
-                            className="px-3 py-2 hover:opacity-90 border-b last:border-b-0"
-                          >
-                            <div className="text-sm text-gray-800">
-                              {n.display_message || 'New notification'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
-                            </div>
-                          </li>
-                        ))
-                      ) : (
-                        <li className="px-3 py-4 text-sm text-gray-500 text-center">
-                          No notifications
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
+    <header className="shadow-sm" style={{ backgroundColor: '#99BCC0' }}>
+      <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex justify-between items-center">
+          <NewLogo />
+
+          {/* --- Desktop Right Section --- */}
+          <div className="hidden lg:flex items-center gap-4 text-sm text-gray-500 relative">
+            {/* Help Buttons (desktop only) */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-teal-600 text-white text-sm font-semibold px-3 py-1 rounded-full shadow-md">
+                📞 Call us: <span className="font-bold">0921-561-1220</span>
               </div>
-              <span>Client: {clientName || 'Loading...'}</span>
+              <a
+                href="https://web.facebook.com/preskoac"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-lg transition-transform transform hover:scale-105"
+              >
+                💬 Message us
+              </a>
             </div>
+
+            {/* Notifications */}
+            <div className="relative">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)}>
+                <Bell className="w-6 h-6 text-blue-500 cursor-pointer" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2 w-72 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50">
+                  <div className="p-3 border-b font-semibold">Notifications</div>
+                  <ul className="max-h-64 overflow-y-auto">
+                    {notifications.length > 0 ? (
+                      notifications.map((n, idx) => (
+                        <li key={idx} className="px-3 py-2 hover:opacity-90 border-b last:border-b-0">
+                          <div className="text-sm text-gray-800">{n.display_message || 'New notification'}</div>
+                          <div className="text-xs text-gray-500">
+                            {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                          </div>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-3 py-4 text-sm text-gray-500 text-center">No notifications</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Client Name */}
+            <span>Client: {clientName || 'Loading...'}</span>
+          </div>
+
+          {/* --- Mobile Right Section --- */}
+          <div className="flex items-center gap-2 lg:hidden">
+            {/* Call + Msg (mobile only) */}
+            <div className="flex items-center gap-2 z-50 relative">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center gap-1 bg-teal-600 text-white text-xs font-medium px-2 py-1 rounded-md shadow"
+                  >
+                    📞 Call
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto px-3 py-2 text-sm text-gray-800">
+                  <p>📞 0921-561-1220</p>
+                </PopoverContent>
+              </Popover>
+              <a
+                href="https://web.facebook.com/preskoac"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded-md shadow"
+              >
+                💬 Msg
+              </a>
+            </div>
+
+            {/* Hamburger Menu */}
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </Button>
           </div>
         </div>
-      </header>
+      </div>
+    </header>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        ></div>
-      )}
 
       {/* Main Content Area */}
       <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Navigation */}
           <Card
-            className={`fixed lg:relative top-0 left-0 h-full lg:h-auto w-64 lg:w-1/4 rounded-none lg:rounded-xl shadow-lg p-4 bg-white flex-shrink-0 z-50 transform transition-transform duration-300 ease-in-out ${
+            className={`fixed lg:relative top-0 left-0 h-full lg:h-auto w-60 max-w-[80%] lg:w-1/4 rounded-none lg:rounded-xl shadow-lg p-4 bg-white flex-shrink-0 z-50 transform transition-transform duration-300 ease-in-out ${
               isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             }`}
           >

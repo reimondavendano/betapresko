@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
-import { Search, Filter, Calendar, User, MapPin, Clock, CheckCircle, Copy, ChevronLeft, ChevronRight, ChevronDown, Settings, AirVent } from 'lucide-react';
+import { Search, Filter, Calendar, User, MapPin, Clock, CheckCircle, Copy, ChevronLeft, ChevronRight, ChevronDown, Settings, AirVent, Edit } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store';
 import { setAppointments } from '@/lib/features/admin/adminSlice';
@@ -32,9 +32,19 @@ export default function AdminAppointments() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
-  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editedDevices, setEditedDevices] = useState<any[]>([]);
+  const [customSettings, setCustomSettings] = useState<any>({});
+    
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [brands, setBrands] = useState<any[]>([]);
+  const [acTypes, setAcTypes] = useState<any[]>([]);
+  const [horsepowerOptions, setHorsepowerOptions] = useState<any[]>([]);
+ const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   // Load appointments with all filters
   const loadAppointments = async (page = 1, resetPage = false) => {
@@ -65,6 +75,47 @@ export default function AdminAppointments() {
     loadAppointments(1, true);
   }, [statusFilter, dateFilter, specificDate]);
 
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [brandsRes, acTypesRes, hpRes] = await Promise.all([
+          fetch("/api/admin/brands"),        // or Supabase query
+          fetch("/api/admin/types"),
+          fetch("/api/admin/horsepower")
+        ]);
+
+      const brandsJson = await brandsRes.json();
+       const typesJson = await acTypesRes.json();
+       const horsepowerJson = await hpRes.json();
+
+      setBrands(Array.isArray(brandsJson) ? brandsJson : brandsJson.data || []);
+      setAcTypes(Array.isArray(typesJson) ? typesJson : typesJson.data || []);
+      setHorsepowerOptions(Array.isArray(horsepowerJson) ? horsepowerJson : horsepowerJson.data || []);
+      } catch (err) {
+        console.error("Error loading dropdown data:", err);
+      }
+    };
+
+    fetchDropdownData();
+  }, []);
+
+
+  useEffect(() => {
+    const fetchCustomSettings = async () => {
+      try {
+        const res = await fetch("/api/admin/custom-settings"); // adjust route if different
+        if (!res.ok) throw new Error("Failed to fetch settings");
+        const data = await res.json();
+        setCustomSettings(data || {});
+      } catch (err) {
+        console.error("Error loading custom settings:", err);
+      }
+    };
+
+    fetchCustomSettings();
+  }, []);
+
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,6 +140,89 @@ export default function AdminAppointments() {
       default: return 'Status';
     }
   };
+
+  const getSettingsMap = (settings: any) =>
+  (settings?.data || []).reduce((acc: Record<string, string>, setting: any) => {
+    acc[setting.setting_key] = setting.setting_value;
+    return acc;
+  }, {});
+
+
+  // Compute unit price
+  const computeUnitPrice = (
+    device: any,
+    settingsMap: Record<string, string>,
+    serviceName?: string
+  ): number => {
+    if (!device) return 0;
+
+    // If this is a repair service
+    if (serviceName?.toLowerCase().includes("repair")) {
+      return Number(settingsMap["repair_price"] || 0);
+    }
+    
+    const acTypeName = device.ac_types?.name?.toLowerCase() || "";
+    const horsepowerValue = parseFloat(device?.horsepower_options?.value || "0");
+
+    if (acTypeName.includes("split") || acTypeName.includes("u")) {
+      if (horsepowerValue <= 1.5) {
+        return Number(settingsMap["split_type_price"] || 0);
+      } else {
+        return (
+          Number(settingsMap["split_type_price"] || 0) +
+          Number(settingsMap["surcharge"] || 0)
+        );
+      }
+    } else if (acTypeName.includes("window")) {
+      if (horsepowerValue <= 1.5) {
+        return Number(settingsMap["window_type_price"] || 0);
+      } else {
+        return (
+          Number(settingsMap["window_type_price"] || 0) +
+          Number(settingsMap["surcharge"] || 0)
+        );
+      }
+    }
+
+    console.log(settingsMap["split_type_price"], 'split');
+    console.log(settingsMap["window_type_price"], 'window');
+
+    return 0;
+  };
+
+  // Discount calculation (use settingsMap, not raw array)
+  const calculateDiscount = (client: any, customSettings: any) => {
+    const settingsMap = getSettingsMap(customSettings || []);
+    const std = Number(settingsMap["discount"] ?? 0);           // Standard discount
+    const fam = Number(settingsMap["family_discount"] ?? 0);    // Family/Friends discount
+
+    if (client?.discounted === true) {
+      // Client marked discounted → choose the higher of family vs standard
+      if (fam >= std) return { value: fam, type: "Family/Friends" };
+      return { value: std, type: "Standard" };
+    }
+
+    // client.discounted === false (or not true) → always apply standard discount
+    if (std > 0) return { value: std, type: "Standard" };
+
+    return { value: 0, type: "None" };
+  };
+
+
+
+
+  // Inside your component / dialog
+  const settingsMap = getSettingsMap(customSettings);
+
+    const subtotal = editedDevices.reduce(
+    (sum, d) => sum + computeUnitPrice(d, settingsMap, editTarget?.services?.name),
+    0
+  );
+
+  const discount = calculateDiscount(editTarget?.clients, customSettings);
+  const finalTotal = subtotal * (1 - discount.value / 100);
+
+
 
   const getDateDisplayText = () => {
     if (specificDate) return moment(specificDate).format('MMM DD, YYYY');
@@ -195,6 +329,41 @@ export default function AdminAppointments() {
       setDateFilter('all'); // Clear preset date filter when using specific date
     }
   };
+
+  // Update a specific field of a device in editedDevices
+  const handleDeviceChange = (rowId: string, field: string, value: string) => {
+    setEditedDevices((prev) =>
+      prev.map((device) => {
+        if (device.rowId === rowId) {
+          let updated: any = { ...device, [field]: value };
+
+          // also attach full object when AC Type changes
+          if (field === "ac_type_id") {
+            updated.ac_types = acTypes.find((t: any) => String(t.id) === value);
+          }
+
+          // also attach full object when Horsepower changes
+          if (field === "horsepower_id") {
+            updated.horsepower_options = horsepowerOptions.find(
+              (hp: any) => String(hp.id) === value
+            );
+          }
+
+          // recompute price based on new values
+          const newPrice = computeUnitPrice(
+            updated,
+            settingsMap,
+            editTarget?.services?.name
+          );
+
+          return { ...updated, price: newPrice };
+        }
+        return device;
+      })
+    );
+  };
+
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -542,6 +711,44 @@ export default function AdminAppointments() {
                         </Button>
                       </div>
                     )}
+
+                    {/* Edit Devices Button for Completed */}
+                   {appointment.status === 'completed' && (
+                      <div className="pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                          setEditTarget(appointment);
+                          setEditedDevices(
+                          appointment.appointment_devices.map((ad: any) => {
+                            const deviceObj = {
+                              rowId: ad.id,
+                              brand_id: ad.devices.brand_id ? String(ad.devices.brand_id) : "",
+                              ac_type_id: ad.devices.ac_type_id ? String(ad.devices.ac_type_id) : "",
+                              horsepower_id: ad.devices.horsepower_id ? String(ad.devices.horsepower_id) : "",
+                              name: ad.devices.name || "",
+                              device_id: ad.devices.id,
+
+                              // keep full objects for computeUnitPrice
+                              ac_types: ad.devices.ac_types,
+                              horsepower_options: ad.devices.horsepower_options,
+                            };
+
+                            // compute default price immediately
+                            return {
+                              ...deviceObj,
+                              price: computeUnitPrice(deviceObj, settingsMap, appointment.services?.name),
+                            };
+                          })
+                        );
+                        setEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit size={14} className="mr-1" /> Edit Devices
+                        </Button>
+                      </div>
+                      )}
                   </div>
                 </Card>
               ))}
@@ -637,6 +844,190 @@ export default function AdminAppointments() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Devices for {editTarget?.clients?.name}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {editedDevices.map((device, idx) => (
+              <div key={device.rowId} className="mb-4 p-3 border rounded-lg bg-gray-50">
+                 <p className="text-sm font-medium mb-2">{device.name}</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                 
+                  {/* Brand */}
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Brand</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={device.brand_id || ""}
+                      onChange={(e) => handleDeviceChange(device.rowId, "brand_id", e.target.value)}
+                    >
+                      <option value="">Select Brand</option>
+                      {brands.map((b: any) => (
+                        <option key={b.id} value={String(b.id)}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* AC Type */}
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">AC Type</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={device.ac_type_id || ""}
+                      onChange={(e) => handleDeviceChange(device.rowId, "ac_type_id", e.target.value)}
+                    >
+                      <option value="">Select Type</option>
+                      {acTypes.map((t: any) => (
+                        <option key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Horsepower */}
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Horsepower</label>
+                    <select
+                      className="w-full border rounded p-2"
+                      value={device.horsepower_id || ""}
+                      onChange={(e) => handleDeviceChange(device.rowId, "horsepower_id", e.target.value)}
+                    >
+                      <option value="">Select HP</option>
+                      {horsepowerOptions.map((hp: any) => (
+                        <option key={hp.id} value={String(hp.id)}>
+                          {hp.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          
+        <div className="mt-2 text-sm text-gray-700">
+          <span className="font-semibold">Subtotal: </span>
+          ₱{Number(subtotal).toLocaleString()}
+        </div>
+
+        <div className="mt-1 text-sm text-blue-600">
+          <span className="font-semibold">Discount ({discount.type}): </span>
+          {discount.value}%
+        </div>
+
+        <div className="pt-4 font-bold text-lg text-green-600">
+          Total: ₱{Number(finalTotal).toLocaleString()}
+        </div>
+
+        <div className="flex justify-end mt-4 gap-2">
+          <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            className="bg-teal-600 text-white"
+            onClick={() => setShowConfirmDialog(true)}
+          >
+            Save Changes
+          </Button>
+
+        </div>
+
+        </DialogContent>
+      </Dialog>
+      
+
+
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Update</DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-700">
+            Are you sure you want to update the devices and recalculate the total?
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-teal-600 text-white"
+              onClick={async () => {
+                setShowConfirmDialog(false);
+
+                // Loop through each device and update
+                for (const d of editedDevices) {
+                  await fetch("/api/admin/devices", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      id: d.device_id,
+                      client_id: editTarget.client_id,
+                      brand_id: d.brand_id,
+                      ac_type_id: d.ac_type_id,
+                      horsepower_id: d.horsepower_id,
+                    }),
+                  });
+                }
+
+                // Compute new total
+                const subtotal = editedDevices.reduce(
+                  (sum, d) =>
+                    sum +
+                    computeUnitPrice(d, settingsMap, editTarget?.services?.name),
+                  0
+                );
+                const discount = calculateDiscount(
+                  editTarget?.clients,
+                  customSettings
+                );
+                const finalAmount =
+                  subtotal - (subtotal * discount.value) / 100;
+
+                // Update appointment amount
+                await fetch(`/api/admin/appointments`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    id: editTarget.id,
+                    amount: finalAmount,
+                  }),
+                });
+
+                setEditDialogOpen(false);
+                setShowSuccessDialog(true); // show success dialog
+                await loadAppointments(pagination.page);
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Successful</DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-700">Devices and total have been successfully updated.</p>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowSuccessDialog(false)}>OK</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      
+
 
       {/* Confirm Complete Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -773,6 +1164,8 @@ export default function AdminAppointments() {
           </div>
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 }

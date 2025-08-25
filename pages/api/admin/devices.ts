@@ -19,14 +19,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           horsepower_options(display_name)
         `)
         .eq('client_id', client_id)
-        .order('created_at', { ascending: false })
+        .order('updated_at', { ascending: false })
 
       const { data, error } = await query
       if (error) return handleSupabaseError(error, res)
       return res.status(200).json({ data })
     }
 
-    res.setHeader('Allow', ['GET'])
+    if (req.method === "PATCH") {
+      const { id, brand_id, ac_type_id, horsepower_id } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: "Device id is required" });
+      }
+
+      const { data, error } = await supabase
+        .from("devices")
+        .update({
+          brand_id,
+          ac_type_id,
+          horsepower_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+
+      if (error) throw error;
+
+      return res.status(200).json(data);
+    }
+
+    res.setHeader('Allow', ['GET', 'PATCH'])
     return res.status(405).end(`Method ${req.method} Not Allowed`)
   } catch (e: any) {
     return handleSupabaseError(e, res)

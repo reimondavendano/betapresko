@@ -51,9 +51,27 @@ export default function BookingPage() {
             <div className="flex-shrink-0">
               <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={180} height={120} />
             </div>
-            <div className="text-sm text-gray-500">
-              {/* Need help? Call (02) 123-4567 */}
+           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <div className="text-sm font-medium text-white bg-teal-600 px-3 py-1 rounded-lg shadow-md animate-pulse">
+                📞 Need help? Call us: <span className="font-bold">0921-561-1220</span>
+              </div>
+              <a
+                href="https://web.facebook.com/preskoac"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-lg transition-transform transform hover:scale-105"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 36 36"
+                  className="w-5 h-5 fill-current"
+                >
+                  <path d="M18 0C8.06 0 0 7.52 0 16.8c0 5.3 2.7 10.04 6.9 13.16V36l6.3-3.44c1.5.42 3.1.64 4.8.64 9.94 0 18-7.52 18-16.8S27.94 0 18 0zm.9 22.6l-4.8-5.1-9 5.1 9.9-10.6 4.8 5.1 9-5.1-9.9 10.6z" />
+                </svg>
+                Message us
+              </a>
             </div>
+
           </div>
         </div>
       </header>

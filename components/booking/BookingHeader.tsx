@@ -24,7 +24,7 @@ export function BookingHeader() {
 
   return (
     <div className="bg-white shadow-sm border-b">
-      <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6"> {/* Adjusted vertical padding for mobile */}
+      <div className="max-w-5xl mx-auto px-4 py-4 sm:py-6"> {/* Adjusted vertical padding for mobile */}
         <div className="flex flex-wrap justify-center sm:justify-between items-center gap-y-4 sm:gap-y-0"> {/* Added flex-wrap and adjusted justify/gap-y */}
           {steps.map((step, index) => {
             const IconComponent = step.icon; // Get the icon component for the current step

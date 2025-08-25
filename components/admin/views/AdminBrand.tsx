@@ -84,78 +84,88 @@ export default function AdminBrand() {
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-6 pb-6">
         {/* Header section */}
-      <div className="flex items-center justify-between p-4 bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg">
-        <h1 className="text-2xl font-bold">Manage Brands</h1>
-        <div className="flex space-x-2">
-          <button
-            className="flex items-center px-4 py-2 bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60"
-            disabled={selectedIds.length === 0}
-            onClick={() => confirmDelete(selectedIds)}
-          >
-            <Trash2 className="h-5 w-5 mr-2" />
-            Delete
-          </button>
-          <button
-            className="flex items-center px-4 py-2 bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
-            onClick={openAdd}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add New Brand
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 
+          bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold">Manage Brands</h1>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              className="flex items-center justify-center px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base 
+                bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60"
+              disabled={selectedIds.length === 0}
+              onClick={() => confirmDelete(selectedIds)}
+            >
+              <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+              Delete
+            </button>
+            <button
+              className="flex items-center justify-center px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base 
+                bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
+              onClick={openAdd}
+            >
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+              Add New Brand
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Table wrapper */}
       <div className="bg-white shadow overflow-hidden sm:rounded-b-lg">
         {/* Search row */}
-        <div className="px-6 py-3 border-b flex items-center justify-between">
-          <Input placeholder="Search brand..." value={search} onChange={e=>{setPage(1);setSearch(e.target.value)}} className="w-64" />
+        <div className="px-4 sm:px-6 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <Input 
+            placeholder="Search brand..." 
+            value={search} 
+            onChange={e=>{setPage(1);setSearch(e.target.value)}} 
+            className="w-full sm:w-64"
+          />
           <div className="text-xs text-gray-500">Total: {total}</div>
         </div>
 
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <input type="checkbox" className="h-4 w-4 text-indigo-600" checked={selectedIds.length===rows.length && rows.length>0} onChange={(e)=>toggleSelectAll(e.target.checked)} />
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Name</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
-              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {rows.length===0 && (
-              <tr><td colSpan={4} className="px-6 py-4 text-center text-gray-500">{loading? 'Loading...' : 'No data'}</td></tr>
-            )}
-            {rows.map(r => (
-              <tr key={r.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <input type="checkbox" className="h-4 w-4 text-indigo-600" checked={selectedIds.includes(r.id)} onChange={(e)=>toggleSelect(r.id, e.target.checked)} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{r.name}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{r.is_active ? 'Yes' : 'No'}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium w-36">
-                  <div className="flex justify-center space-x-2">
-                    <button onClick={()=>openEdit(r)} className="text-yellow-500 hover:text-yellow-600" aria-label="Edit">
-                      <PenSquare className="h-5 w-5" />
-                    </button>
-                    <button onClick={()=>confirmDelete([r.id])} className="text-red-500 hover:text-red-600" aria-label="Delete">
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input type="checkbox" className="h-4 w-4 text-indigo-600" checked={selectedIds.length===rows.length && rows.length>0} onChange={(e)=>toggleSelectAll(e.target.checked)} />
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Name</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {rows.length===0 && (
+                <tr><td colSpan={4} className="px-6 py-4 text-center text-gray-500">{loading? 'Loading...' : 'No data'}</td></tr>
+              )}
+              {rows.map(r => (
+                <tr key={r.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input type="checkbox" className="h-4 w-4 text-indigo-600" checked={selectedIds.includes(r.id)} onChange={(e)=>toggleSelect(r.id, e.target.checked)} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">{r.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">{r.is_active ? 'Yes' : 'No'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium w-36">
+                    <div className="flex justify-center space-x-2">
+                      <button onClick={()=>openEdit(r)} className="text-yellow-500 hover:text-yellow-600" aria-label="Edit">
+                        <PenSquare className="h-5 w-5" />
+                      </button>
+                      <button onClick={()=>confirmDelete([r.id])} className="text-red-500 hover:text-red-600" aria-label="Delete">
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
-        <div className="px-6 py-3 flex items-center justify-between text-sm">
+         <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between text-sm gap-2">
           <div>Page {page} of {pageCount}</div>
           <div className="flex gap-2">
             <Button variant="outline" disabled={page===1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</Button>

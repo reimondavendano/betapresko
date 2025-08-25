@@ -45,14 +45,14 @@ export default function BookingPage() {
     <div className="min-h-screen" >
       {/* Header */}
       <header className="shadow-sm" style={{ backgroundColor: '#99BCC0' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Replaced Logo component with Image component and updated the src */}
             <div className="flex-shrink-0">
               <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={180} height={120} />
             </div>
             <div className="text-sm text-gray-500">
-              Need help? Call (02) 123-4567
+              {/* Need help? Call (02) 123-4567 */}
             </div>
           </div>
         </div>

@@ -60,7 +60,7 @@ export default function AdminBookings() {
   const pageSize = 4
 
   const [date, setDate] = useState<Date>(new Date())
-  const [view, setView] = useState<View>(Views.WEEK)
+  const [view, setView] = useState<View>(Views.MONTH)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null)
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('')
@@ -373,31 +373,40 @@ useEffect(() => {
       {/* Main Calendar View - Now Full Width */}
       <div className="w-full space-y-4">
         {/* Top Controls */}
-        <div className="flex justify-between items-center">
-          
-          <div className="flex space-x-2 items-center">
-            <Button variant="ghost" size="icon" onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}><ChevronLeft /></Button>
+        <div className="flex flex-wrap justify-between items-start gap-2">
+          {/* Left section: navigation + view buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setDate(moment(date).subtract(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}>
+              <ChevronLeft />
+            </Button>
             <span className="font-bold">{moment(date).format(view === Views.MONTH ? 'MMMM YYYY' : 'MMMM YYYY')}</span>
-            <Button variant="ghost" size="icon" onClick={() => setDate(moment(date).add(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}><ChevronRight /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setDate(moment(date).add(1, view === Views.MONTH ? 'month' : view === Views.WEEK ? 'week' : 'day').toDate())}>
+              <ChevronRight />
+            </Button>
             <Button onClick={() => setDate(new Date())}>Today</Button>
-            <div className="ml-4 flex gap-2">
+
+            {/* View buttons */}
+            <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
               <Button variant={view === Views.MONTH ? 'default' : 'outline'} onClick={() => setView(Views.MONTH)}>Month</Button>
               <Button variant={view === Views.WEEK ? 'default' : 'outline'} onClick={() => setView(Views.WEEK)}>Week</Button>
               <Button variant={view === Views.DAY ? 'default' : 'outline'} onClick={() => setView(Views.DAY)}>Day</Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-           
-            <div className="ml-4 flex items-center gap-3 text-xs">
-              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-orange-500 inline-block"></span> Confirmed</span>
-              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-green-600 inline-block"></span> Completed</span>
-              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-red-600 inline-block"></span> Blocked</span>
-            </div>
-          </div>
-          <div className="flex space-x-2">
-            {/* Search is now in the left sidebar */}
+
+          {/* Right section: legends */}
+          <div className="flex flex-wrap gap-3 text-xs mt-2 sm:mt-0">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-orange-500 inline-block"></span> Confirmed
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-green-600 inline-block"></span> Completed
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-red-600 inline-block"></span> Blocked
+            </span>
           </div>
         </div>
+
 
         {/* The Calendar component itself - Expanded */}
         <div className="bg-white rounded-lg p-4 shadow-md h-[calc(100vh-160px)]">

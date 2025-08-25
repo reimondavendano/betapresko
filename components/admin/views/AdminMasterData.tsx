@@ -17,29 +17,69 @@ export default function AdminMasterData() {
         <div className="grid grid-cols-12 gap-4 h-full">
           <div className="col-span-12 md:col-span-3 h-full">
             <div className="h-full rounded-xl p-2 bg-gradient-to-br from-gray-200 via-[#8FB6BA] to-[#fff] shadow">
-            <TabsList className="flex md:flex-col gap-2 w-full bg-transparent p-0 h-full md:h-auto overflow-auto">
-              <TabsTrigger value="brands" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+            <TabsList
+              className="
+                flex flex-col gap-2 w-full bg-transparent p-0 h-full md:h-auto
+              "
+            >
+              <TabsTrigger
+                value="brands"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Box size={18} /> Brands
               </TabsTrigger>
-              <TabsTrigger value="horsepower" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="horsepower"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Wrench size={18} /> Horsepower
               </TabsTrigger>
-              <TabsTrigger value="types" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="types"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Asterisk size={18} /> AC Types
               </TabsTrigger>
-              <TabsTrigger value="cities" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="cities"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Building2 size={18} /> Cities
               </TabsTrigger>
-              <TabsTrigger value="barangays" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="barangays"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <MapPinHouse size={18} /> Barangays
               </TabsTrigger>
-              <TabsTrigger value="services" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="services"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Settings size={18} /> Services
               </TabsTrigger>
-              <TabsTrigger value="blocked" className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base">
+              <TabsTrigger
+                value="blocked"
+                className="justify-start gap-2 w-full rounded-lg bg-white/80 hover:bg-white text-gray-700 
+                  data-[state=active]:bg-white data-[state=active]:text-gray-500 text-base
+                  md:w-full"
+              >
                 <Blocks size={18} /> Blocked Dates
               </TabsTrigger>
             </TabsList>
+
             </div>
           </div>
           <div className="col-span-12 md:col-span-9 h-full">

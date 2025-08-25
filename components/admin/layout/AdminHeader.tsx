@@ -65,7 +65,11 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
           </button>
           {isOpen && (
             <div
-              className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50"
+              className="
+                absolute mt-2 w-80 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50
+                right-0 md:right-0
+                left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0
+              "
             >
               <ul className="divide-y divide-gray-200 max-h-[60vh] overflow-y-auto">
                 <li className="px-3 py-2 text-sm font-semibold text-gray-800">
@@ -93,6 +97,7 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
               </ul>
             </div>
           )}
+
 
         </div>
 

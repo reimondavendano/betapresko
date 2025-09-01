@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
-import { Search, Filter, Calendar, User, MapPin, Clock, CheckCircle, Copy, ChevronLeft, ChevronRight, ChevronDown, Settings, AirVent, Edit } from 'lucide-react';
+import { Search, Filter, Calendar, User, MapPin, Clock, CheckCircle, Copy, ChevronLeft, ChevronRight, ChevronDown, Settings, AirVent, Edit, RadarIcon } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store';
 import { setAppointments } from '@/lib/features/admin/adminSlice';
 import { AppointmentWithDetails, PaginationInfo } from '@/types/database';
 import moment from 'moment';
+import { useRealtime } from '@/app/RealtimeContext';
+import { Cancel } from '@radix-ui/react-alert-dialog';
 
 export default function AdminAppointments() {
   const dispatch = useDispatch();
@@ -46,6 +48,8 @@ export default function AdminAppointments() {
  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
+  const { refreshKey } = useRealtime();
+
   // Load appointments with all filters
   const loadAppointments = async (page = 1, resetPage = false) => {
     setLoading(true);
@@ -73,7 +77,7 @@ export default function AdminAppointments() {
 
   useEffect(() => {
     loadAppointments(1, true);
-  }, [statusFilter, dateFilter, specificDate]);
+  }, [statusFilter, dateFilter, specificDate, refreshKey]);
 
   useEffect(() => {
     const fetchDropdownData = async () => {
@@ -184,9 +188,6 @@ export default function AdminAppointments() {
       }
     }
 
-    console.log(settingsMap["split_type_price"], 'split');
-    console.log(settingsMap["window_type_price"], 'window');
-
     return 0;
   };
 
@@ -219,7 +220,7 @@ export default function AdminAppointments() {
     0
   );
 
-  const discount = calculateDiscount(editTarget?.clients, customSettings);
+  const discount = { value: editTarget?.stored_discount ?? 0, type: editTarget?.discount_type || 'Standard' };
   const finalTotal = subtotal * (1 - discount.value / 100);
 
 
@@ -654,7 +655,10 @@ export default function AdminAppointments() {
                       <div className="pt-2 border-t">
                         <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                           <AirVent size={14} />
-                          <span>{appointment.appointment_devices.length} device(s) scheduled</span>
+                          <span>
+                            {appointment.appointment_devices.length} device(s){' '}
+                            {appointment.status === 'voided' ? 'voided' : 'scheduled'}
+                          </span>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button className="text-gray-400 hover:text-gray-600">
@@ -695,12 +699,14 @@ export default function AdminAppointments() {
                       </div>
                     )}
 
-                    {/* Mark as Completed Button */}
+                    {/* Mark as Completed or Voided Button */}
+                    {/* Actions when status = confirmed */}
                     {appointment.status === 'confirmed' && (
-                      <div className="pt-2">
+                      <div className="pt-2 flex gap-2">
+                        {/* Mark as Completed */}
                         <Button
                           size="sm"
-                          className="w-full bg-green-600 hover:bg-green-700 text-white"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => {
                             setConfirmTarget(appointment);
                             setConfirmOpen(true);
@@ -709,8 +715,31 @@ export default function AdminAppointments() {
                           <CheckCircle size={16} className="mr-2" />
                           Mark as Completed
                         </Button>
+
+                        {/* Void Button */}
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+                          onClick={async () => {
+                            try {
+                              await fetch("/api/admin/appointments", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ id: appointment.id, status: "voided" }),
+                              });
+
+                              await loadAppointments(pagination.page); // refresh list
+                            } catch (err) {
+                              console.error("❌ Failed to void appointment:", err);
+                            }
+                          }}
+                        >
+                          < RadarIcon size={16} className="mr-2" />
+                          Void
+                        </Button>
                       </div>
                     )}
+
 
                     {/* Edit Devices Button for Completed */}
                    {appointment.status === 'completed' && (
@@ -984,10 +1013,10 @@ export default function AdminAppointments() {
                     computeUnitPrice(d, settingsMap, editTarget?.services?.name),
                   0
                 );
-                const discount = calculateDiscount(
-                  editTarget?.clients,
-                  customSettings
-                );
+                const discount = {
+                  value: editTarget?.stored_discount ?? 0,
+                  type: editTarget?.discount_type || 'Standard' 
+                };
                 const finalAmount =
                   subtotal - (subtotal * discount.value) / 100;
 
@@ -1026,144 +1055,145 @@ export default function AdminAppointments() {
       </Dialog>
 
 
-      
-
-
       {/* Confirm Complete Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirm Completion</DialogTitle>
-          </DialogHeader>
-          <div className="text-sm">
-            {`Set ${confirmTarget?.clients?.name || 'Client'} appointment to completed?`}
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirm Completion</DialogTitle>
+        </DialogHeader>
+        <div className="text-sm">
+          {`Set ${confirmTarget?.clients?.name || "Client"} appointment to completed?`}
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
           <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={confirmLoading}
-              onClick={async () => {
-                if (!confirmTarget) return
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={confirmLoading}
+            onClick={async () => {
+              if (!confirmTarget) return;
+              try {
+                setConfirmLoading(true);
+
+                // 1. Update appointment status
+                await fetch("/api/admin/appointments", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: confirmTarget.id, status: "completed" }),
+                });
+
+                // 2. Handle points increment based on referral status
+                let isReferral = false;
+                let clientData: any;
+
                 try {
-                  setConfirmLoading(true)
-
-                  // 1. Update appointment status
-                  await fetch('/api/admin/appointments', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: confirmTarget.id, status: 'completed' }),
-                  })
-
-                  // 2. Handle points increment based on referral status
-                  let isReferral = false
-                  let clientData: any
-                  
-                  try {
-                    // Fetch the client data to check for ref_id
-                    const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`)
-                    if (!clientRes.ok) {
-                      throw new Error('Failed to fetch client data')
-                    }
-                    
-                    clientData = await clientRes.json()
-                    const clientId = clientData.id
-                    const pointsToAdd = 1
-                    
-                    // Check if client has a referrer (ref_id is not null/empty)
-                    if (clientData.ref_id) {
-                      isReferral = true
-                      const refId = clientData.ref_id
-                      
-                      console.log(`Processing referral: Client ${clientId} was referred by ${refId}`)
-                      
-                      // Add points to the completed client
-                      await fetch(`/api/clients/${clientId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          points: (clientData.points || 0) + pointsToAdd,
-                        }),
-                      })
-                      
-                      console.log(`Added ${pointsToAdd} point to client ${clientId}`)
-                      
-                      // Fetch referrer data and add points
-                      const refRes = await fetch(`/api/clients/${refId}`)
-                      if (refRes.ok) {
-                        const refData = await refRes.json()
-                        await fetch(`/api/clients/${refId}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            points: (refData.points || 0) + pointsToAdd,
-                          }),
-                        })
-                        
-                        console.log(`Added ${pointsToAdd} point to referrer ${refId}`)
-                      }
-                      
-                      // Remove ref_id after processing (client is no longer a "new" referral)
-                      await fetch(`/api/clients/${clientId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ref_id: null }),
-                      })
-                      
-                      console.log(`Removed ref_id from client ${clientId}`)
-                      
-                    } else {
-                      // No referral - just add points to the completed client
-                      isReferral = false
-                      
-                      await fetch(`/api/clients/${clientId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          points: (clientData.points || 0) + pointsToAdd,
-                        }),
-                      })
-                      
-                      console.log(`Added ${pointsToAdd} point to client ${clientId} (no referral)`)
-                    }
-                    
-                  } catch (err) {
-                    console.error('Error handling client points:', err)
+                  // Fetch the client data to check for ref_id
+                  const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`);
+                  if (!clientRes.ok) {
+                    throw new Error("Failed to fetch client data");
                   }
 
-                  // 3. Insert into notifications table
-                  await fetch(`/api/clients/notification-by-id`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                  clientData = await clientRes.json();
+                  const clientId = clientData.id;
+                  const pointsToAdd = 1;
+
+                  if (clientData.ref_id) {
+                    // --- Referral flow ---
+                    isReferral = true;
+                    const refId = clientData.ref_id;
+
+                    // Add points to client
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        points: (clientData.points || 0) + pointsToAdd,
+                      }),
+                    });
+
+                    // Add points to referrer
+                    const refRes = await fetch(`/api/clients/${refId}`);
+                    if (refRes.ok) {
+                      const refData = await refRes.json();
+                      await fetch(`/api/clients/${refId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          points: (refData.points || 0) + pointsToAdd,
+                        }),
+                      });
+                    }
+
+                    // Clear ref_id after processing
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ref_id: null }),
+                    });
+                  } else {
+                    // --- No referral flow ---
+                    isReferral = false;
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        points: (clientData.points || 0) + pointsToAdd,
+                      }),
+                    });
+                  }
+                } catch (err) {
+                  console.error("Error handling client points:", err);
+                }
+
+                // 3. Insert into notifications table
+                await fetch(`/api/clients/notification-by-id`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    client_id: confirmTarget.clients?.id,
+                    send_to_admin: false,
+                    send_to_client: true,
+                    is_referral: isReferral,
+                    date: confirmTarget.appointment_date,
+                  }),
+                });
+
+                // 4. 🔔 Send push notification to client
+                try {
+                  await fetch(`${process.env.BASE_URL}/api/send-push`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                      mode: "admin_to_client",
                       client_id: confirmTarget.clients?.id,
-                      send_to_admin: false,
-                      send_to_client: true,
-                      is_referral: isReferral,
-                      date: confirmTarget.appointment_date,
+                      client_name: confirmTarget.clients?.name || "Client",
+                      title: "✅ Appointment Completed",
                     }),
                   });
-
-                  // 4. Close dialogs
-                  setConfirmOpen(false)
-                  setConfirmTarget(null)
-                  if (selectedAppt && selectedAppt.id === confirmTarget.id) {
-                    setDetailsOpen(false)
-                  }
-
-                  // 5. Reload appointments
-                  await loadAppointments(pagination.page)
-                } catch (e) {
-                  console.error('Error completing appointment and adding notification', e)
-                } finally {
-                  setConfirmLoading(false)
+                } catch (pushErr) {
+                  console.error("❌ Failed to send push to client:", pushErr);
                 }
-              }}
-            >
-            {confirmLoading ? 'Please wait...' : 'OK'}
+
+                // 5. Close dialogs
+                setConfirmOpen(false);
+                setConfirmTarget(null);
+                if (selectedAppt && selectedAppt.id === confirmTarget.id) {
+                  setDetailsOpen(false);
+                }
+
+                // 6. Reload appointments
+                await loadAppointments(pagination.page);
+              } catch (e) {
+                console.error("Error completing appointment and adding notification", e);
+              } finally {
+                setConfirmLoading(false);
+              }
+            }}
+          >
+            {confirmLoading ? "Please wait..." : "OK"}
           </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
+
 
 
     </div>

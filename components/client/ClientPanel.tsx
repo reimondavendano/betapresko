@@ -28,6 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { ClientInvoice } from './ClientInvoice'
+import { useRealtime } from '@/app/RealtimeContext'
 // import { ClientAddLocationTab } from '../../components/client/ClientAddLocation'
 
 const NewLogo = () => <Image src="/assets/images/presko_logo.png" alt="Presko Logo" width={200} height={100} />
@@ -44,6 +45,9 @@ export default function ClientPanel({ params }: ClientPanelProps) {
   const [clientName, setClientName] = useState('')
   const [notifications, setNotifications] = useState<any[]>([])
   const [isNotifOpen, setIsNotifOpen] = useState(false)
+
+  
+    const { refreshKey } = useRealtime();
 
   const clientId = params?.id
 
@@ -78,7 +82,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
       }
     }
     fetchClientName()
-  }, [clientId])
+  }, [clientId, refreshKey])
 
   const fetchNotifications = async () => {
     if (!clientId) return
@@ -93,7 +97,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
 
   useEffect(() => {
     fetchNotifications()
-  }, [clientId])
+  }, [clientId, refreshKey])
 
   if (!clientId) {
     return (
@@ -132,32 +136,62 @@ export default function ClientPanel({ params }: ClientPanelProps) {
             <div className="relative">
               <button onClick={() => setIsNotifOpen(!isNotifOpen)}>
                 <Bell className="w-6 h-6 text-blue-500 cursor-pointer" />
-                {notifications.length > 0 && (
+
+                {/* 🔔 Only count "is_new" notifications */}
+                {notifications.filter((n) => n.is_new).length > 0 && (
                   <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
-                    {notifications.length}
+                    {notifications.filter((n) => n.is_new).length}
                   </span>
                 )}
               </button>
+
               {isNotifOpen && (
                 <div className="absolute right-0 mt-2 w-72 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50">
                   <div className="p-3 border-b font-semibold">Notifications</div>
                   <ul className="max-h-64 overflow-y-auto">
                     {notifications.length > 0 ? (
                       notifications.map((n, idx) => (
-                        <li key={idx} className="px-3 py-2 hover:opacity-90 border-b last:border-b-0">
-                          <div className="text-sm text-gray-800">{n.display_message || 'New notification'}</div>
+                        <li
+                          key={idx}
+                          onClick={async () => {
+                            try {
+                              // Call backend to update is_new = false
+                              await fetch(`/api/mark-notification-seen`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ notificationId: n.id }),
+                              });
+                            } catch (err) {
+                              console.error("Failed to mark notification as seen", err);
+                            }
+
+                            // Update state immediately
+                            setNotifications((prev) =>
+                              prev.map((notif) =>
+                                notif.id === n.id ? { ...notif, is_new: false } : notif
+                              )
+                            );
+                          }}
+                          className={`px-3 py-2 hover:opacity-90 border-b last:border-b-0 cursor-pointer ${
+                            n.is_new ? "bg-white font-semibold" : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          <div className="text-sm">{n.display_message || "New notification"}</div>
                           <div className="text-xs text-gray-500">
-                            {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                            {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                           </div>
                         </li>
                       ))
                     ) : (
-                      <li className="px-3 py-4 text-sm text-gray-500 text-center">No notifications</li>
+                      <li className="px-3 py-4 text-sm text-gray-500 text-center">
+                        No notifications
+                      </li>
                     )}
                   </ul>
                 </div>
               )}
             </div>
+
 
             {/* Client Name */}
             <span>Client: {clientName || 'Loading...'}</span>
@@ -330,6 +364,7 @@ export default function ClientPanel({ params }: ClientPanelProps) {
                 clientId={clientId}
                 onBookNewCleaningClick={() => handleTabClick('bookService')}
                 onReferClick={() => handleTabClick('clientInfo')}
+                onViewProfile={() => handleTabClick("clientInfo")}
               />
             )}
             {activeTab === 'clientInfo' && <ClientInfoTab clientId={clientId} />}

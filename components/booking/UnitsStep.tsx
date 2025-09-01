@@ -415,7 +415,7 @@ export function UnitsStep() {
               const discountAmount = calculateDiscountAmount();
               return (
                 <div className="flex justify-between items-center text-lg text-red-600">
-                  <span>Discount ({customPricingSettings.discount}%):</span>
+                  <span>Discount ({customPricingSettings.discount}% - Standard):</span>
                   <span className="font-semibold text-red-600">- ₱{discountAmount.toLocaleString()}</span>
                 </div>
               );

@@ -5,6 +5,7 @@ import { setNotifications, setNewNotificationsCount } from '@/lib/features/admin
 import type { RootState } from '@/lib/store'
 import { Bell, Menu } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useRealtime } from '@/app/RealtimeContext'
 
 export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const dispatch = useDispatch()
@@ -14,20 +15,42 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
   const newNotificationsCount = useSelector((s: RootState) => s.admin.newNotificationsCount)
 
   const [isOpen, setIsOpen] = useState(false)
+  const { refreshKey } = useRealtime();
 
   useEffect(() => {
     const fetchInitialNotifications = async () => {
       try {
         const res = await fetch('/api/admin/notifications')
         const json = await res.json()
-        dispatch(setNotifications(json.data || []))
-        dispatch(setNewNotificationsCount(json.data?.length || 0))
+        const data = json.data || []
+
+        dispatch(setNotifications(data))
+        dispatch(setNewNotificationsCount(data.filter((n: any) => n.is_new).length))
       } catch (err) {
         console.error('Failed to fetch initial notifications', err)
       }
     }
     fetchInitialNotifications()
-  }, [dispatch])
+  }, [dispatch, refreshKey])
+
+  const markAsSeen = async (id: string) => {
+    try {
+      await fetch('/api/mark-notification-seen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId: id }),
+      })
+
+      // Optimistic UI update
+      const updated = notifications.map((n: any) =>
+        n.id === id ? { ...n, is_new: false } : n
+      )
+      dispatch(setNotifications(updated))
+      dispatch(setNewNotificationsCount(updated.filter((n: any) => n.is_new).length))
+    } catch (err) {
+      console.error('Failed to mark notification as seen', err)
+    }
+  }
 
   const viewLabelMap: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -41,9 +64,7 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
 
   return (
     <header className="h-16 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
-
       <div className="flex items-center gap-3">
-        {/* Hamburger only on mobile */}
         <button className="lg:hidden p-2 rounded-md hover:bg-gray-200" onClick={onMenuClick}>
           <Menu className="w-6 h-6 text-gray-700" />
         </button>
@@ -59,18 +80,13 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
             <Bell className="w-5 h-5 text-gray-600" />
             {newNotificationsCount > 0 && (
               <span className="absolute top-0 right-0 min-h-[16px] min-w-[16px] px-1 text-xs rounded-full bg-red-500 text-white border border-white flex items-center justify-center">
-                {notifications.length}
+                {newNotificationsCount}
               </span>
             )}
           </button>
+
           {isOpen && (
-            <div
-              className="
-                absolute mt-2 w-80 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50
-                right-0 md:right-0
-                left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0
-              "
-            >
+            <div className="absolute mt-2 w-80 max-w-[90vw] bg-white rounded-lg shadow-lg border z-50 right-0">
               <ul className="divide-y divide-gray-200 max-h-[60vh] overflow-y-auto">
                 <li className="px-3 py-2 text-sm font-semibold text-gray-800">
                   Notifications
@@ -79,7 +95,10 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
                   notifications.map((n: any) => (
                     <li
                       key={n.id}
-                      className="px-3 py-4 hover:bg-gray-100 cursor-pointer transition-colors duration-200"
+                      className={`px-3 py-4 hover:bg-gray-100 cursor-pointer transition-colors duration-200 ${
+                        n.is_new ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() => markAsSeen(n.id)}
                     >
                       <div className="text-sm text-gray-800">
                         {n.display_message || 'New notification'}
@@ -97,8 +116,6 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
               </ul>
             </div>
           )}
-
-
         </div>
 
         <div className="flex items-center gap-2 ml-4 cursor-pointer max-w-xs">
@@ -108,16 +125,10 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick: () => void }
             className="w-9 h-9 rounded-full ring-2 ring-orange-400"
           />
           <div className="flex flex-col leading-tight">
-            <span
-              className="text-sm font-medium text-gray-800 truncate"
-              title={admin?.name || admin?.username || 'Admin'}
-            >
+            <span className="text-sm font-medium text-gray-800 truncate" title={admin?.name || admin?.username || 'Admin'}>
               {admin?.name || admin?.username || 'Admin'}
             </span>
-            <span
-              className="text-xs text-gray-500 truncate"
-              title={admin?.address || ''}
-            >
+            <span className="text-xs text-gray-500 truncate" title={admin?.address || ''}>
               {admin?.address || ''}
             </span>
           </div>

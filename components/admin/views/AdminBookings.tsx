@@ -24,7 +24,7 @@ import type { BlockedDate } from '@/types/database';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store';
 import { setAppointments } from '@/lib/features/admin/adminSlice';
-import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking';
+// import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking';
 
 
 // Set moment locale to ensure proper formatting
@@ -47,6 +47,7 @@ export default function AdminBookings() {
     appointmentId?: string
     blockedName?: string
     blockedReason?: string | null
+    fullAppt?: any
   }
 
   const dispatch = useDispatch();
@@ -69,12 +70,12 @@ export default function AdminBookings() {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
 
-  useEffect(() => {
-    const channel = subscribeToBookings();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // useEffect(() => {
+  //   const channel = subscribeToBookings();
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, []);
 
   const onEventDrop = async ({ event, start, end }: any) => {
     // Update UI immediately
@@ -199,6 +200,7 @@ export default function AdminBookings() {
       barangay: a.client_locations?.barangays?.name || "",
       appointmentDate: a.appointment_date,
       appointmentId: a.id,
+      fullAppt: a,
     })
   })
 
@@ -238,137 +240,6 @@ useEffect(() => {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 pb-6">
-      {/* COMMENTED OUT: Left Sidebar - Appointment list functionality moved to AdminAppointments */}
-      {/*
-      <Card className="w-100 p-4 space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-xl font-semibold">Appointment Calendar</h3>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="flex items-center gap-2 h-8">
-                <Settings size={14} />
-                Status
-                <ChevronDown size={14} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? 'bg-accent' : ''}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('confirmed')} className={statusFilter === 'confirmed' ? 'bg-accent' : ''}>
-                Confirmed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('completed')} className={statusFilter === 'completed' ? 'bg-accent' : ''}>
-                Completed
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="flex items-center gap-2 h-8">
-                <CalendarIcon size={14} />
-                Show by
-                <ChevronDown size={14} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setDateFilter('all')} className={dateFilter === 'all' ? 'bg-accent' : ''}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateFilter('today')} className={dateFilter === 'today' ? 'bg-accent' : ''}>
-                Today
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateFilter('incoming')} className={dateFilter === 'incoming' ? 'bg-accent' : ''}>
-                Incoming
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateFilter('previous')} className={dateFilter === 'previous' ? 'bg-accent' : ''}>
-                Previous
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input 
-              placeholder="Search..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-full h-8"
-            />
-          </div>
-        </div>
-
-        <div>
-          <div className="space-y-3">
-            {sortedAppointments.length === 0 && <div className="text-sm text-gray-500">No appointments</div>}
-            {paginatedAppointments.map((a, idx) => {
-              const city = a.client_locations?.cities?.name || ''
-              const brgy = a.client_locations?.barangays?.name || ''
-              const fullTitle = `${a.clients?.name || 'Client'}`
-              const globalIdx = startIndex + idx
-              const start = moment(a.appointment_date).hour(9 + (globalIdx % 8)).minute(0)
-              const end = moment(start).add(1, 'hour')
-              const serviceName = a.services?.name || 'N/A'
-              return (
-                <div key={a.id} className="space-y-2">
-                  <div className="flex items-start">
-                    <div className="flex-1">
-                      <p className="font-medium">{fullTitle}</p>
-                      <p className="text-sm text-gray-400">{city}, {brgy}</p>
-                      <p className="text-sm text-blue-600 font-medium">{serviceName}</p>
-                      <p className="text-sm text-gray-400">{a.appointment_date} [{start.format('hh:mm A')} - {end.format('hh:mm A')}]</p>
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-800 text-white"
-                          onClick={() => {
-                            setSelectedAppt(a)
-                            setSelectedTimeRange(`${start.format('hh:mm A')} - ${end.format('hh:mm A')}`)
-                            setDetailsOpen(true)
-                          }}
-                        >
-                          View Details
-                        </Button>
-                        {a.status === 'confirmed' && (
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => {
-                              setConfirmTarget(a)
-                              setConfirmOpen(true)
-                            }}
-                          >
-                            Mark as completed
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          {sortedAppointments.length > 0 && (
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-xs text-gray-500">
-                Showing {sortedAppointments.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, sortedAppointments.length)} of {sortedAppointments.length}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Previous</Button>
-                <span className="text-xs">Page {currentPage} of {totalPages}</span>
-                <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>Next</Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
-      */}
 
       {/* Main Calendar View - Now Full Width */}
       <div className="w-full space-y-4">
@@ -593,102 +464,129 @@ useEffect(() => {
           </div>
           <div className="flex justify-end gap-2 pt-4">
           <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={confirmLoading}
-              onClick={async () => {
-                if (!confirmTarget) return
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={confirmLoading}
+            onClick={async () => {
+              if (!confirmTarget) return
+              try {
+                setConfirmLoading(true)
+
+                // 1. Update appointment status
+                await fetch("/api/admin/appointments", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: confirmTarget.id, status: "completed" }),
+                });
+
+                // 2. Handle points increment based on referral status
+                let isReferral = false;
+                let clientData: any;
+
                 try {
-                  setConfirmLoading(true)
-
-                  // 1. Update appointment status
-                  await fetch('/api/admin/appointments', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: confirmTarget.id, status: 'completed' }),
-                  })
-
-                  // 2. Check if client is referral
-                  let isReferral = false
-                  let clientData: any
-                  try {
-                    const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`)
-                    if (clientRes.ok) {
-                      clientData = await clientRes.json()
-                      if (clientData?.ref_id) {
-                        isReferral = true
-
-                        // --- Add points to client and referrer ---
-                        const clientId = clientData.id
-                        const refId = clientData.ref_id
-
-                        const pointsToAdd = 1;
-
-                        // Add points to completed client
-                        await fetch(`/api/clients/${clientId}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            field: "points",
-                            value: (clientData.points || 0) + pointsToAdd,
-                          }),
-                        })
-
-                        // Fetch referrer
-                        const refRes = await fetch(`/api/clients/${refId}`)
-                        if (refRes.ok) {
-                          const refData = await refRes.json()
-                          await fetch(`/api/clients/${refId}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              points: (refData.points || 0) + pointsToAdd,
-                            }),
-                          })
-                        }
-
-                        // Remove ref_id from completed client
-                        await fetch(`/api/clients/${clientId}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ ref_id: null }),
-                        })
-                      } 
-                    }
-                  } catch (err) {
-                    console.error('Error handling client points/ref_id', err)
+                  // Fetch the client data to check for ref_id
+                  const clientRes = await fetch(`/api/clients/${confirmTarget.clients?.id}`);
+                  if (!clientRes.ok) {
+                    throw new Error("Failed to fetch client data");
                   }
 
-                  // 3. Insert into notifications table
-                  await fetch(`/api/clients/notification-by-id`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                  clientData = await clientRes.json();
+                  const clientId = clientData.id;
+                  const pointsToAdd = 1;
+
+                  if (clientData.ref_id) {
+                    // --- Referral flow ---
+                    isReferral = true;
+                    const refId = clientData.ref_id;
+
+                    // Add points to client
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        points: (clientData.points || 0) + pointsToAdd,
+                      }),
+                    });
+
+                    // Add points to referrer
+                    const refRes = await fetch(`/api/clients/${refId}`);
+                    if (refRes.ok) {
+                      const refData = await refRes.json();
+                      await fetch(`/api/clients/${refId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          points: (refData.points || 0) + pointsToAdd,
+                        }),
+                      });
+                    }
+
+                    // Clear ref_id after processing
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ref_id: null }),
+                    });
+                  } else {
+                    // --- No referral flow ---
+                    isReferral = false;
+                    await fetch(`/api/clients/${clientId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        points: (clientData.points || 0) + pointsToAdd,
+                      }),
+                    });
+                  }
+                } catch (err) {
+                  console.error("Error handling client points:", err);
+                }
+
+                // 3. Insert into notifications table
+                await fetch(`/api/clients/notification-by-id`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    client_id: confirmTarget.clients?.id,
+                    send_to_admin: false,
+                    send_to_client: true,
+                    is_referral: isReferral,
+                    date: confirmTarget.appointment_date,
+                  }),
+                });
+
+                // 4. 🔔 Send push notification to client
+                try {
+                  await fetch(`${process.env.BASE_URL}/api/send-push`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                      mode: "admin_to_client",
                       client_id: confirmTarget.clients?.id,
-                      send_to_admin: false,
-                      send_to_client: true,
-                      is_referral: isReferral,
-                      date: confirmTarget.appointment_date,
+                      client_name: confirmTarget.clients?.name || "Client",
+                      title: "✅ Appointment Completed",
                     }),
                   });
-
-                  // 4. Close dialogs
-                  setConfirmOpen(false)
-                  setConfirmTarget(null)
-                  if (selectedAppt && selectedAppt.id === confirmTarget.id) {
-                    setDetailsOpen(false)
-                  }
-
-                  // 5. Reload appointments
-                  await loadAppointments(statusFilter)
-                } catch (e) {
-                  console.error('Error completing appointment and adding notification', e)
-                } finally {
-                  setConfirmLoading(false)
+                } catch (pushErr) {
+                  console.error("❌ Failed to send push to client:", pushErr);
                 }
-              }}
-            >
-            {confirmLoading ? 'Please wait...' : 'OK'}
+
+                // ✅ Close dialogs + refresh
+                setConfirmOpen(false)
+                setConfirmTarget(null)
+                if (selectedAppt && selectedAppt.id === confirmTarget.id) {
+                  setDetailsOpen(false)
+                }
+                await loadAppointments(statusFilter)
+              } catch (e) {
+                console.error("Error completing appointment flow:", e)
+              } finally {
+                setConfirmLoading(false)
+              }
+            }}
+          >
+            {confirmLoading ? "Please wait..." : "OK"}
           </Button>
+
           </div>
         </DialogContent>
       </Dialog>

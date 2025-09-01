@@ -84,6 +84,7 @@ export function ConfirmStep() {
     appointmentDate,
     totalAmount,
     clientInfo,
+    discount,
     locationInfo,
     availableBrands,
     availableACTypes,
@@ -176,8 +177,11 @@ export function ConfirmStep() {
         dispatch(setClientId(currentClientId));
 
         const siteUrlSetting = await customSettingsApi.getSetting('site_url');
+        const discountSetting = await customSettingsApi.getSetting('discount');
+        const discountValue = discountSetting?.setting_value;
+
         const siteUrl = siteUrlSetting?.setting_value || 
-        (typeof window !== 'undefined' ? window.location.origin : 'https://betapresko.vercel.app');
+        (typeof window !== 'undefined' ? window.location.origin : 'https://presko-ac.vercel.app/');
 
         // update with real QR
         await clientApi.updateClient(currentClientId, { qr_code: `client/${currentClientId}`});
@@ -209,6 +213,8 @@ export function ConfirmStep() {
         appointment_date: appointmentDate,
         appointment_time: null,
         amount: totalAmount,
+        stored_discount: discount,
+        discount_type: 'Standard',
         total_units: selectedDevices.reduce((sum, device) => sum + device.quantity, 0),
         notes: null,
         status: 'confirmed',
@@ -281,96 +287,102 @@ export function ConfirmStep() {
       setIsSubmitting(false);
 
 
-      /* SMS functionality, uncomment when production deployment is ready*/
+     /* SMS functionality, uncomment when production deployment is ready*/
       
-      // try {
-       
-      //   const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
-      //   const smsTemplate =
-      //         smsTemplateSetting?.setting_value ||
-      //         `Hi {0},
+      try {
+    // 🔹 Check if SMS is enabled
+      const smsActiveSetting = await customSettingsApi.getSetting('sms_active');
+      const isSmsActive = smsActiveSetting?.setting_value === 'true';
 
-      //         Your booking with us is confirmed!
+      if (isSmsActive) {
+        const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
+        const smsTemplate =
+          smsTemplateSetting?.setting_value ||
+          `Hi {0},
 
-      //         Cleaning Date: {1}
-      //         Total Aircon Units: {2}
-      //         Amount: {3}
+          Your booking with us is confirmed!
 
-      //         To check your booking, please scan your Presko QR Code or visit:
-      //         https://betapresko.vercel.app/client/{4}
+          Cleaning Date: {1}
+          Total Aircon Units: {2}
+          Amount: {3}
 
-      //         Thank you for choosing Presko!`;
+          To check your booking, please scan your Presko QR Code or visit:
+          https://presko-ac.vercel.app/client/{4}
 
-       
-      //  const smsMessage = formatSmsTemplate(smsTemplate, [
-      //     clientInfo.name,
-      //     appointmentDate,
-      //     selectedDevices.reduce((sum, d) => sum + d.quantity, 0),
-      //     totalAmount.toLocaleString(),
-      //     currentClientId,
-      //   ]);
+          Thank you for choosing Presko!`;
 
-      
-      //   const smsResponse = await fetch('/api/sms/send-sms', {
-      //     method: 'POST',
-      //     headers: { 'Content-Type': 'application/json' },
-      //     body: JSON.stringify({
-      //       number: `0${mobileDigits}`, // ✅ keep in PH format
-      //       message: smsMessage,
-      //       type: 'normal',
-      //     }),
-      //   });
+        const smsMessage = formatSmsTemplate(smsTemplate, [
+          clientInfo.name,
+          appointmentDate,
+          selectedDevices.reduce((sum, d) => sum + d.quantity, 0),
+          totalAmount.toLocaleString(),
+          currentClientId,
+        ]);
 
-      //   if (!smsResponse.ok) {
-      //     console.error('SMS sending failed:', await smsResponse.json());
-      //   }
-      // } catch (smsError) {
-      //   console.error('Failed to send SMS confirmation:', smsError);
-      // }
+        const smsResponse = await fetch('/api/sms/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number: `0${mobileDigits}`, // ✅ keep PH format
+            message: smsMessage,
+            type: 'normal',
+          }),
+        });
+
+        if (!smsResponse.ok) {
+          console.error('SMS sending failed:', await smsResponse.json());
+            }
+          } else {
+            console.log("SMS sending skipped: sms_active is false");
+          }
+        } catch (smsError) {
+          console.error('Failed to send SMS confirmation:', smsError);
+        }
 
 
-      setIsCompleted(true);
-      localStorage.setItem("confirmedClientId", currentClientId);
-      
-    } catch (err: any) {
-      setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
-      setIsSubmitting(false);
-    }
-  };
 
-  function formatSmsTemplate(
-    template: string,
-    values: (string | number)[]
-  ): string {
-    let result = template;
-
-    values.forEach((val, index) => {
-      // Replace all occurrences of {0}, {1}, etc.
-      const regex = new RegExp(`\\{${index}\\}`, 'g');
-      result = result.replace(regex, String(val));
-    });
-
-    // Normalize line endings to \n so they render properly in SMS
-    result = result.replace(/\r\n/g, '\n');
-
-    // Trim trailing spaces on each line
-    result = result
-      .split('\n')
-      .map(line => line.trimEnd())
-      .join('\n');
-
-    return result;
-  }
-
-  useEffect(() => {
-      const confirmedClientId = localStorage.getItem("confirmedClientId");
-
-      if (confirmedClientId) {
-        // 🔹 Case 1: New client just confirmed → go straight to client panel
-        window.location.href = `/client/${confirmedClientId}`;
-        return;
+        setIsCompleted(true);
+        localStorage.setItem("confirmedClientId", currentClientId);
+        
+      } catch (err: any) {
+        setError(`Booking failed: ${err.message || 'An unexpected error occurred.'}`);
+        setIsSubmitting(false);
       }
-    }, []);
+    };
+
+    function formatSmsTemplate(
+      template: string,
+      values: (string | number)[]
+    ): string {
+      let result = template;
+
+      values.forEach((val, index) => {
+        // Replace all occurrences of {0}, {1}, etc.
+        const regex = new RegExp(`\\{${index}\\}`, 'g');
+        result = result.replace(regex, String(val));
+      });
+  
+      // Normalize line endings to \n so they render properly in SMS
+      result = result.replace(/\r\n/g, '\n');
+
+      // Trim trailing spaces on each line
+      result = result
+        .split('\n')
+        .map(line => line.trimEnd())
+        .join('\n');
+
+      return result;
+    }
+
+    useEffect(() => {
+        const confirmedClientId = localStorage.getItem("confirmedClientId");
+
+        if (confirmedClientId) {
+          // 🔹 Case 1: New client just confirmed → go straight to client panel
+          window.location.href = `/client/${confirmedClientId}`;
+          return;
+        }
+      }, []);
 
 
   const handleGoToExistingClientDashboard = () => {

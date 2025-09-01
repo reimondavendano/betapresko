@@ -40,7 +40,7 @@ interface DetailsModalProps {
   onClose: () => void;
   location: ClientLocation;
   locations: ClientLocation[]; // ✅ new prop for the list
-  statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service';
+  statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service' | 'voided';
   serviceName?: string | null;
   devices: Device[];
   allBrands: Brand[];
@@ -156,8 +156,9 @@ export function DetailsModal({
         return { color: 'orange', icon: AlertCircle, bgColor: 'bg-orange-50', textColor: 'text-orange-700', borderColor: 'border-orange-200' };
       case 'repair':
         return { color: 'red', icon: Wrench, bgColor: 'bg-red-50', textColor: 'text-red-700', borderColor: 'border-red-200' };
+      case 'voided':
+        return { color: 'violet', icon: Ban, bgColor: 'bg-violet-50', textColor: 'text-violet-700', borderColor: 'border-violet-200' };
       case 'no-service':
-        return { color: 'gray', icon: Settings, bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200' };
       default:
         return { color: 'gray', icon: Settings, bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200' };
     }
@@ -486,6 +487,36 @@ export function DetailsModal({
               </Card>
             );
           })}
+
+          {statusType === 'voided' && devices.map((device) => {
+            const brand = allBrands.find((b) => b.id === device.brand_id)?.name || 'N/A';
+            const acType = allACTypes.find((t) => t.id === device.ac_type_id)?.name || 'N/A';
+            const horsepower = allHorsepowerOptions.find((h) => h.id === device.horsepower_id)?.display_name || 'N/A';
+
+            return (
+              <Card key={device.id} className="border border-violet-200 mb-4">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-violet-100 rounded-lg">
+                        <Ban className="w-5 h-5 text-violet-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-lg">{device.name}</h4>
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
+                          <span className="bg-violet-100 text-violet-700 px-2 py-1 rounded-full text-xs">{brand}</span>
+                          <span className="bg-violet-100 text-violet-700 px-2 py-1 rounded-full text-xs">{acType}</span>
+                          <span className="bg-violet-200 text-violet-800 px-2 py-1 rounded-full text-xs font-medium">{horsepower}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-violet-600">This cleaning appointment was voided.</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+
 
           {appointmentsWithDevices.length === 0 && devices.length === 0 && (
             <div className="text-center py-12">

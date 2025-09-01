@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox'
 import { Plus, Trash2, PenSquare } from 'lucide-react'
 
-type Service = { id: string; name: string; description: string | null; is_active: boolean; created_at: string }
+type Service = { id: string; name: string; description: string | null; is_active: boolean; set_inactive: boolean; created_at: string }
 
 export default function AdminServices() {
   const pageSize = 5
@@ -23,6 +23,7 @@ export default function AdminServices() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [setInactive, setSetInactive] = useState(false)
   const [existsOpen, setExistsOpen] = useState(false)
 
   const pageCount = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total])
@@ -43,13 +44,13 @@ export default function AdminServices() {
 
   useEffect(() => { fetchRows() }, [page, search])
 
-  const openAdd = () => { setEditing(null); setName(''); setDescription(''); setIsActive(true); setEditOpen(true) }
-  const openEdit = (row: Service) => { setEditing(row); setName(row.name); setDescription(row.description || ''); setIsActive(row.is_active); setEditOpen(true) }
+  const openAdd = () => { setEditing(null); setName(''); setDescription(''); setIsActive(true); setSetInactive(false); setEditOpen(true) }
+  const openEdit = (row: Service) => { setEditing(row); setName(row.name); setDescription(row.description || ''); setIsActive(row.is_active); setSetInactive(row.set_inactive); setEditOpen(true) }
 
   const saveRow = async () => {
     if (!name.trim()) return
     if (editing) {
-      const res = await fetch('/api/admin/services', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, name: name.trim(), description: description || null, is_active: isActive }) })
+      const res = await fetch('/api/admin/services', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, name: name.trim(), description: description || null, is_active: isActive, set_inactive: setInactive }) })
       if (!res.ok) {
         const j = await res.json().catch(()=>({}))
         if (res.status === 409) setExistsOpen(true)
@@ -57,7 +58,7 @@ export default function AdminServices() {
         return
       }
     } else {
-      const res = await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), description: description || null, is_active: isActive }) })
+      const res = await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), description: description || null, is_active: isActive, set_inactive: setInactive }) })
       if (!res.ok) {
         const j = await res.json().catch(()=>({}))
         if (res.status === 409) setExistsOpen(true)
@@ -86,7 +87,6 @@ export default function AdminServices() {
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-6 pb-6">
         {/* Header section */}
-      {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 
         bg-gradient-to-br from-[#99BCC0] via-[#8FB6BA] to-[#6fa3a9] text-white rounded-t-lg">
         
@@ -132,12 +132,13 @@ export default function AdminServices() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soon</th>
                 <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {rows.length===0 && (
-                <tr><td colSpan={5} className="px-6 py-4 text-center text-gray-500">{loading? 'Loading...' : 'No data'}</td></tr>
+                <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">{loading? 'Loading...' : 'No data'}</td></tr>
               )}
               {rows.map(r => (
                 <tr key={r.id}>
@@ -147,6 +148,7 @@ export default function AdminServices() {
                   <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-gray-500">{r.name}</div></td>
                   <td className="px-6 py-4"><div className="text-sm text-gray-500 max-w-xl truncate" title={r.description || ''}>{r.description}</div></td>
                   <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-gray-500">{r.is_active ? 'Yes' : 'No'}</div></td>
+                  <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-gray-500">{r.set_inactive ? 'Yes' : 'No'}</div></td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium w-36">
                     <div className="flex justify-center space-x-2">
                       <button onClick={()=>openEdit(r)} className="text-yellow-500 hover:text-yellow-600" aria-label="Edit">
@@ -192,6 +194,10 @@ export default function AdminServices() {
               <Checkbox id="svc_active" checked={isActive} onCheckedChange={(v:any)=>setIsActive(!!v)} />
               <label htmlFor="svc_active" className="text-sm">Active</label>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="svc_inactive" checked={setInactive} onCheckedChange={(v:any)=>setSetInactive(!!v)} />
+              <label htmlFor="svc_inactive" className="text-sm">Soon</label>
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={()=>setEditOpen(false)}>Cancel</Button>
               <Button onClick={saveRow}>{editing? 'Update' : 'Add'}</Button>
@@ -230,5 +236,3 @@ export default function AdminServices() {
     </div>
   )
 }
-
-

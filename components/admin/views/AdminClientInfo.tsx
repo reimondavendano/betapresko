@@ -22,6 +22,7 @@ interface Client {
   points: number;
   discounted: boolean;
   referral_link: string;
+  sms_opt_in: boolean;
 }
 
 interface ClientLocation {
@@ -197,7 +198,6 @@ export default function AdminClientInfo() {
     if (selectedClient && dialogAction) {
       // Here you can implement the actual action
       
-      
       // Use your existing notification function instead of alert()
       if (dialogAction === 'edit') {
         showTempNotification(`Edit functionality for ${selectedClient.name} - This would open an edit form`);
@@ -209,7 +209,7 @@ export default function AdminClientInfo() {
   };
 
   // Handle checkbox change for discounted status
-  const handleDiscountedChange = async (clientId: string, checked: boolean) => {
+  const handleDiscountedChange = async (clientId: string, checked: boolean, clientName: string) => {
     try {
       const response = await fetch(`/api/admin/update-client-discounted`, {
         method: 'PATCH',
@@ -235,12 +235,45 @@ export default function AdminClientInfo() {
         )
       );
       // Use notification for success as well
-      showTempNotification(`Updated client ${clientId} discounted status to: ${checked ? 'Yes' : 'No'}`);
+      showTempNotification(`Updated client ${clientName} discounted status to: ${checked ? 'Yes' : 'No'}`);
       
     } catch (error) {
       console.error('Error updating client discounted status:', error);
       // Use your existing notification function instead of alert()
       showTempNotification('Failed to update discounted status. Please try again.', true);
+    }
+  };
+
+    const handleSmsOptInChange = async (clientId: string, checked: boolean, clientName: string) => {
+    try {
+      const response = await fetch(`/api/admin/update-client-sms`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: clientId,
+          sms_opt_in: checked,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update client SMS opt-in');
+      }
+
+      // Update local state
+      setClients(prevClients =>
+        prevClients.map(client =>
+          client.id === clientId
+            ? { ...client, sms_opt_in: checked }
+            : client
+        )
+      );
+
+      showTempNotification(`Updated client ${clientId} SMS opt-in status to: ${checked ? 'Yes' : 'No'}`);
+    } catch (error) {
+      console.error('Error updating client SMS opt-in status:', error);
+      showTempNotification('Failed to update SMS opt-in. Please try again.', true);
     }
   };
 
@@ -314,6 +347,9 @@ export default function AdminClientInfo() {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
                   Discounted
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  SMS   
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Action
                 </th>
@@ -368,11 +404,26 @@ export default function AdminClientInfo() {
                         >
                           <Checkbox
                             checked={client.discounted}
-                            onCheckedChange={(checked) => handleDiscountedChange(client.id, checked as boolean)}
+                            onCheckedChange={(checked) => handleDiscountedChange(client.id, checked as boolean, client.name as string)}
                             className="mr-2"
                           />
                           <span className="text-sm text-gray-600">
                             {client.discounted ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                        <div 
+                          className="flex items-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={client.sms_opt_in}
+                            onCheckedChange={(checked) => handleSmsOptInChange(client.id, checked as boolean, client.name as string)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">
+                            {client.sms_opt_in ? 'Yes' : 'No'}
                           </span>
                         </div>
                       </td>

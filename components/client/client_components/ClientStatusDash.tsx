@@ -44,12 +44,13 @@ interface CleaningStatusEntry {
   dueDevices: number;
   wellMaintainedDevices: number;
   scheduledDevices: number;
+  voidedDevices: number;
   totalDevices: number;
   devices: Array<{
     device: any;
     appointment: any;
     service: any;
-    status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair';
+    status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair' | 'voided';
     brand: string;
     acType: string;
     horsepower: string;
@@ -61,7 +62,7 @@ interface ClientStatusDashProps {
   handleOpenBookingModal: (locationId: UUID) => void;
   handleOpenDetailsModal: (
     locationId: UUID,
-    statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service',
+    statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service' | 'voided',
     serviceName?: string,
   ) => void;
   // Primary location editing props
@@ -204,7 +205,7 @@ export function ClientStatusDash({
 
               <Button
                 size="sm"
-                className="w-full sm:w-auto rounded-lg bg-gradient-to-r from-[#B7DEE1] via-[#A9CDD0] to-[#99BCC0] hover:opacity-90 text-white shadow-md"
+                className="w-full sm:w-auto rounded-lg bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold px-6 py-2 rounded-full shadow-lg hover:from-teal-600 hover:to-cyan-700 shadow-md"
                 onClick={() => handleOpenBookingModal(status.location.id)}
               >
                 <Plus className="w-4 h-4 mr-1" /> Add Booking
@@ -229,8 +230,11 @@ export function ClientStatusDash({
                     <Badge className="bg-green-50 text-green-700 hover:bg-green-50 text-xs">
                       {status.wellMaintainedDevices} Up to Date
                     </Badge>
-                    <Badge className="bg-purple-50 text-purple-700 hover:bg-purple-50 text-xs">
+                    <Badge className="bg-purple-50 text-orange-700 hover:bg-orange-50 text-xs">
                       {status.devices.filter(d => d.status === "repair").length} Repair
+                    </Badge>
+                    <Badge className="bg-violet-50 text-violet-700 hover:bg-violet-50 text-xs">
+                      {status.devices.filter(d => d.status === "voided").length} Voided
                     </Badge>
                   </div>
                 </Card>
@@ -324,30 +328,35 @@ export function ClientStatusDash({
                           );
                         }
 
-                        const statusGroups = {
+                       const statusGroups = {
                           "well-maintained": devices.filter(d => d.status === "well-maintained"),
                           due: devices.filter(d => d.status === "due"),
                           scheduled: devices.filter(d => d.status === "scheduled"),
                           "no-service": devices.filter(d => d.status === "no-service"),
+                          voided: devices.filter(d => d.status === "voided"),
                         };
+
 
                         return Object.entries(statusGroups)
                           .map(([statusKey, statusDevices]) => {
                             if (statusDevices.length === 0) return null;
 
-                            const statusLabels = {
-                              "well-maintained": "Up to date",
-                              due: "Due",
-                              scheduled: "Booked",
-                              "no-service": "No Service",
-                            };
+                           const statusLabels = {
+                                "well-maintained": "Up to date",
+                                due: "Due",
+                                scheduled: "Booked",
+                                "no-service": "No Service",
+                                voided: "Voided",
+                              };
 
-                            const statusColors = {
-                              "well-maintained": "text-green-600",
-                              due: "text-red-600",
-                              scheduled: "text-blue-600",
-                              "no-service": "text-gray-600",
-                            };
+                              const statusColors = {
+                                "well-maintained": "text-green-600",
+                                due: "text-red-600",
+                                scheduled: "text-blue-600",
+                                "no-service": "text-gray-600",
+                                voided: "text-violet-600",   // 👈 violet
+                              };
+
 
                             return (
                               <div key={statusKey} className="text-sm">
@@ -362,7 +371,7 @@ export function ClientStatusDash({
                                   onClick={() =>
                                     handleOpenDetailsModal(
                                       status.location.id,
-                                      statusKey as "scheduled" | "due" | "well-maintained" | "repair" | "no-service",
+                                      statusKey as "scheduled" | "due" | "well-maintained" | "repair" | "no-service" | "voided",
                                       serviceName
                                     )
                                   }

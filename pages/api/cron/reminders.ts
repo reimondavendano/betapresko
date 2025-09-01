@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select(`
         id, name, last_cleaning_date, due_3_months, due_4_months, due_6_months,
         client_id,
-        clients (id, name, mobile),
+        clients (id, name, mobile, email, sms_opt_in),
         client_locations (id, name),
         brands (name),
         ac_types (name),
@@ -50,6 +50,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const client = (dev as any).clients;
       if (!client?.id || !client.mobile) continue;
 
+      // 🚨 NEW CONDITION: Skip if client didn't opt in
+      if (!client.sms_opt_in) continue;
+
       // Check if this device is due today (3, 4, or 6 months)
       let dueLabel: string | null = null;
       if (dev.due_3_months === today) dueLabel = "3 mos";
@@ -59,9 +62,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!dueLabel) continue;
 
       const brand = (dev as any).brands?.name || "";
-      const type = (dev as any).ac_types?.name || "";
+      const acType = (dev as any).ac_types?.name || "";
       const hp = (dev as any).horsepower_options?.display_name || "";
-      const unitDesc = `1× ${brand} ${type} ${hp} – ${dueLabel}`;
+
+      const deviceInfo = `${brand} ${acType} ${hp} (${dueLabel})`;
 
       if (!clientsMap[client.id]) {
         clientsMap[client.id] = {
@@ -70,12 +74,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           locations: {},
         };
       }
-      const locName = (dev as any).client_locations?.name || "Unknown location";
-      if (!clientsMap[client.id].locations[locName]) {
-        clientsMap[client.id].locations[locName] = [];
+
+      const locationName = (dev as any).client_locations?.name || "Unknown Location";
+      if (!clientsMap[client.id].locations[locationName]) {
+        clientsMap[client.id].locations[locationName] = [];
       }
-      clientsMap[client.id].locations[locName].push(unitDesc);
+      clientsMap[client.id].locations[locationName].push(deviceInfo);
     }
+
 
     // --- Send one SMS per client ---
     const sent: any[] = [];

@@ -79,11 +79,13 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.2.2",
     "vaul": "^0.9.9",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/react-big-calendar": "^1.16.2"
+    "@types/react-big-calendar": "^1.16.2",
+    "@types/web-push": "^3.6.4"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.9",

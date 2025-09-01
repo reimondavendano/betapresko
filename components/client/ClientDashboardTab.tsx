@@ -65,11 +65,15 @@ import { Client, ClientLocation, Appointment, Device, Service, Brand, ACType, Ho
 import { barangayApi } from '@/pages/api/barangays/barangayApi';
 import { cityApi } from '@/pages/api/cities/cityApi';
 import { PointsAppointments } from './client_components/PointsAppointments';
+import { useRealtime } from '@/app/RealtimeContext';
+import { toast } from 'sonner';
+import { loyaltyPointsApi } from '@/pages/api/loyalty_points/loyaltyPointsApi';
 
 interface ClientDashboardTabProps {
   clientId: string;
   onBookNewCleaningClick: () => void;
   onReferClick: () => void;
+  onViewProfile: () => void;
 }
 
 // Helper function to format the full address
@@ -95,7 +99,7 @@ function areAllDevicesScheduled(locationId: UUID, devices: Device[], appointment
   });
 }
 
-export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferClick }: ClientDashboardTabProps) {
+export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferClick, onViewProfile }: ClientDashboardTabProps) {
   const [client, setClient] = useState<Client | null>(null);
   const [locations, setLocations] = useState<ClientLocation[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -154,7 +158,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
   const [isDetailsModalOpen, setIsDetailsModal] = useState(false);
   const [modalLocation, setModalLocation] = useState<ClientLocation | null>(null);
-  const [modalStatusType, setModalStatusType] = useState<'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service' | null>(null);
+  const [modalStatusType, setModalStatusType] = useState<'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service' | 'voided' | null>(null);
   const [modalDevices, setModalDevices] = useState<Device[]>([]);
   const [modalServiceName, setModalServiceName] = useState<string | null>(null);
   const [editingDeviceId, setEditingDeviceId] = useState<UUID | null>(null);
@@ -175,6 +179,9 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [selectedBarangay, setSelectedBarangay] = useState<any | null>(null);
   const [isFetchingCities, setIsFetchingCities] = useState(false);
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [referralCount, setReferralCount] = useState(0);
 
   const [locationForm, setLocationForm] = useState<{
     name: string;
@@ -546,12 +553,17 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       const appointmentDate = bookingDate;
       let totalUnits = selectedDevices.length;
       let amount = 0;
+      let stored_discount = 0;
+      let discount_type = 'Standard';
       let newDeviceIds: UUID[] = [];
       let additionalDeviceIds: UUID[] = [];
 
       // --- Pricing ---
       const pricing = calculateTotalPrice();
+
       amount = pricing.total;
+      stored_discount = pricing.discount;
+      discount_type = pricing.discount_type;
       totalUnits = selectedDevices.length + 
                    newUnits.reduce((sum, unit) => sum + unit.quantity, 0) +
                    additionalUnits.reduce((sum, unit) => sum + unit.quantity, 0);
@@ -564,6 +576,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         appointment_date: appointmentDate,
         appointment_time: null,
         amount,
+        stored_discount,
+        discount_type,
         total_units: totalUnits,
         notes: "Client panel booking",
       });
@@ -632,6 +646,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       if (showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0) {
         const additionalPricing = calculateAdditionalServicePrice();
         const additionalAmount = additionalPricing.total;
+        const additionalDiscounted = additionalPricing.discount;
         const additionalAppointment = await appointmentApi.createAppointment({
           client_id: client.id,
           location_id: selectedLocationId,
@@ -639,6 +654,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           appointment_date: additionalServiceDate,
           appointment_time: null,
           amount: additionalAmount,
+          stored_discount: additionalDiscounted,
+          discount_type: discount_type,
           total_units: additionalServiceDevices.length,
           notes: "Client panel booking - Additional service",
         });
@@ -680,6 +697,26 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
       await Promise.all(deviceUpdatePromises);
 
+      try {
+        await fetch("/api/send-push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "client_to_admin",
+            client_id: client.id,
+            client_name: client.name,
+            title: "📅 New Booking",
+            
+          }),
+          
+        });
+
+        toast.success("Admins notified!");
+      } catch (err) {
+        console.error("❌ Failed to notify admins", err);
+        toast.error("Failed to notify admins");
+      }
+
       // --- Create notification entry ---
       try {
         let isReferral = false;
@@ -701,6 +738,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       } catch (notificationError) {
         console.error("Error creating notification:", notificationError);
       }
+
 
       // --- Refresh local state ---
       const [fetchedDevices, fetchedAppointments] = await Promise.all([
@@ -728,6 +766,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
     setEditingDeviceId(device.id);
     setEditedDeviceData(device);
   };
+  
 
   const handleCancelEdit = () => {
     setEditingDeviceId(null);
@@ -768,7 +807,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
 
   // --- Details Modal Handlers ---
-  const handleOpenDetailsModal = (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service', serviceName?: string) => {
+  const handleOpenDetailsModal = (locationId: UUID, statusType: 'scheduled' | 'due' | 'well-maintained' | 'repair' | 'no-service' | 'voided', serviceName?: string) => {
     const location = locations.find(loc => loc.id === locationId);
     if (!location) return;
     setModalLocation(location);
@@ -855,7 +894,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
   ));
 };
 
-
+  const { refreshKey } = useRealtime();
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
@@ -878,80 +917,57 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     fetchLookupData();
   }, []);
 
+  
+
   useEffect(() => {
-    const fetchClientData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const fetchedClient = await clientApi.getClientById(clientId);
-        if (!fetchedClient) {
-          setError('Client not found.');
-          setIsLoading(false);
-          return;
-        }
+  const fetchClientData = async () => {
+    setIsLoading(true);
+    setError(null);
 
-        const [fetchedLocations, fetchedDevices, fetchedAppointments] = await Promise.all([
-          clientLocationApi.getByClientId(clientId),
-          deviceApi.getByClientId(clientId),
-          appointmentApi.getByClientId(clientId),
-        ]);
-        
-        // let calculatedPoints = 0;
-        // fetchedAppointments.forEach(appt => {
-        //   if (appt.status === 'completed') {
-        //     calculatedPoints += 1;
-        //     // if (appt.total_units && appt.total_units >= 3) {
-        //     //   calculatedPoints += 1;
-        //     // }
-        //   }
-        // });
-        
-
-        let pointsExpiry = null;
-        
-          const firstCompletedAppointment = fetchedAppointments.reduce(
-            (earliest, current) => {
-              if (current.status === "completed") {
-                const currentTimestamp = new Date(current.appointment_date).getTime();
-                const earliestTimestamp = earliest
-                  ? new Date(earliest.appointment_date).getTime()
-                  : Infinity;
-                return currentTimestamp < earliestTimestamp ? current : earliest;
-              }
-              return earliest;
-            },
-            null as Appointment | null
-          );
-
-          if (firstCompletedAppointment) {
-            pointsExpiry = addYears(
-              new Date(firstCompletedAppointment.appointment_date),
-              1
-            ).toISOString();
-          }
-        
-        
-        
-        const updatedClient = await clientApi.updateClient(clientId, {
-          // points: calculatedPoints,
-          points_expiry: pointsExpiry,
-        });
-        setClient(updatedClient);
-      
-        setLocations(fetchedLocations);
-        setDevices(fetchedDevices);
-        setAppointments(fetchedAppointments);
-
-      } catch (err: any) {
-        console.error('Error fetching client dashboard data:', err);
-        setError(err.message || 'Failed to load client data.');
-      } finally {
+    try {
+      const fetchedClient = await clientApi.getClientById(clientId);
+      if (!fetchedClient) {
+        setError("Client not found.");
         setIsLoading(false);
+        return;
       }
-    };
 
-    fetchClientData();
-  }, [clientId]);
+      const [
+        fetchedLocations,
+        fetchedDevices,
+        fetchedAppointments,
+        fetchedPoints,
+        fetchedReferrals
+      ] = await Promise.all([
+        clientLocationApi.getByClientId(clientId),
+        deviceApi.getByClientId(clientId),
+        appointmentApi.getByClientId(clientId),
+        loyaltyPointsApi.getClientPoints(clientId),
+        loyaltyPointsApi.getReferralCount(clientId),
+      ]);
+
+
+      setClient(fetchedClient);
+      setLoyaltyPoints(fetchedPoints);
+      setLocations(fetchedLocations);
+      setDevices(fetchedDevices);
+      setAppointments(fetchedAppointments);
+      setReferralCount(fetchedReferrals);
+      
+    } catch (err: any) {
+      console.error("Error fetching client dashboard data:", err);
+      setError(err.message || "Failed to load client data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchClientData();
+}, [clientId, refreshKey]);
+
+
+
+
 
 
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
@@ -981,212 +997,198 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       }
     };
     buildLinks();
-  }, [devices, appointments]);
+  }, [devices, appointments, refreshKey]);
 
    const getDeviceCleaningStatus = () => {
-    const statusByLocation = new Map<UUID, {
-      location: ClientLocation,
-      totalDevices: number,
-      lastServiceDate: string | null,
-      lastCleaningDate: string | null;
-      lastRepairDate: string | null;
-      serviceGroups: Array<{
-        service: Service,
-        scheduledDevices: number,
-        dueDevices: number, 
-        wellMaintainedDevices: number,
-        repairDevices: number,
+      const statusByLocation = new Map<UUID, {
+        location: ClientLocation,
+        totalDevices: number,
         lastServiceDate: string | null,
-        devices: Array<{
-          device: Device;
-          appointment: Appointment | undefined;
-          status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair';
-          brand: string;
-          acType: string;
-          horsepower: string;
-        }>;
-      }>
-    }>();
+        lastCleaningDate: string | null;
+        lastRepairDate: string | null,
+        serviceGroups: Array<{
+          service: Service,
+          scheduledDevices: number,
+          dueDevices: number, 
+          wellMaintainedDevices: number,
+          voidedDevices?: number;
+          repairDevices: number,
+          lastServiceDate: string | null,
+          devices: Array<{
+            device: Device;
+            appointment: Appointment | undefined;
+            status: 'scheduled' | 'due' | 'well-maintained' | 'no-service' | 'repair' | 'voided';
+            brand: string;
+            acType: string;
+            horsepower: string;
+          }>;
+        }>
+      }>();
 
-    const today = new Date();
+      const today = new Date();
 
-    // Initialize locations
-    locations.forEach(location => {
-      statusByLocation.set(location.id, {
-        location,
-        totalDevices: 0,
-        lastServiceDate: null,
-        lastCleaningDate:  null,
-        lastRepairDate:  null,
-        serviceGroups: [],
-      });
-    });
-
-    devices.forEach(device => {
-      const locationId = device.location_id;
-      if (!locationId) return;
-      const locationStatus = statusByLocation.get(locationId);
-      if (!locationStatus) return;
-
-      locationStatus.totalDevices++;
-
-      const cleaningService = allServices.find(s => s.name.toLowerCase().includes('clean'));
-      if (device.last_cleaning_date && cleaningService) {
-        const lastCleanDate = new Date(device.last_cleaning_date);
-        if (!locationStatus.lastServiceDate || lastCleanDate > new Date(locationStatus.lastServiceDate)) {
-          locationStatus.lastServiceDate = device.last_cleaning_date;
-        }
-      }
-
-      const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-      const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-      const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-
-      const linkedAppointmentIds = deviceIdToAppointmentId.get(device.id as UUID) || [];
-      const deviceAppointments = linkedAppointmentIds
-        .map(id => appointments.find(appt => appt.id === id))
-        .filter(Boolean) as Appointment[];
-
-      const confirmedAppts = deviceAppointments.filter(a => a.status === 'confirmed');
-      const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
-      const latestCompleted = completedAppts.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())[0];
-
-      const hasLastCleaning = !!device.last_cleaning_date && completedAppts.some(a => {
-        const service = allServices.find(s => s.id === a.service_id);
-        return service?.name.toLowerCase().includes("clean");
-      });
-      const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
-      const isDue = [device.due_3_months, device.due_4_months, device.due_6_months]
-        .filter(Boolean)
-        .some((d) => new Date(d as string) <= today);
-
-      // --- Step 1: Handle repair appointments (always add if exists) ---
-      confirmedAppts.forEach(appt => {
-        const service = allServices.find(s => s.id === appt.service_id);
-        if (!service) return;
-        const isRepairService = service.name.toLowerCase().includes('repair') || service.name.toLowerCase().includes('maintenance');
-        if (isRepairService) {
-          let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
-          if (!serviceGroup) {
-            serviceGroup = {
-              service,
-              scheduledDevices: 0,
-              dueDevices: 0,
-              wellMaintainedDevices: 0,
-              repairDevices: 0,
-              lastServiceDate: null,
-              devices: []
-            };
-            locationStatus.serviceGroups.push(serviceGroup);
-          }
-          serviceGroup.repairDevices++;
-          serviceGroup.devices.push({ device, appointment: appt, status: 'repair', brand, acType, horsepower});
-        }
-      });
-
-      // --- Step 2: Handle cleaning-related appointments/status ---
-      const cleaningAppts = confirmedAppts.filter(appt => {
-        const service = allServices.find(s => s.id === appt.service_id);
-        if (!service) return false;
-        return service.name.toLowerCase().includes('clean');
-      });
-
-      if (cleaningAppts.length > 0) {
-        cleaningAppts.forEach(appt => {
-          const service = allServices.find(s => s.id === appt.service_id);
-          if (!service) return;
-          let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
-          if (!serviceGroup) {
-            serviceGroup = {
-              service,
-              scheduledDevices: 0,
-              dueDevices: 0,
-              wellMaintainedDevices: 0,
-              repairDevices: 0,
-              lastServiceDate: null,
-              devices: []
-            };
-            locationStatus.serviceGroups.push(serviceGroup);
-          }
-          serviceGroup.scheduledDevices++;
-          serviceGroup.devices.push({ device, appointment: appt, status: 'scheduled', brand, acType, horsepower });
+      // Initialize locations
+      locations.forEach(location => {
+        statusByLocation.set(location.id, {
+          location,
+          totalDevices: 0,
+          lastServiceDate: null,
+          lastCleaningDate:  null,
+          lastRepairDate:  null,
+          serviceGroups: [],
         });
-      } else {
-        // No confirmed cleaning appointment → fallback to last cleaning / due logic
-        let deviceStatus: 'scheduled' | 'due' | 'well-maintained' | 'no-service' = 'no-service';
-        let serviceToUse: Service | undefined = undefined;
-        let appointmentToUse: Appointment | undefined = undefined;
+      });
 
-        const latestCompletedCleaning = completedAppts
-          .map(a => {
-            const service = allServices.find(s => s.id === a.service_id);
-            return { appt: a, service };
-          })
-          .filter(x => x.service?.name.toLowerCase().includes("clean"))
-          .sort((a, b) => new Date(b.appt.appointment_date).getTime() - new Date(a.appt.appointment_date).getTime())[0];
+      devices.forEach(device => {
+        const locationId = device.location_id;
+        if (!locationId) return;
+        const locationStatus = statusByLocation.get(locationId);
+        if (!locationStatus) return;
 
-        // Find any confirmed CLEANING appointment
-        const confirmedCleaningAppt = confirmedAppts.find(appt => {
-          const service = allServices.find(s => s.id === appt.service_id);
+        locationStatus.totalDevices++;
+
+        const cleaningService = allServices.find(s => s.name.toLowerCase().includes('clean'));
+        if (device.last_cleaning_date && cleaningService) {
+          const lastCleanDate = new Date(device.last_cleaning_date);
+          if (!locationStatus.lastServiceDate || lastCleanDate > new Date(locationStatus.lastServiceDate)) {
+            locationStatus.lastServiceDate = device.last_cleaning_date;
+          }
+        }
+
+        const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+        const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+        const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+
+        const linkedAppointmentIds = deviceIdToAppointmentId.get(device.id as UUID) || [];
+        const deviceAppointments = linkedAppointmentIds
+          .map(id => appointments.find(appt => appt.id === id))
+          .filter(Boolean) as Appointment[];
+
+        const confirmedAppts = deviceAppointments.filter(a => a.status === 'confirmed');
+        const completedAppts = deviceAppointments.filter(a => a.status === 'completed');
+
+        const hasLastCleaning = !!device.last_cleaning_date && completedAppts.some(a => {
+          const service = allServices.find(s => s.id === a.service_id);
           return service?.name.toLowerCase().includes("clean");
         });
+        const hasDueDates = !!device.due_3_months && !!device.due_4_months && !!device.due_6_months;
+        const isDue = [device.due_3_months, device.due_4_months, device.due_6_months]
+          .filter(Boolean)
+          .some((d) => new Date(d as string) <= today);
 
-        if (confirmedCleaningAppt) {
-          // scheduled Cleaning
-          deviceStatus = "scheduled";
-          serviceToUse = allServices.find(s => s.id === confirmedCleaningAppt.service_id);
-          appointmentToUse = confirmedCleaningAppt;
-
-        } else if (latestCompletedCleaning) {
-          // Completed Cleaning → decide due vs well-maintained
-          if (hasDueDates) {
-            deviceStatus = isDue ? "due" : "well-maintained";
-          } else {
-            deviceStatus = "well-maintained";
+        // --- Step 1: Handle repair appointments (always add if exists) ---
+        confirmedAppts.forEach(appt => {
+          const service = allServices.find(s => s.id === appt.service_id);
+          if (!service) return;
+          const isRepairService = service.name.toLowerCase().includes('repair') || service.name.toLowerCase().includes('maintenance');
+          if (isRepairService) {
+            let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
+            if (!serviceGroup) {
+              serviceGroup = {
+                service,
+                scheduledDevices: 0,
+                dueDevices: 0,
+                wellMaintainedDevices: 0,
+                repairDevices: 0,
+                lastServiceDate: null,
+                devices: []
+              };
+              locationStatus.serviceGroups.push(serviceGroup);
+            }
+            serviceGroup.repairDevices++;
+            serviceGroup.devices.push({ device, appointment: appt, status: 'repair', brand, acType, horsepower});
           }
-          serviceToUse = latestCompletedCleaning.service!;
-          appointmentToUse = latestCompletedCleaning.appt;
+        });
 
+        // --- Step 2: Handle cleaning-related appointments/status ---
+        const cleaningAppts = confirmedAppts.filter(appt => {
+          const service = allServices.find(s => s.id === appt.service_id);
+          if (!service) return false;
+          return service.name.toLowerCase().includes('clean');
+        });
+
+        if (cleaningAppts.length > 0) {
+          cleaningAppts.forEach(appt => {
+            const service = allServices.find(s => s.id === appt.service_id);
+            if (!service) return;
+            let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === service.id);
+            if (!serviceGroup) {
+              serviceGroup = {
+                service,
+                scheduledDevices: 0,
+                dueDevices: 0,
+                wellMaintainedDevices: 0,
+                repairDevices: 0,
+                voidedDevices: 0,
+                lastServiceDate: null,
+                devices: []
+              };
+              locationStatus.serviceGroups.push(serviceGroup);
+            }
+            serviceGroup.scheduledDevices++;
+            serviceGroup.devices.push({ device, appointment: appt, status: 'scheduled', brand, acType, horsepower });
+          });
         } else {
-          //  No cleaning appointments at all → don't push into cleaning groups
-          deviceStatus = "no-service";
-          serviceToUse = undefined;
-          appointmentToUse = undefined;
-        }
+          let deviceStatus: 'scheduled' | 'due' | 'well-maintained' | 'voided' | 'no-service' = 'no-service';
+          let serviceToUse: Service | undefined = undefined;
+          let appointmentToUse: Appointment | undefined = undefined;
 
-        if (serviceToUse) {
-          let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === serviceToUse!.id);
-          if (!serviceGroup) {
-            serviceGroup = {
-              service: serviceToUse,
-              scheduledDevices: 0,
-              dueDevices: 0,
-              wellMaintainedDevices: 0,
-              repairDevices: 0,
-              lastServiceDate: null,
-              devices: []
-            };
-            locationStatus.serviceGroups.push(serviceGroup);
+          const voidedAppts = deviceAppointments.filter(a => a.status === 'voided');
+          const latestVoidedCleaning = voidedAppts
+            .map(appt => ({ appt, service: allServices.find(s => s.id === appt.service_id) }))
+            .filter(x => x.service?.name.toLowerCase().includes("clean"));
+
+          const latestCompletedCleaning = completedAppts
+            .map(a => ({ appt: a, service: allServices.find(s => s.id === a.service_id) }))
+            .filter(x => x.service?.name.toLowerCase().includes("clean"));
+
+          // Merge voided + completed, sort by date, pick latest
+          const latestCleaning = [...latestVoidedCleaning, ...latestCompletedCleaning]
+            .sort((a, b) => new Date(b.appt.appointment_date).getTime() - new Date(a.appt.appointment_date).getTime())[0];
+
+          if (latestCleaning) {
+            if (latestCleaning.appt.status === "voided") {
+              deviceStatus = "voided";
+            } else {
+              deviceStatus = hasDueDates && isDue ? "due" : "well-maintained";
+            }
+            serviceToUse = latestCleaning.service!;
+            appointmentToUse = latestCleaning.appt;
           }
 
-          if (deviceStatus === 'due') serviceGroup.dueDevices++;
-          else if (deviceStatus === 'well-maintained') serviceGroup.wellMaintainedDevices++;
+          if (serviceToUse) {
+            let serviceGroup = locationStatus.serviceGroups.find(sg => sg.service.id === serviceToUse!.id);
+            if (!serviceGroup) {
+              serviceGroup = {
+                service: serviceToUse,
+                scheduledDevices: 0,
+                dueDevices: 0,
+                wellMaintainedDevices: 0,
+                voidedDevices: 0,
+                repairDevices: 0,
+                lastServiceDate: null,
+                devices: []
+              };
+              locationStatus.serviceGroups.push(serviceGroup);
+            }
 
-          serviceGroup.devices.push({ device, appointment: appointmentToUse, status: deviceStatus, brand, acType, horsepower });
+            if (deviceStatus === 'due') serviceGroup.dueDevices++;
+            else if (deviceStatus === 'well-maintained') serviceGroup.wellMaintainedDevices++;
+            else if (deviceStatus === 'voided') serviceGroup.voidedDevices = (serviceGroup.voidedDevices || 0) + 1;
+
+            serviceGroup.devices.push({ device, appointment: appointmentToUse, status: deviceStatus, brand, acType, horsepower });
+          }
         }
-      }
-    });
+      });
 
-        return Array.from(statusByLocation.values()).map(locationStatus => {
+      return Array.from(statusByLocation.values()).map(locationStatus => {
         const allDeviceEntries: any[] = [];
         const uniqueDeviceIds = new Set<string>();
         let totalScheduled = 0;
         let totalDue = 0;
         let totalWellMaintained = 0;
-        
+        let totalVoided = 0;
 
-        // track as timestamp to avoid re-parsing
-        let lastCleaningDateTs: number | null = null;
         let lastCleaningDate: string | null = null;
 
         locationStatus.serviceGroups.forEach(serviceGroup => {
@@ -1194,29 +1196,26 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
             serviceGroup.service.name.toLowerCase().includes('repair') ||
             serviceGroup.service.name.toLowerCase().includes('maintenance');
 
-          //  Only consider CLEANING appointments for lastCleaningDate
+          // Only consider CLEANING appointments for lastCleaningDate
           if (!isRepair) {
-          serviceGroup.devices.forEach(deviceEntry => {
-            if (
-              deviceEntry.appointment &&
-              deviceEntry.appointment.status === "completed" &&
-              serviceGroup.service?.name?.toLowerCase().includes("clean")
-            ) {
-              const candidateDate = deviceEntry.appointment.appointment_date;
-
-              if (candidateDate) {
-                if (!lastCleaningDate || candidateDate > lastCleaningDate) {
-                  lastCleaningDate = candidateDate; // stays as yyyy-mm-dd
+            serviceGroup.devices.forEach(deviceEntry => {
+              if (
+                deviceEntry.appointment &&
+                deviceEntry.appointment.status === "completed" &&
+                serviceGroup.service?.name?.toLowerCase().includes("clean")
+              ) {
+                const candidateDate = deviceEntry.appointment.appointment_date;
+                if (candidateDate) {
+                  if (!lastCleaningDate || candidateDate > lastCleaningDate) {
+                    lastCleaningDate = candidateDate;
+                  }
                 }
               }
-            }
-          });
-        }
+            });
+          }
 
-        serviceGroup.lastServiceDate = lastCleaningDate;
+          serviceGroup.lastServiceDate = lastCleaningDate;
 
-
-          // keep your existing counting & collection
           if (isRepair) {
             serviceGroup.devices.forEach(deviceEntry => {
               uniqueDeviceIds.add(deviceEntry.device.id);
@@ -1228,6 +1227,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           totalScheduled += serviceGroup.scheduledDevices;
           totalDue += serviceGroup.dueDevices;
           totalWellMaintained += serviceGroup.wellMaintainedDevices;
+          totalVoided += serviceGroup.voidedDevices || 0;
 
           serviceGroup.devices.forEach(deviceEntry => {
             uniqueDeviceIds.add(deviceEntry.device.id);
@@ -1241,18 +1241,18 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           scheduledDevices: totalScheduled,
           dueDevices: totalDue,
           wellMaintainedDevices: totalWellMaintained,
+          voidedDevices: totalVoided,
           devices: allDeviceEntries,
           serviceGroups: locationStatus.serviceGroups,
-          // ⚠️ if you need it here too
-          lastCleaningDate: lastCleaningDateTs ? new Date(lastCleaningDateTs).toISOString() : null,
+          lastCleaningDate: lastCleaningDate,
         };
       }).sort((a, b) => {
-      if (a.location.is_primary && !b.location.is_primary) return -1;
-      if (!a.location.is_primary && b.location.is_primary) return 1;
-      return a.location.name.localeCompare(b.location.name);
-    });
+        if (a.location.is_primary && !b.location.is_primary) return -1;
+        if (!a.location.is_primary && b.location.is_primary) return 1;
+        return a.location.name.localeCompare(b.location.name);
+      });
+    };
 
-  };
   
   const cleaningStatuses = getDeviceCleaningStatus();
   
@@ -1524,10 +1524,12 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     }
     
     const total = subtotal - discountAmount;
+    const discount_type = calculateDiscount().type;
 
     return {
       subtotal,
       discount: discountValue,
+      discount_type,
       discountAmount,
       total
     };
@@ -1558,18 +1560,21 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       discountAmount = (subtotal * discount.value) / 100;
     }
     const total = subtotal - discountAmount;
+    const discount_type = calculateDiscount().type;
     
     return {
       subtotal,
       discount: discountValue,
+      discount_type,
       discountAmount,
-      total
+      total,
     };
   };
 
   // Calculate combined total price for both services
   const calculateCombinedTotalPrice = () => {
     const mainPricing = calculateTotalPrice();
+    const discount_type = calculateDiscount();
     
     const additionalPricing = showAdditionalService && additionalServiceDevices.length > 0 
       ? calculateAdditionalServicePrice() 
@@ -1579,7 +1584,8 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       subtotal: mainPricing.subtotal + additionalPricing.subtotal,
       discount: mainPricing.discount, // Assuming same discount applies, or adjust as needed
       discountAmount: mainPricing.discountAmount + additionalPricing.discountAmount,
-      total: mainPricing.total + additionalPricing.total
+      total: mainPricing.total + additionalPricing.total,
+      discount_type: discount_type.type
     };
   };
 
@@ -1617,9 +1623,18 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
   return (
     <>
       <div className="space-y-8">
-        <DashboardHeader clientName={client.name} locationLabel={primaryLocation ? `${primaryLocation.city_name}, Philippines` : 'Philippines'} />
+        <DashboardHeader
+          clientName={client.name}
+          locationLabel={
+            primaryLocation
+              ? `${primaryLocation.city_name}, Philippines`
+              : "Philippines"
+          }
+          points={client.points}
+          onViewProfile={() => onViewProfile()} // ✅ add this
+        />
 
-        <StatsOverview points={client.points} bookingsCount={appointments.length} devicesCount={devices.length} />
+        <StatsOverview referralCount={referralCount} loyaltyPoints={loyaltyPoints} bookingsCount={appointments.length} devicesCount={devices.length} appointments={appointments} />
 
         <ClientStatusDash 
           cleaningStatuses={currentCleaningStatuses} 
@@ -1641,28 +1656,27 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
           
         />
 
-        {/* <AddLocationButton onClick={handleOpenLocationModal} /> */}
-
-        {/* <PointsCard points={client.points} pointsExpiry={client.points_expiry} onReferClick={onReferClick} />
-
-        <RecentAppointmentsTable
-          appointments={currentAppointments}
-          getServiceName={getServiceName}
-          getLocationName={(id) => getLocation(id)?.name || 'N/A'}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPreviousPage={handlePreviousPage}
-          onNextPage={handleNextPage}
-          itemsPerPage={itemsPerPage}
-        /> */}
 
        <PointsAppointments
         appointments={appointments}
-        points={client?.points || 0}
+        deviceIdToAppointmentId={deviceIdToAppointmentId}
+        points={client?.points ?? 0}
         pointsExpiry={client?.points_expiry}
-        getServiceName={getServiceName}   // you already have this in your file
-        locations={locations}// ✅ now defined
-        onReferClick={onReferClick}  // or open modal
+        getServiceName={getServiceName}
+        locations={locations}
+        devices={devices}
+        brands={allBrands}                   
+        acTypes={allACTypes}                
+        horsepowerOptions={allHorsepowerOptions} 
+        onApplyDeviceUpdate={async (id, patch) => {
+          const updated = await deviceApi.updateDevice(id, patch);
+          return updated;
+        }}
+        onDeviceUpdated={(updated) => {
+          setDevices((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+        }}
+        onReferClick={onReferClick}
+        allServices={allServices || []}
       />
 
       </div>
@@ -1832,7 +1846,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                         <span className="font-semibold text-gray-800">₱{pricing.subtotal.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Discount ({pricing.discount}%):</span>
+                        <span className="text-gray-600">Discount ({pricing.discount}% - {pricing.discount_type}):</span>
                         <span className="font-semibold text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
                       </div>
                       <div className="border-t-2 border-gray-300 pt-4 mt-4">

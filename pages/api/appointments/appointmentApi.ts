@@ -29,9 +29,11 @@ export const appointmentApi = {
           appointment_date: newAppointmentData.appointment_date,
           appointment_time: newAppointmentData.appointment_time || null, // Allow null
           amount: newAppointmentData.amount,
+          stored_discount: newAppointmentData.stored_discount, // Default to false if not provided
           total_units: newAppointmentData.total_units,
           notes: newAppointmentData.notes || null, // Allow null
           status: 'confirmed',
+          discount_type: newAppointmentData.discount_type || 'Standard',
         }
       ])
       .select()
@@ -70,7 +72,7 @@ export const appointmentApi = {
       }: {
         clientId: string;
         status?: string;
-        dateFilter?: "all" | "today" | "incoming" | "previous" | string;
+        dateFilter?: "all" | "today" | string;
         page?: number;
         limit?: number;
       }) => {
@@ -81,7 +83,7 @@ export const appointmentApi = {
           .from("appointments")
           .select(
             `
-              id, appointment_date, appointment_time, status, amount, total_units, notes,
+              id, appointment_date, appointment_time, status, amount, total_units, notes, stored_discount, discount_type,
               clients:client_id(id, name, mobile, email),
               client_locations:location_id(id, name, address_line1),
               services:service_id(id, name),
@@ -108,11 +110,7 @@ export const appointmentApi = {
         // Date filters
         if (dateFilter === "today") {
           query = query.eq("appointment_date", today);
-        } else if (dateFilter === "incoming") {
-          query = query.gte("appointment_date", today);
-        } else if (dateFilter === "previous") {
-          query = query.lt("appointment_date", today);
-        } else if (dateFilter && dateFilter !== "all") {
+        }  else if (dateFilter && dateFilter !== "all") {
           // 👈 Only run when it's an actual date string like "2025-08-25"
           query = query.eq("appointment_date", dateFilter);
         }

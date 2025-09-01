@@ -435,65 +435,130 @@ export default async function handler(
 
       // Generate forecast data for next 6 months
 
+      // const { data: forecastDevices, error: devErr } = await supabase
+      //     .from('devices')
+      //     .select('id, client_id, due_3_months, due_4_months, due_6_months')
+
+      //   if (devErr) throw devErr
+
+      //   const deviceIds = (forecastDevices || []).map(d => d.id)
+
+      //   // 2. Get latest appointment per device (ordered by date)
+      //   const { data: appointmentsData, error: apptErr } = await supabase
+      //     .from('appointment_devices')
+      //     .select('device_id, appointment:appointments(amount, appointment_date)')
+      //     .in('device_id', deviceIds)
+      //     .order('appointment_date', { referencedTable: 'appointments', ascending: false })
+
+      //   if (apptErr) throw apptErr
+
+      //   // 3. Map device_id → latest appointment.amount
+      //   const deviceRevenueMap = new Map<string, number>()
+      //   appointmentsData?.forEach((row: any) => {
+      //     if (!deviceRevenueMap.has(row.device_id)) {
+      //       const amount = row.appointment?.amount || 0
+      //       deviceRevenueMap.set(row.device_id, amount)
+      //     }
+      //   })
+
+      //   // 4. Build forecast data month by month
+      //   const forecastData: ForecastData[] = []
+
+      //   for (let i = 0; i < 6; i++) {
+      //     const forecastMonth = new Date(now.getFullYear(), now.getMonth() + i + 1, 1)
+      //     const monthKey = forecastMonth.toISOString().substring(0, 7)
+
+      //     const devicesDueThisMonth = (forecastDevices || []).filter(d =>
+      //       [d.due_3_months, d.due_4_months, d.due_6_months].some(due => due?.startsWith(monthKey))
+      //     )
+
+      //   const devicesScheduled = devicesDueThisMonth.length
+      //    const clientSet = new Set<string>()
+      //       devicesDueThisMonth.forEach(d => {
+      //         const hasAppointment = appointmentsData?.some(row => row.device_id === d.id)
+      //         if (hasAppointment) {
+      //           clientSet.add(d.client_id) // count client only once, regardless of devices
+      //         }
+      //       })
+      //       const projectedBookings = clientSet.size
+
+      //     // Revenue = sum of each device's *latest* appointment amount
+      //     const projectedRevenue = devicesDueThisMonth.reduce((sum, d) => {
+      //       return sum + (deviceRevenueMap.get(d.id) || 0)
+      //     }, 0)
+
+      //     forecastData.push({
+      //       month: forecastMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      //       projectedRevenue,
+      //       projectedBookings,
+      //       devicesScheduled,
+      //     })
+      //   }
+
+      const nowAdays = new Date();
+      const sixMonthsLater = new Date();
+      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+      // 1. Get devices due in next 6 months
       const { data: forecastDevices, error: devErr } = await supabase
-          .from('devices')
-          .select('id, client_id, due_3_months, due_4_months, due_6_months')
+        .from("devices")
+        .select("id, client_id, due_6_months")
+        .gte("due_6_months", nowAdays.toISOString().substring(0, 10))
+        .lte("due_6_months", sixMonthsLater.toISOString().substring(0, 10));
 
-        if (devErr) throw devErr
+      if (devErr) throw devErr;
 
-        const deviceIds = (forecastDevices || []).map(d => d.id)
+      const deviceIds = (forecastDevices || []).map((d) => d.id);
 
-        // 2. Get latest appointment per device (ordered by date)
-        const { data: appointmentsData, error: apptErr } = await supabase
-          .from('appointment_devices')
-          .select('device_id, appointment:appointments(amount, appointment_date)')
-          .in('device_id', deviceIds)
-          .order('appointment_date', { referencedTable: 'appointments', ascending: false })
+      // 2. Get latest appointment per device (ordered by date desc)
+      const { data: appointmentsData, error: apptErr } = await supabase
+        .from("appointment_devices")
+        .select("device_id, appointment:appointments(amount, appointment_date, client_id)")
+        .in("device_id", deviceIds)
+        .order("appointment_date", { referencedTable: "appointments", ascending: false });
 
-        if (apptErr) throw apptErr
+      if (apptErr) throw apptErr;
 
-        // 3. Map device_id → latest appointment.amount
-        const deviceRevenueMap = new Map<string, number>()
-        appointmentsData?.forEach((row: any) => {
-          if (!deviceRevenueMap.has(row.device_id)) {
-            const amount = row.appointment?.amount || 0
-            deviceRevenueMap.set(row.device_id, amount)
+      // 3. Map device_id → latest appointment.amount
+      const deviceRevenueMap = new Map<string, number>();
+      const deviceClientMap = new Map<string, string>();
+
+      appointmentsData?.forEach((row: any) => {
+        if (!deviceRevenueMap.has(row.device_id)) {
+          const amount = row.appointment?.amount || 0;
+          deviceRevenueMap.set(row.device_id, amount);
+          if (row.appointment?.client_id) {
+            deviceClientMap.set(row.device_id, row.appointment.client_id);
           }
-        })
-
-        // 4. Build forecast data month by month
-        const forecastData: ForecastData[] = []
-
-        for (let i = 0; i < 6; i++) {
-          const forecastMonth = new Date(now.getFullYear(), now.getMonth() + i + 1, 1)
-          const monthKey = forecastMonth.toISOString().substring(0, 7)
-
-          const devicesDueThisMonth = (forecastDevices || []).filter(d =>
-            [d.due_3_months, d.due_4_months, d.due_6_months].some(due => due?.startsWith(monthKey))
-          )
-
-        const devicesScheduled = devicesDueThisMonth.length
-         const clientSet = new Set<string>()
-            devicesDueThisMonth.forEach(d => {
-              const hasAppointment = appointmentsData?.some(row => row.device_id === d.id)
-              if (hasAppointment) {
-                clientSet.add(d.client_id) // count client only once, regardless of devices
-              }
-            })
-            const projectedBookings = clientSet.size
-
-          // Revenue = sum of each device's *latest* appointment amount
-          const projectedRevenue = devicesDueThisMonth.reduce((sum, d) => {
-            return sum + (deviceRevenueMap.get(d.id) || 0)
-          }, 0)
-
-          forecastData.push({
-            month: forecastMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-            projectedRevenue,
-            projectedBookings,
-            devicesScheduled,
-          })
         }
+      });
+
+      // 4. Calculate totals
+      const devicesScheduled = forecastDevices?.length || 0;
+
+      // distinct client count among due devices
+      const clientSet = new Set<string>();
+      forecastDevices?.forEach((d) => {
+        const clientId = deviceClientMap.get(d.id);
+        if (clientId) clientSet.add(clientId);
+      });
+      const projectedBookings = clientSet.size;
+
+      // sum of latest appointment amounts
+      const projectedRevenue = (forecastDevices || []).reduce((sum, d) => {
+        return sum + (deviceRevenueMap.get(d.id) || 0);
+      }, 0);
+
+      // 5. Return forecast data (single entry for "Next 6 Months")
+      const forecastData: ForecastData[] = [
+        {
+          month: `Next 6 Months`,
+          projectedRevenue,
+          projectedBookings,
+          devicesScheduled,
+        },
+      ];
+
 
 
       

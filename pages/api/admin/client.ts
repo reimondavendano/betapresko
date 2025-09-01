@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       let query = supabase
         .from('clients')
-        .select('id, name, mobile, email, points, discounted', { count: 'exact' })
+        .select('id, name, mobile, email, points, discounted, sms_opt_in', { count: 'exact' })
         .order('created_at', { ascending: false })
 
       if (search) {

@@ -49,12 +49,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PATCH') {
-      const { id, name, description, is_active } = req.body as { id: string; name?: string; description?: string | null; is_active?: boolean }
+      const { id, name, description, is_active, set_inactive } = req.body as { id: string; name?: string; description?: string | null; is_active?: boolean, set_inactive?: boolean }
       if (!id) return res.status(400).json({ error: 'id is required' })
       const payload: any = {}
       if (typeof name !== 'undefined') payload.name = String(name)
       if (typeof description !== 'undefined') payload.description = description === null ? null : String(description)
       if (typeof is_active !== 'undefined') payload.is_active = !!is_active
+      if (typeof set_inactive !== 'undefined') payload.set_inactive = !!set_inactive
 
       // Optional duplicate check when name provided
       if (payload.name) {

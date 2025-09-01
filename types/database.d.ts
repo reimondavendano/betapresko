@@ -116,6 +116,8 @@ export interface Appointment {
   appointment_time: TimeString | null;
   status: AppointmentStatus;
   amount: number; // decimal(10,2) in SQL maps to number in TS
+  stored_discount: number;
+  discount_type: string; // New field to capture discount type
   total_units: number;
   notes: string | null;
   created_at: Timestamp;

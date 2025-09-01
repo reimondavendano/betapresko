@@ -16,8 +16,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .order('created_at', { ascending: false })
 
       if (search) {
-        query = query.ilike('name', `%${search}%`)
+        // Step 1: get matching city IDs
+        const { data: cityMatches } = await supabase
+          .from('cities')
+          .select('id')
+          .ilike('name', `%${search}%`);
+
+        const cityIds = (cityMatches || []).map(c => c.id);
+
+        // Step 2: build query for barangays
+        if (cityIds.length > 0) {
+          query = query.or(
+            `name.ilike.%${search}%,city_id.in.(${cityIds.join(',')})`
+          );
+        } else {
+          query = query.ilike('name', `%${search}%`);
+        }
       }
+
+
+
 
       const { data, error, count } = await query.range(from, to)
       if (error) return handleSupabaseError(error, res)

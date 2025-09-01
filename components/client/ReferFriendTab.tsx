@@ -18,7 +18,7 @@ export function ReferFriendTab({ clientId }: ReferFriendTabProps) {
   // Mock referral link
   const referralLink = typeof window !== 'undefined'
     ? `${window.location.origin}/signup?ref=${clientId}`
-    : `https://betapresko.vercel.app/signup?ref=${clientId}`;
+    : `https://presko-ac.vercel.app/signup?ref=${clientId}`;
   
   // The message to share, with the referral link embedded
   const shareMessage = `Thank you for supporting Presko AC! For our services, you may click the link to register.`;

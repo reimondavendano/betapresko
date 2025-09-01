@@ -9,6 +9,7 @@ import type { AppointmentWithDetails, CustomSetting } from "@/types/database";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
+
 interface Props {
   clientId: string;
 }
@@ -16,7 +17,7 @@ interface Props {
 export function ClientInvoice({ clientId }: Props) {
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<"all" | "today" | "incoming" | "previous">("all");
+  const [filter, setFilter] = useState<"all" | "today" >("all");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -135,7 +136,7 @@ export function ClientInvoice({ clientId }: Props) {
       <div className="flex flex-col sm:flex-row sm:justify-between w-full gap-2">
         {/* Buttons Row */}
         <div className="flex flex-wrap gap-2">
-          {["all", "today", "incoming", "previous"].map((f) => (
+          {["all", "today"].map((f) => (
             <Button
               key={f}
               className="rounded-md border-teal-400 text-teal-600 bg-white hover:bg-white-100 shadow-md text-sm"
@@ -177,8 +178,9 @@ export function ClientInvoice({ clientId }: Props) {
         }, 0);
 
         // Apply discount on subtotal
-        const discount = calculateDiscount(appt.clients);
-        const discountAmount = (subtotal * discount.value) / 100;
+        const discount = appt.stored_discount;
+        const discountType = appt.discount_type;
+        const discountAmount = (subtotal * discount) / 100;
 
         // Final total comes from appointment table (trusted amount)
         const finalTotal = appt.amount;
@@ -266,7 +268,7 @@ export function ClientInvoice({ clientId }: Props) {
                 <span>₱{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Discount ({discount.value}% {discount.type})</span>
+                <span>Discount ({discount}% {discountType})</span>
                 <span>-₱{discountAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">

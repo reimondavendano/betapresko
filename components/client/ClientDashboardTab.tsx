@@ -602,7 +602,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           // Get the IDs of points to redeem
           const pointIds = pointsToRedeem.map(point => point.id);
           
-          // Update multiple loyalty points status to "Redeemed"
           await loyaltyPointsApi.redeemMultiplePoints(pointIds);
           
           // DON'T increment the local state - fetch fresh data instead
@@ -1993,7 +1992,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                   <div className="flex items-center">
                     <AlertCircle className="w-5 h-5 text-amber-600 mr-2" />
                     <p className="text-sm text-amber-800">
-                      No points for this booking since a friend's discount is applied.
+                      No points for this booking since a friends discount is applied.
                     </p>
                   </div>
                 </div>
@@ -2051,7 +2050,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               <AlertCircle className="w-12 h-12 text-amber-500" />
               <h3 className="text-lg font-bold text-gray-800">Cannot Use Points</h3>
               <p className="text-center text-gray-600">
-                No points for this booking since a friend's discount is applied.
+                No points for this booking since a friends discount is applied.
               </p>
               <Button 
                 onClick={() => setShowFriendsDiscountWarning(false)} 

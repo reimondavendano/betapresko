@@ -219,8 +219,8 @@ export function ClientStatusDash({
                 {/* Total Devices Card */}
                 <Card className="p-4 flex flex-col items-start">
                   <p className="text-sm font-medium text-gray-600">Total Devices</p>
-                  <p className="text-3xl font-bold text-blue-600">{status.totalDevices}</p>
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  <p className="text-3xl font-bold text-blue-600 mt-3">{status.totalDevices}</p>
+                  <div className="flex flex-wrap gap-2 mt-4">
                     <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
                       {status.scheduledDevices} Booked
                     </Badge>

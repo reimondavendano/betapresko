@@ -34,6 +34,40 @@ export const appointmentApi = {
           notes: newAppointmentData.notes || null, // Allow null
           status: 'confirmed',
           discount_type: newAppointmentData.discount_type || 'Standard',
+          stored_loyalty_points: newAppointmentData.stored_loyalty_points || 0,
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating appointment:', error);
+      throw new Error(error.message);
+    }
+    return data as Appointment;
+  },
+
+  createAppointmentRedeem: async (newAppointmentData: Omit<Appointment, 'id' | 'created_at' | 'updated_at' >): Promise<Appointment> => {
+    // Supabase will automatically generate 'id', 'created_at', 'updated_at'
+    // 'status' defaults to 'pending' as per your database schema
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert([
+        {
+          client_id: newAppointmentData.client_id,
+          location_id: newAppointmentData.location_id,
+          service_id: newAppointmentData.service_id,
+          appointment_date: newAppointmentData.appointment_date,
+          appointment_time: newAppointmentData.appointment_time || null, // Allow null
+          amount: 0,
+          stored_discount: 0, // Default to false if not provided
+          total_units: 1,
+          notes: newAppointmentData.notes || null, // Allow null   
+          status: 'redeemed',
+          discount_type: "Standard",
+
+          
+          
         }
       ])
       .select()

@@ -26,29 +26,29 @@ export function RecentAppointmentsTable({
   const [currentPage, setCurrentPage] = React.useState(1);
 
   // ✅ Apply filters
-  const filteredAppointments = appointments.filter((appointment) => {
-    const matchStatus =
-      statusFilter === "all" ? true : appointment.status === statusFilter;
+    const filteredAppointments = appointments.filter((appointment) => {
+      const matchStatus =
+        statusFilter === "all" ? true : appointment.status === statusFilter;
 
-    const matchDate = dateFilter
-      ? format(new Date(appointment.appointment_date), "yyyy-MM-dd") === dateFilter
-      : true;
+      const matchDate = dateFilter
+        ? format(new Date(appointment.appointment_date), "yyyy-MM-dd") === dateFilter
+        : true;
 
-    return matchStatus && matchDate;
-  });
+      return matchStatus && matchDate;
+    });
 
-  // ✅ Pagination based on filtered data
-  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage) || 1;
+    // ✅ Pagination based on filtered data
+    const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage) || 1;
 
-  React.useEffect(() => {
-    setCurrentPage(1); // reset when filters change
-  }, [statusFilter, dateFilter]);
+    React.useEffect(() => {
+      setCurrentPage(1); // reset when filters change
+    }, [statusFilter, dateFilter]);
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedAppointments = filteredAppointments.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedAppointments = filteredAppointments.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
 
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
@@ -82,7 +82,7 @@ export function RecentAppointmentsTable({
         {/* ✅ Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-teal-600 border-b-2 border-t-2">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>

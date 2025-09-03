@@ -7,6 +7,7 @@ interface DashboardHeaderProps {
   clientName: string;
   locationLabel: string;
   points: number;
+  loyaltyPoints: number;
   onViewProfile: () => void; // ✅ new prop
 }
 
@@ -14,6 +15,7 @@ export function DashboardHeader({
   clientName,
   locationLabel,
   points,
+  loyaltyPoints,
   onViewProfile,
 }: DashboardHeaderProps) {
   return (
@@ -65,7 +67,7 @@ export function DashboardHeader({
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
             Loyalty Points
           </h3>
-          <div className="text-4xl font-bold text-orange-600 mb-2">{points}</div>
+          <div className="text-4xl font-bold text-orange-600 mb-2">{loyaltyPoints}</div>
           <p className="text-sm text-gray-600">Total earned points</p>
           <div className="mt-4 p-3 bg-white/60 rounded-lg">
             <div className="flex items-center justify-center space-x-2">

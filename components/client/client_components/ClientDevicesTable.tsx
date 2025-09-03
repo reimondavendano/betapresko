@@ -140,7 +140,7 @@ export function ClientDevicesTable({
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+             <thead className="bg-gray-50 border-teal-600 border-b-2 border-t-2">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
@@ -184,7 +184,7 @@ export function ClientDevicesTable({
                           case "scheduled":
                             return (
                               <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">
-                                Scheduled
+                                Booked
                               </span>
                             );
                           case "due":
@@ -196,7 +196,7 @@ export function ClientDevicesTable({
                           case "maintain":
                             return (
                               <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
-                                Well Maintained
+                                Up to Date
                               </span>
                             );
                           case "repair":

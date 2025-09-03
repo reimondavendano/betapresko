@@ -1,6 +1,6 @@
 // src/api/deviceApi.ts
 import { supabase } from '../../../lib/supabase'; // Adjust path as needed
-import { Device, UUID } from '../../../types/database'; // Import Device and UUID types
+import { Device, DeviceRedeem, UUID } from '../../../types/database'; // Import Device and UUID types
 
 export const deviceApi = {
   /**
@@ -47,6 +47,38 @@ export const deviceApi = {
     }
     return data as Device[];
   },
+
+   getByClientIdForRedeemed: async (clientId: string): Promise<DeviceRedeem[]> => {
+    const { data, error } = await supabase
+      .from("devices")
+      .select(`
+        id,
+        name,
+        brand:brands(id, name),
+        ac_type:ac_types(id, name),
+        horsepower:horsepower_options(id, display_name)
+      `)
+      .eq("client_id", clientId);
+
+    if (error) {
+      console.error("Error fetching devices:", error);
+      throw new Error(error.message);
+    }
+
+    // 🔥 normalize so brand/ac_type/horsepower are single objects
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      brand: d.brand?.[0] || null,
+      ac_type: d.ac_type?.[0] || null,
+      horsepower: d.horsepower?.[0] || null,
+    })) as DeviceRedeem[];
+  },
+
+  
+
+
+
 
   /**
    * Updates an existing device.

@@ -42,6 +42,7 @@ import { clientLocationApi } from '../../pages/api/clientLocation/clientLocation
 import { Client, ClientLocation } from '../../types/database';
 import { customSettingsApi } from '@/pages/api/custom_settings/customSettingsApi';
 import { ReferFriendTab } from './ReferFriendTab';
+import { loyaltyPointsApi } from '@/pages/api/loyalty_points/loyaltyPointsApi';
 
 
 interface ClientInfoTabProps {
@@ -57,6 +58,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Client>>({});
   const [siteUrl, setSiteUrl] = useState<string>('');
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
 
 
   useEffect(() => {
@@ -74,7 +76,11 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
         setFormData(fetchedClient);
 
         const fetchedLocations = await clientLocationApi.getByClientId(clientId);
+
+        const loyaltyPointsAwait = await loyaltyPointsApi.getClientPoints(clientId);
+
         setLocations(fetchedLocations);
+        setLoyaltyPoints(loyaltyPointsAwait);
       } catch (err: any) {
         setError(err.message || 'Failed to load client information.');
       } finally {
@@ -355,7 +361,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
                   <Crown className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Loyalty Points</h3>
-                <div className="text-4xl font-bold text-orange-600 mb-2">{client.points}</div>
+                <div className="text-4xl font-bold text-orange-600 mb-2">{loyaltyPoints}</div>
                 <p className="text-sm text-gray-600">Total earned points</p>
                 <div className="mt-4 p-3 bg-white/60 rounded-lg">
                   <div className="flex items-center justify-center space-x-2">

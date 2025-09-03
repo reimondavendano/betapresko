@@ -218,6 +218,7 @@ export function ConfirmStep() {
         total_units: selectedDevices.reduce((sum, device) => sum + device.quantity, 0),
         notes: null,
         status: 'confirmed',
+        stored_loyalty_points: 0, 
       };
       const createdAppointment: Appointment = await appointmentApi.createAppointment(newAppointmentData);
 

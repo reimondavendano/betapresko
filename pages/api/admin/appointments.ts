@@ -92,13 +92,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (typeof stored_discount !== 'undefined') updatePayload.stored_discount = stored_discount
       if (typeof discount_type !== 'undefined') updatePayload.discount_type = discount_type
 
-
       // Update appointment fields and fetch needed data for downstream logic
       const { data: appt, error: updateErr } = await supabase
         .from('appointments')
         .update(updatePayload)
         .eq('id', id)
-        .select('id, status, appointment_date, client_id, service_id, amount, stored_discount, discount_type')
+        .select(`
+          id,
+          status,
+          appointment_date,
+          client_id,
+          service_id,
+          amount,
+          stored_discount,
+          discount_type,
+          clients:client_id(id, name, mobile)
+        `)
         .single()
 
       if (updateErr) return handleSupabaseError(updateErr, res)
@@ -133,7 +142,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (deviceIds.length > 0 && service) {
           const serviceName = service.name.toLowerCase();
-         
 
           let updatePayload: any = {
             updated_at: new Date().toISOString(),
@@ -158,7 +166,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // --- Referral logic ---
+        // --- Updated Points calculation based on transaction amount ---
+        const transactionAmount = appt.amount || 0;
+        let pointsToAdd = 0;
+        
+        if (transactionAmount >= 500 && transactionAmount <= 999) {
+          pointsToAdd = 0.5;
+        } else if (transactionAmount >= 1000 && transactionAmount <= 2000) {
+          pointsToAdd = 1;
+        } else if (transactionAmount >= 2001 && transactionAmount <= 3000) {
+          pointsToAdd = 2;
+        } else if (transactionAmount >= 3001) {
+          pointsToAdd = 3; // capped at 1 point
+        }
+
+        // --- Referral logic with updated points ---
         if (appt.client_id) {
           const { data: client, error: clientErr } = await supabase
             .from("clients")
@@ -166,7 +188,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .eq("id", appt.client_id)
             .single();
 
+
           if (clientErr) return handleSupabaseError(clientErr, res);
+
+          // Add points to client
+          const { error: clientUpdateErr } = await supabase
+            .from("clients")
+            .update({
+              points: (client.points || 0) + pointsToAdd,
+              updated_at: new Date().toISOString() as any,
+            })
+            .eq("id", client.id);
+
+          const { data: loyaltyData, error: loyaltyErr } = await supabase
+            .from("loyalty_points")
+            .insert([
+              {
+                client_id: appt.client_id,
+                appointment_id: appt.id,
+                points: pointsToAdd, // Use calculated points based on transaction amount
+                date_earned: appt.appointment_date 
+              },
+            ])
+            .select();
+
+     
+          if (clientUpdateErr) return handleSupabaseError(clientUpdateErr, res);
 
           if (client?.ref_id) {
             const { data: referrer, error: refErr } = await supabase
@@ -180,12 +227,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const { error: incErr } = await supabase
                 .from("clients")
                 .update({
-                  points: (referrer.points || 0) + 1,
+                  points: (referrer.points || 0) + pointsToAdd,
                   updated_at: new Date().toISOString() as any,
                 })
                 .eq("id", referrer.id);
               if (incErr) return handleSupabaseError(incErr, res);
-            }
+
+              const { data: referrerLoyaltyData, error: referrerLoyaltyErr } = await supabase
+                .from("loyalty_points")
+                .insert([
+                  {
+                    client_id: referrer.id,
+                    appointment_id: null,
+                    points: 1, 
+                    date_earned: appt.appointment_date,
+                    is_referral: true,
+                  },
+                ])
+                .select();
+                 if (refErr) return handleSupabaseError(refErr, res);
+
+              console.log("Referral points added:", referrerLoyaltyData);
+              }
+           
 
             const { error: clearErr } = await supabase
               .from("clients")
@@ -195,28 +259,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-
-        // --- Loyalty Points logic ---
-        if (appt.client_id) {
-          const { data: loyaltyData, error: loyaltyErr } = await supabase
-            .from("loyalty_points")
-            .insert([
-              {
-                client_id: appt.client_id,
-                appointment_id: appt.id,
-                points: 1,
-                date_earned: appt.appointment_date 
-              },
-            ])
-            .select();
-
-          if (loyaltyErr) {
-            console.error("Loyalty insert failed:", loyaltyErr);
-            return handleSupabaseError(loyaltyErr, res);
-          }
-    
-        }
-
         try {
           await fetch(`${process.env.BASE_URL}/api/send-push`, {
             method: "POST",
@@ -224,7 +266,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             body: JSON.stringify({
               mode: "admin_to_client",
               client_id: appt.client_id,
-              client_name: "", // optional: fetch name if needed
+              client_name: appt?.clients?.[0]?.name || "Client",
               title: "✅ Appointment Completed",
             }),
           });
@@ -243,5 +285,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return handleSupabaseError(e, res)
   }
 }
-
-

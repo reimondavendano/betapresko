@@ -12,37 +12,56 @@ export const loyaltyPointsApi = {
     const { data, error, count } = await supabase
       .from("loyalty_points")
       .select(
-    `
-      id,
-      points,
-      status,
-      date_earned,
-      date_expiry,
-      client:clients (id, name),
-      appointment:appointments (
+      `
         id,
-        service:services (id, name),
-        devices:appointment_devices (
-          device:devices (
-            id,
-            name,
-            brand:brands (name),
-            ac_type:ac_types (name),
-            horsepower:horsepower_options (display_name)
+        points,
+        status,
+        date_earned,
+        date_expiry,
+        client:clients (id, name),
+        appointment:appointments (
+          id,
+          service:services (id, name),
+          devices:appointment_devices (
+            device:devices (
+              id,
+              name,
+              brand:brands (name),
+              ac_type:ac_types (name),
+              horsepower:horsepower_options (display_name)
+            )
           )
         )
-      )
-        `,
-        { count: "exact" }
-      )
+          `,
+          { count: "exact" }
+        )
       .eq("client_id", clientId)
-      .order("date_earned", { ascending: false })
+      .order("date_earned", { ascending: true })
       .range(from, to);
 
     if (error) throw error;
 
     return { data, count: count || 0 };
   },
+
+  createLoyaltyPoint: async (loyaltyPointData: {
+      client_id: string;
+      appointment_id?: string;
+      points: number;
+      status: "Earned" | "Redeemed" | "Expired";
+      date_earned: string;
+      date_expiry: string;
+      is_referral?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from("loyalty_points")
+        .insert([loyaltyPointData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
 
       /**
      * Get latest expiry date for client's earned points
@@ -69,12 +88,72 @@ export const loyaltyPointsApi = {
 
       return earliest;
 
-      // 🔵 Option B: if you prefer latest expiry
-      // const latest = data.reduce((max, row) =>
-      //   row.date_expiry > max ? row.date_expiry : max,
-      // data[0].date_expiry);
-      // return latest;
     },
+
+  getRedemptionEventCount: async (clientId: string): Promise<number> => {
+    const currentYear = new Date().getFullYear();
+    
+    // Get all redeemed points for current year
+    // Use updated_at to track when the redemption actually happened
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .select("date_earned, created_at, updated_at, status")
+      .eq("client_id", clientId)
+      .eq("status", "Redeemed")
+      // Check when the redemption happened (updated_at), not when points were earned
+      .gte("updated_at", `${currentYear}-01-01T00:00:00`)
+      .lt("updated_at", `${currentYear + 1}-01-01T00:00:00`);
+
+    if (error) throw error;
+
+    // Group by redemption date (when status was changed to Redeemed)
+    // Points redeemed in the same transaction are counted as one event
+    const redemptionDates = new Map<string, number>();
+    
+    data?.forEach(point => {
+      // Use updated_at as the redemption date
+      const redemptionDate = new Date(point.updated_at).toDateString();
+      redemptionDates.set(redemptionDate, (redemptionDates.get(redemptionDate) || 0) + 1);
+    });
+
+    // Count unique redemption events (unique dates)
+    return redemptionDates.size;
+  },
+
+  getRedemptionEventCountAccurate: async (clientId: string): Promise<number> => {
+    const currentYear = new Date().getFullYear();
+    
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .select("updated_at, status")
+      .eq("client_id", clientId)
+      .eq("status", "Redeemed")
+      .gte("updated_at", `${currentYear}-01-01T00:00:00`)
+      .lt("updated_at", `${currentYear + 1}-01-01T00:00:00`)
+      .order("updated_at", { ascending: true });
+
+    if (error) throw error;
+    if (!data || data.length === 0) return 0;
+
+    // Group redemptions that happened within 5 minutes of each other as one event
+    let eventCount = 1;
+    let lastRedemptionTime = new Date(data[0].updated_at);
+
+    for (let i = 1; i < data.length; i++) {
+      const currentTime = new Date(data[i].updated_at);
+      const timeDiff = (currentTime.getTime() - lastRedemptionTime.getTime()) / 1000 / 60; // in minutes
+      
+      if (timeDiff > 5) {
+        // If more than 5 minutes apart, count as a new redemption event
+        eventCount++;
+        lastRedemptionTime = currentTime;
+      }
+    }
+
+    return eventCount;
+  },
+
+  
 
 
   /**
@@ -109,5 +188,104 @@ export const loyaltyPointsApi = {
     if (error) throw error;
 
     return count || 0;
+  },
+
+    updateLoyaltyPointStatus: async (id: string, status: "Earned" | "Redeemed" | "Expired") => {
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .update({ status })
+      .eq("id", id)
+      .select();
+
+    if (error) throw error;
+    return data?.[0];
+  },
+
+  /**
+   * NEW: Get multiple redeemable loyalty points up to the total points needed
+   * This handles fractional points by finding multiple records that sum to the target
+   */
+  getRedeemablePoints: async (clientId: string, targetPoints: number) => {
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .select("id, points, status, date_earned")
+      .eq("client_id", clientId)
+      .eq("status", "Earned")
+      .order("date_earned", { ascending: true });
+
+    if (error) throw error;
+
+    const currentYear = new Date().getFullYear();
+    const redeemedThisYear = data.filter(
+      (p) =>
+        p.status === "Redeemed" &&
+        new Date(p.date_earned).getFullYear() === currentYear
+    ).length;
+
+    // Check if already redeemed 3 times this year
+    if (redeemedThisYear >= 3) return [];
+
+    // Find points to redeem that sum up to targetPoints
+    const earnedPoints = data.filter(
+      (p) =>
+        p.status === "Earned" &&
+        new Date(p.date_earned).getFullYear() === currentYear
+    );
+
+    const pointsToRedeem = [];
+    let currentSum = 0;
+
+    for (const point of earnedPoints) {
+      if (currentSum >= targetPoints) break;
+      pointsToRedeem.push(point);
+      currentSum += point.points;
+    }
+
+    // Only return if we have enough points to cover the target
+    return currentSum >= targetPoints ? pointsToRedeem : [];
+  },
+
+  /**
+   * NEW: Update multiple loyalty points to "Redeemed" status
+   */
+  redeemMultiplePoints: async (pointIds: string[]) => {
+    if (pointIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .update({ status: "Redeemed" })
+      .in("id", pointIds)
+      .select();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Keep the old method for backward compatibility
+  getNextRedeemable: async (clientId: string) => {
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .select("id, status, date_earned")
+      .eq("client_id", clientId)
+      .order("date_earned", { ascending: true });
+
+    if (error) throw error;
+
+    const currentYear = new Date().getFullYear();
+    const redeemedThisYear = data.filter(
+      (p) =>
+        p.status === "Redeemed" &&
+        new Date(p.date_earned).getFullYear() === currentYear
+    ).length;
+
+    if (redeemedThisYear >= 3) return null;
+
+    const oldest = data.find(
+      (p) =>
+        p.status === "Earned" &&
+        new Date(p.date_earned).getFullYear() === currentYear
+    );
+
+    return oldest?.id || null;
   },
 };

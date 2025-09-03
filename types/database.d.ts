@@ -105,7 +105,7 @@ export type ClientLocationWithDetails = ClientLocation & {
 };
 
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'voided';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'voided' | 'redeemed';
 
 export interface Appointment {
   id: UUID;
@@ -119,6 +119,7 @@ export interface Appointment {
   stored_discount: number;
   discount_type: string; // New field to capture discount type
   total_units: number;
+  stored_loyalty_points: number; // New field to capture loyalty points used
   notes: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
@@ -139,6 +140,16 @@ export interface Device {
   due_6_months: DateString | null; // GENERATED ALWAYS AS date
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+interface DeviceRedeem {
+  id: UUID;
+  name: string;
+  brand?: { id: UUID; name: string } | null;
+  ac_type?: { id: UUID; name: string } | null;
+  horsepower?: { id: UUID; display_name: string } | null;
+  price?: number;       // computed for logic
+  isEligible?: boolean; // used to check if device can be redeemed
 }
 
 // New: appointment_devices join table

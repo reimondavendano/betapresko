@@ -182,6 +182,12 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [referralCount, setReferralCount] = useState(0);
+  const [loyaltyPointsHistory, setLoyaltyPointsHistory] = useState<any[]>([]);
+
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+  const [loyaltyPointsDiscount, setLoyaltyPointsDiscount] = useState(0);
+  const [showFriendsDiscountWarning, setShowFriendsDiscountWarning] = useState(false);
+  const [redemptionEventsThisYear, setRedemptionEventsThisYear] = useState(0);
 
   const [locationForm, setLocationForm] = useState<{
     name: string;
@@ -555,18 +561,21 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       let amount = 0;
       let stored_discount = 0;
       let discount_type = 'Standard';
+      let stored_loyalty_points = 0;
       let newDeviceIds: UUID[] = [];
       let additionalDeviceIds: UUID[] = [];
 
-      // --- Pricing ---
-      const pricing = calculateTotalPrice();
-
-      amount = pricing.total;
+      // --- Pricing calculation with loyalty points ---
+      const pricing = calculateCombinedTotalPriceWithLoyalty();
+      
+      // Use the final total after applying loyalty points discount
+      amount = pricing.finalTotal;
       stored_discount = pricing.discount;
       discount_type = pricing.discount_type;
+      stored_loyalty_points = useLoyaltyPoints ? loyaltyPointsDiscount : 0;
       totalUnits = selectedDevices.length + 
-                   newUnits.reduce((sum, unit) => sum + unit.quantity, 0) +
-                   additionalUnits.reduce((sum, unit) => sum + unit.quantity, 0);
+                  newUnits.reduce((sum, unit) => sum + unit.quantity, 0) +
+                  additionalUnits.reduce((sum, unit) => sum + unit.quantity, 0);
 
       // --- Create main appointment ---
       const newAppointment = await appointmentApi.createAppointment({
@@ -580,29 +589,43 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         discount_type,
         total_units: totalUnits,
         notes: "Client panel booking",
+        stored_loyalty_points: stored_loyalty_points,
       });
 
-      // --- Insert new devices for newUnits ---
-      // for (const unit of newUnits) {
-      //   if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) continue;
-      //   const brand = allBrands.find((b) => b.id === unit.brand_id)?.name || "Unknown";
-      //   const acType = allACTypes.find((t) => t.id === unit.ac_type_id)?.name || "Unknown";
-      //   const deviceName = `${brand} ${acType}`;
-
-      //   for (let i = 0; i < unit.quantity; i++) {
-      //     const newDevice = await deviceApi.createDevice({
-      //       client_id: client.id,
-      //       location_id: selectedLocationId,
-      //       name: deviceName,
-      //       brand_id: unit.brand_id,
-      //       ac_type_id: unit.ac_type_id,
-      //       horsepower_id: unit.horsepower_id,
-      //       last_cleaning_date: null,
-      //       last_repair_date: null,
-      //     });
-      //     newDeviceIds.push(newDevice.id);
-      //   }
-      // }
+      // --- Handle loyalty points redemption ---
+      if (useLoyaltyPoints && loyaltyPointsDiscount > 0) {
+      try {
+        // Find multiple redeemable loyalty points that sum to the discount amount
+        const pointsToRedeem = await loyaltyPointsApi.getRedeemablePoints(client.id, loyaltyPoints);
+        
+        if (pointsToRedeem.length > 0) {
+          // Get the IDs of points to redeem
+          const pointIds = pointsToRedeem.map(point => point.id);
+          
+          // Update multiple loyalty points status to "Redeemed"
+          await loyaltyPointsApi.redeemMultiplePoints(pointIds);
+          
+          // DON'T increment the local state - fetch fresh data instead
+          // The redemption count should come from the database
+          
+          // // Refresh all loyalty points data including redemption count
+          // const [updatedPoints, updatedHistory, updatedRedemptionCount] = await Promise.all([
+          //   loyaltyPointsApi.getClientPoints(client.id),
+          //   loyaltyPointsApi.getLoyaltyPoints(client.id),
+          //   loyaltyPointsApi.getRedemptionEventCountAccurate(client.id) // Use the accurate version
+          // ]);
+          
+          // setLoyaltyPoints(updatedPoints);
+          // setLoyaltyPointsHistory(updatedHistory.data || []);
+          // setRedemptionEventsThisYear(updatedRedemptionCount); // Set the actual count from DB
+          
+          toast.success('Loyalty points redeemed successfully!');
+        }
+      } catch (loyaltyError) {
+        console.error('Error handling loyalty points redemption:', loyaltyError);
+        toast.error('Booking successful, but failed to redeem loyalty points. Please contact support.');
+      }
+    }
 
       // --- Insert new devices for additionalUnits ---
       for (const unit of additionalUnits) {
@@ -658,6 +681,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
           discount_type: discount_type,
           total_units: additionalServiceDevices.length,
           notes: "Client panel booking - Additional service",
+          stored_loyalty_points: stored_loyalty_points,
         });
 
         const additionalJoinRows = additionalServiceDevices.map((deviceId) => ({
@@ -680,12 +704,10 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
         const service = allServices.find(s => s.id === selectedServiceId);
         if (service) {
-           const serviceName = service.name.toLowerCase();
+          const serviceName = service.name.toLowerCase();
           if (serviceName.includes("repair") || serviceName.includes("maintenance")) {
-            //  Repair or maintenance
             updatePayload.last_repair_date = appointmentDate;
           } else if (serviceName.includes("cleaning")) {
-            //  Pure cleaning
             updatePayload.last_cleaning_date = appointmentDate;
           }
         }
@@ -706,9 +728,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             client_id: client.id,
             client_name: client.name,
             title: "📅 New Booking",
-            
           }),
-          
         });
 
         toast.success("Admins notified!");
@@ -739,7 +759,6 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
         console.error("Error creating notification:", notificationError);
       }
 
-
       // --- Refresh local state ---
       const [fetchedDevices, fetchedAppointments] = await Promise.all([
         deviceApi.getByClientId(client.id),
@@ -748,11 +767,15 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
       setDevices(fetchedDevices);
       setAppointments(fetchedAppointments);
 
-      // Reset forms
+      // Reset forms and loyalty points state
       setNewUnits([]);
       setAdditionalUnits([]);
+      setUseLoyaltyPoints(false);
+      setLoyaltyPointsDiscount(0);
+      
     } catch (err) {
       console.error("Failed to confirm booking:", err);
+      toast.error("Failed to confirm booking. Please try again.");
     } finally {
       handleCloseBookingModal();
       handleCloseSummaryModal();
@@ -920,54 +943,56 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
   
 
   useEffect(() => {
-  const fetchClientData = async () => {
-    setIsLoading(true);
-    setError(null);
+    const fetchClientData = async () => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const fetchedClient = await clientApi.getClientById(clientId);
-      if (!fetchedClient) {
-        setError("Client not found.");
+      try {
+        const fetchedClient = await clientApi.getClientById(clientId);
+        if (!fetchedClient) {
+          setError("Client not found.");
+          setIsLoading(false);
+          return;
+        }
+
+        const [
+          fetchedLocations,
+          fetchedDevices,
+          fetchedAppointments,
+          fetchedPoints,
+          fetchedReferrals,
+          fetchedPointsHistoryResponse,
+          redemptionCount
+        ] = await Promise.all([
+          clientLocationApi.getByClientId(clientId),
+          deviceApi.getByClientId(clientId),
+          appointmentApi.getByClientId(clientId),
+          loyaltyPointsApi.getClientPoints(clientId), 
+          loyaltyPointsApi.getReferralCount(clientId),    
+          loyaltyPointsApi.getLoyaltyPoints(clientId),
+          loyaltyPointsApi.getRedemptionEventCountAccurate(clientId)
+        ]);
+
+        
+        setClient(fetchedClient);
+        setLoyaltyPoints(fetchedPoints);                                  
+        setReferralCount(fetchedReferrals);                               
+        setLoyaltyPointsHistory(fetchedPointsHistoryResponse.data || []); 
+        setRedemptionEventsThisYear(redemptionCount);
+        setLocations(fetchedLocations);
+        setDevices(fetchedDevices);
+        setAppointments(fetchedAppointments);
+
+      } catch (err: any) {
+        console.error("Error fetching client dashboard data:", err);
+        setError(err.message || "Failed to load client data.");
+      } finally {
         setIsLoading(false);
-        return;
       }
+    };
 
-      const [
-        fetchedLocations,
-        fetchedDevices,
-        fetchedAppointments,
-        fetchedPoints,
-        fetchedReferrals
-      ] = await Promise.all([
-        clientLocationApi.getByClientId(clientId),
-        deviceApi.getByClientId(clientId),
-        appointmentApi.getByClientId(clientId),
-        loyaltyPointsApi.getClientPoints(clientId),
-        loyaltyPointsApi.getReferralCount(clientId),
-      ]);
-
-
-      setClient(fetchedClient);
-      setLoyaltyPoints(fetchedPoints);
-      setLocations(fetchedLocations);
-      setDevices(fetchedDevices);
-      setAppointments(fetchedAppointments);
-      setReferralCount(fetchedReferrals);
-      
-    } catch (err: any) {
-      console.error("Error fetching client dashboard data:", err);
-      setError(err.message || "Failed to load client data.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  fetchClientData();
-}, [clientId, refreshKey]);
-
-
-
-
+    fetchClientData();
+  }, [clientId, refreshKey]);
 
 
   const getServiceName = (id: UUID | null) => allServices.find(s => s.id === id)?.name || 'N/A';
@@ -1571,6 +1596,105 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
     };
   };
 
+  // Add this helper function to calculate loyalty points discount
+  const calculateLoyaltyPointsDiscount = (points: number): number => {
+    if (points <= 0) return 0;
+    
+    // Base calculation: every 0.5 points = 50 pesos
+    return points * 100; // 0.5 points = 50 pesos, 1 point = 100 pesos, etc.
+  };
+
+  // Add this helper function to check if loyalty points can be used
+  const canUseLoyaltyPoints = (): boolean => {
+    if (!client || loyaltyPoints <= 0) return false;
+    
+    // Check if client has friends/family discount (discounted = true)
+    if (client.discounted) return false;
+    
+    return true;
+  };
+
+  // Updated checkRedemptionLimit function
+  const checkRedemptionLimit = async (): Promise<boolean> => {
+    try {
+      if (!client) return false;
+      
+      // Fetch the latest redemption count from database
+      const currentRedemptionCount = await loyaltyPointsApi.getRedemptionEventCountAccurate(client.id);
+      
+      // Update the local state with fresh data
+      setRedemptionEventsThisYear(currentRedemptionCount);
+      
+      console.log(`Current redemption events this year: ${currentRedemptionCount}/3`);
+      
+      // Check if under the limit
+      return currentRedemptionCount < 3; // Max 3 redemption events per year
+    } catch (error) {
+      console.error('Error checking redemption limit:', error);
+      return false;
+    }
+  };
+
+  // Add this handler for loyalty points toggle
+  const handleLoyaltyPointsToggle = async (checked: boolean) => {
+    if (!client) return;
+    
+    // Check if client has friends/family discount
+    if (client.discounted) {
+      setShowFriendsDiscountWarning(true);
+      return;
+    }
+    
+    if (checked) {
+      // Always fetch fresh redemption count from database
+      const canRedeem = await checkRedemptionLimit();
+      
+      if (!canRedeem) {
+        // Get the actual count for a more informative message
+        const currentCount = await loyaltyPointsApi.getRedemptionEventCountAccurate(client.id);
+        alert(`You have already redeemed loyalty points ${currentCount} times this year. Maximum of 3 redemptions per year allowed.`);
+        return;
+      }
+      
+      const discount = calculateLoyaltyPointsDiscount(loyaltyPoints);
+      setLoyaltyPointsDiscount(discount);
+      setUseLoyaltyPoints(true);
+    } else {
+      setLoyaltyPointsDiscount(0);
+      setUseLoyaltyPoints(false);
+    }
+  };
+
+  // Optional: Add a helper to refresh redemption count periodically
+  const refreshRedemptionCount = async () => {
+    if (!client) return;
+    
+    try {
+      const updatedCount = await loyaltyPointsApi.getRedemptionEventCountAccurate(client.id);
+      setRedemptionEventsThisYear(updatedCount);
+    } catch (error) {
+      console.error('Error refreshing redemption count:', error);
+    }
+  };
+
+  const calculateCombinedTotalPriceWithLoyalty = () => {
+    const basePricing = calculateCombinedTotalPrice();
+    
+    let finalTotal = basePricing.total;
+    let loyaltyDiscount = 0;
+    
+    if (useLoyaltyPoints && loyaltyPointsDiscount > 0) {
+      loyaltyDiscount = Math.min(loyaltyPointsDiscount, finalTotal); // Can't discount more than total
+      finalTotal = Math.max(0, finalTotal - loyaltyDiscount); // Ensure total doesn't go below 0
+    }
+    
+    return {
+      ...basePricing,
+      loyaltyPointsDiscount: loyaltyDiscount,
+      finalTotal: finalTotal
+    };
+  };
+
   // Calculate combined total price for both services
   const calculateCombinedTotalPrice = () => {
     const mainPricing = calculateTotalPrice();
@@ -1631,6 +1755,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               : "Philippines"
           }
           points={client.points}
+          loyaltyPoints={loyaltyPoints}
           onViewProfile={() => onViewProfile()} // ✅ add this
         />
 
@@ -1663,6 +1788,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         points={client?.points ?? 0}
         pointsExpiry={client?.points_expiry}
         getServiceName={getServiceName}
+        clientId={clientId}
         locations={locations}
         devices={devices}
         brands={allBrands}                   
@@ -1677,6 +1803,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         }}
         onReferClick={onReferClick}
         allServices={allServices || []}
+        loyaltyPointsHistory={loyaltyPointsHistory}
       />
 
       </div>
@@ -1761,18 +1888,18 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
         availableBlockedDates={availableBlockedDates}
       />
 
-            {/* NEW: Summary Modal */}
-       {isSummaryModalOpen && (
+      {/* NEW: Summary Modal */}
+      {isSummaryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
             <button onClick={handleCloseSummaryModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
               <X className="w-6 h-6" />
             </button>
-            <h2 className="text-3xl font-bold mb-6 text-gray-800">Booking Summary ✨</h2>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Booking Summary</h2>
+            
             <div className="space-y-6">
               <div className="p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
                 <div className="flex items-center mb-2">
-                  
                   {getServiceIcon(allServices.find(s => s.id === selectedServiceId)?.name || 'N/A')}
                   <h3 className="text-xl font-bold text-blue-800">{allServices.find(s => s.id === selectedServiceId)?.name}</h3>
                 </div>
@@ -1810,6 +1937,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                   ) : (<span className="ml-1">-</span>)}
                 </div>
               </div>
+
               {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
                 <div className="p-6 bg-purple-50 rounded-lg border-2 border-purple-200">
                   <div className="flex items-center mb-2">
@@ -1835,10 +1963,46 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                   </div>
                 </div>
               )}
+
+              {/* Loyalty Points Section */}
+              {canUseLoyaltyPoints() && loyaltyPoints > 0 && (
+                <div className="p-6 bg-green-50 rounded-lg border-2 border-green-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-green-800">Use Loyalty Points</h3>
+                      <p className="text-sm text-green-600">Available: {loyaltyPoints} points (₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)</p>
+                    </div>
+                    <Checkbox
+                      checked={useLoyaltyPoints}
+                      onCheckedChange={handleLoyaltyPointsToggle}
+                      className="h-5 w-5"
+                    />
+                  </div>
+                  {useLoyaltyPoints && (
+                    <div className="text-sm text-green-700 bg-green-100 p-3 rounded">
+                      <Star className="w-4 h-4 inline mr-1" />
+                      Using {loyaltyPoints} loyalty points for ₱{loyaltyPointsDiscount} discount
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Friends/Family Discount Warning */}
+              {client?.discounted && (
+                <div className="p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-amber-600 mr-2" />
+                    <p className="text-sm text-amber-800">
+                      No points for this booking since a friend's discount is applied.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="p-6 bg-gray-100 rounded-xl">
-                <h3 className="text-2xl font-bold mb-4 text-gray-800">Price Breakdown 💸</h3>
+                <h3 className="text-2xl font-bold mb-4 text-gray-800">Price Breakdown</h3>
                 {(() => {
-                  const pricing = calculateCombinedTotalPrice();
+                  const pricing = calculateCombinedTotalPriceWithLoyalty();
                   return (
                     <div className="space-y-3 text-lg">
                       <div className="flex justify-between items-center">
@@ -1849,10 +2013,16 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                         <span className="text-gray-600">Discount ({pricing.discount}% - {pricing.discount_type}):</span>
                         <span className="font-semibold text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
                       </div>
+                      {pricing.loyaltyPointsDiscount > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Loyalty Points Discount:</span>
+                          <span className="font-semibold text-green-600">-₱{pricing.loyaltyPointsDiscount.toLocaleString()}</span>
+                        </div>
+                      )}
                       <div className="border-t-2 border-gray-300 pt-4 mt-4">
                         <div className="flex justify-between items-center text-xl font-extrabold">
                           <span className="text-gray-800">Total Amount:</span>
-                          <span className="text-blue-600">₱{pricing.total.toLocaleString()}</span>
+                          <span className="text-blue-600">₱{pricing.finalTotal.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -1860,12 +2030,35 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                 })()}
               </div>
             </div>
+
             <div className="flex justify-end mt-8 space-x-4">
               <Button onClick={handleCloseSummaryModal} variant="outline" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
                 Go Back
               </Button>
-              <Button variant = "outline" onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white font-bold py-2 px-6">
+              <Button variant="outline" onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white font-bold py-2 px-6">
                 Confirm Booking
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Friends/Family Discount Warning Modal */}
+      {showFriendsDiscountWarning && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex flex-col items-center space-y-4">
+              <AlertCircle className="w-12 h-12 text-amber-500" />
+              <h3 className="text-lg font-bold text-gray-800">Cannot Use Points</h3>
+              <p className="text-center text-gray-600">
+                No points for this booking since a friend's discount is applied.
+              </p>
+              <Button 
+                onClick={() => setShowFriendsDiscountWarning(false)} 
+                className="w-full rounded-lg border-teal-400 text-teal-600 shadow-md"
+                variant="outline"
+              >
+                OK
               </Button>
             </div>
           </div>

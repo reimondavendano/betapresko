@@ -79,6 +79,25 @@ export const customSettingsApi = {
     return parsedSettings
   },
 
+  getDeviceBasePrice: async (acTypeName: string): Promise<number> => {
+    let settingKey: string;
+
+    if (acTypeName.toLowerCase().includes("window")) {
+      settingKey = "window_type_price";
+    } else if (
+      acTypeName.toLowerCase().includes("split") ||
+      acTypeName.toLowerCase().includes("u-shape") ||
+      acTypeName.toLowerCase().includes("u shape")
+    ) {
+      settingKey = "split_type_price";
+    } else {
+      throw new Error(`Unknown AC type: ${acTypeName}`);
+    }
+
+    const value = await customSettingsApi.getSetting(settingKey);
+    return Number(value?.setting_value ?? 0);
+  },
+
   create: async (setting: Partial<CustomSetting>): Promise<CustomSetting | null> => {
     const { data, error } = await supabase
       .from('custom_settings')

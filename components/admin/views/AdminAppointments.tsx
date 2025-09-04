@@ -224,7 +224,7 @@ export default function AdminAppointments() {
 
   const discount = { value: editTarget?.stored_discount ?? 0, type: editTarget?.discount_type || 'Standard' };
 const discountedAmount = subtotal * (1 - discount.value / 100);
-const loyaltyPointsDeduction = editTarget?.stored_loyalty_points;
+const loyaltyPointsDeduction = editTarget?.stored_loyalty_points || 0;
 const finalTotal = discountedAmount - loyaltyPointsDeduction;
 
 
@@ -957,10 +957,10 @@ const finalTotal = discountedAmount - loyaltyPointsDeduction;
         </div>
 
         {/* Show loyalty points deduction if present */}
-        {editTarget.stored_loyalty_points > 0 && (
+        {editTarget?.stored_loyalty_points > 0 && (
           <div className="mt-1 text-sm text-purple-600">
             <span className="font-semibold">Loyalty Points Used: </span>
-            {editTarget.stored_loyalty_points} points (₱{editTarget.stored_loyalty_points})
+            {editTarget?.stored_loyalty_points} points (₱{editTarget?.stored_loyalty_points})
           </div>
         )}
 
@@ -1030,7 +1030,7 @@ const finalTotal = discountedAmount - loyaltyPointsDeduction;
                 type: editTarget?.discount_type || 'Standard' 
               };
               const discountedAmount = subtotal * (1 - discount.value / 100);
-              const loyaltyPointsDeduction = editTarget?.stored_loyalty_points;
+              const loyaltyPointsDeduction = editTarget?.stored_loyalty_points || 0;
               const finalAmount = discountedAmount - loyaltyPointsDeduction;
 
                 // Update appointment amount

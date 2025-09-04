@@ -117,7 +117,7 @@ export const appointmentApi = {
           .from("appointments")
           .select(
             `
-              id, appointment_date, appointment_time, status, amount, total_units, notes, stored_discount, discount_type,
+              id, appointment_date, appointment_time, status, amount, total_units, notes, stored_discount, discount_type, stored_loyalty_points,
               clients:client_id(id, name, mobile, email),
               client_locations:location_id(id, name, address_line1),
               services:service_id(id, name),

@@ -223,7 +223,9 @@ export default function AdminAppointments() {
   );
 
   const discount = { value: editTarget?.stored_discount ?? 0, type: editTarget?.discount_type || 'Standard' };
-  const finalTotal = subtotal * (1 - discount.value / 100);
+const discountedAmount = subtotal * (1 - discount.value / 100);
+const loyaltyPointsDeduction = editTarget?.stored_loyalty_points;
+const finalTotal = discountedAmount - loyaltyPointsDeduction;
 
 
 
@@ -954,6 +956,14 @@ export default function AdminAppointments() {
           {discount.value}%
         </div>
 
+        {/* Show loyalty points deduction if present */}
+        {editTarget.stored_loyalty_points > 0 && (
+          <div className="mt-1 text-sm text-purple-600">
+            <span className="font-semibold">Loyalty Points Used: </span>
+            {editTarget.stored_loyalty_points} points (₱{editTarget.stored_loyalty_points})
+          </div>
+        )}
+
         <div className="pt-4 font-bold text-lg text-green-600">
           Total: ₱{Number(finalTotal).toLocaleString()}
         </div>
@@ -1009,18 +1019,19 @@ export default function AdminAppointments() {
                 }
 
                 // Compute new total
-                const subtotal = editedDevices.reduce(
-                  (sum, d) =>
-                    sum +
-                    computeUnitPrice(d, settingsMap, editTarget?.services?.name),
-                  0
-                );
-                const discount = {
-                  value: editTarget?.stored_discount ?? 0,
-                  type: editTarget?.discount_type || 'Standard' 
-                };
-                const finalAmount =
-                  subtotal - (subtotal * discount.value) / 100;
+               const subtotal = editedDevices.reduce(
+                (sum, d) =>
+                  sum +
+                  computeUnitPrice(d, settingsMap, editTarget?.services?.name),
+                0
+              );
+              const discount = {
+                value: editTarget?.stored_discount ?? 0,
+                type: editTarget?.discount_type || 'Standard' 
+              };
+              const discountedAmount = subtotal * (1 - discount.value / 100);
+              const loyaltyPointsDeduction = editTarget?.stored_loyalty_points;
+              const finalAmount = discountedAmount - loyaltyPointsDeduction;
 
                 // Update appointment amount
                 await fetch(`/api/admin/appointments`, {

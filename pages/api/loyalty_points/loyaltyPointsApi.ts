@@ -5,14 +5,20 @@ export const loyaltyPointsApi = {
   /**
    * Fetch paginated loyalty points history for a client
    */
-  getLoyaltyPoints: async (clientId: string, page = 1, pageSize = 5) => {
+  getLoyaltyPoints: async (
+    clientId: string, 
+    page = 1, 
+    pageSize = 5,
+    statusFilter?: "all" | "Earned" | "Redeemed" | "Expired",
+    dateFilter?: string
+  ) => {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    const { data, error, count } = await supabase
+    let query = supabase
       .from("loyalty_points")
       .select(
-      `
+        `
         id,
         points,
         status,
@@ -32,11 +38,24 @@ export const loyaltyPointsApi = {
             )
           )
         )
-          `,
-          { count: "exact" }
-        )
-      .eq("client_id", clientId)
-      .order("date_earned", { ascending: true })
+        `,
+        { count: "exact" }
+      )
+      .eq("client_id", clientId);
+
+    // Apply status filter if not "all"
+    if (statusFilter && statusFilter !== "all") {
+      query = query.eq("status", statusFilter);
+    }
+
+    // Apply date filter if provided
+    if (dateFilter) {
+      query = query.gte("date_earned", `${dateFilter}T00:00:00`)
+                   .lt("date_earned", `${dateFilter}T23:59:59`);
+    }
+
+    const { data, error, count } = await query
+      .order("date_earned", { ascending: false }) // Show newest first
       .range(from, to);
 
     if (error) throw error;
@@ -190,7 +209,22 @@ export const loyaltyPointsApi = {
     return count || 0;
   },
 
-    updateLoyaltyPointStatus: async (id: string, status: "Earned" | "Redeemed" | "Expired") => {
+   getReferralCountByUniqueDate: async (clientId: string): Promise<number> => {
+    const { data, error } = await supabase
+      .from("loyalty_points")
+      .select("date_earned")
+      .eq("client_id", clientId)
+      .is("appointment_id", null)
+      .eq("is_referral", true);
+
+    if (error) throw error;
+
+    // Count unique dates (assuming one referral per date)
+    const uniqueDates = new Set((data || []).map(point => point.date_earned));
+    return uniqueDates.size;
+  },
+
+  updateLoyaltyPointStatus: async (id: string, status: "Earned" | "Redeemed" | "Expired") => {
     const { data, error } = await supabase
       .from("loyalty_points")
       .update({ status })

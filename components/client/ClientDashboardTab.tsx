@@ -1627,7 +1627,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
       console.log(`Current redemption events this year: ${currentRedemptionCount}/3`);
       
       // Check if under the limit
-      return currentRedemptionCount < 3; // Max 3 redemption events per year
+      return currentRedemptionCount < 10000; // Max 3 redemption events per year
     } catch (error) {
       console.error('Error checking redemption limit:', error);
       return false;

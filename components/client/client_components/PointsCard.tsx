@@ -35,11 +35,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // ✅ State for Redeem FIFO & yearly cap
-  const [nextRedeemableId, setNextRedeemableId] = useState<string | null>(null);
-  const [redeemedThisYear, setRedeemedThisYear] = useState(0);
-
-  // ✅ Modal state
+  // Modal state
   const [redeemModal, setRedeemModal] = useState<{
     isOpen: boolean;
     point: LoyaltyPoint | null;
@@ -51,13 +47,17 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
   const fetchPoints = async (page: number) => {
     setLoading(true);
     try {
+      // Pass filters to API instead of filtering after
       const { data, count } = await loyaltyPointsApi.getLoyaltyPoints(
         clientId,
         page,
-        itemsPerPage
+        itemsPerPage,
+        statusFilter,
+        dateFilter
       );
 
-      let normalized: LoyaltyPoint[] = (data || []).map((p: any) => ({
+      // Normalize data
+      const normalized: LoyaltyPoint[] = (data || []).map((p: any) => ({
         id: p.id,
         points: p.points,
         status:
@@ -74,33 +74,9 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
         appointment: p.appointment || null,
       }));
 
-      // ✅ Filters
-      if (statusFilter !== "all") {
-        normalized = normalized.filter((p) => p.status === statusFilter);
-      }
-      if (dateFilter) {
-        normalized = normalized.filter(
-          (p) =>
-            p.date_earned &&
-            format(new Date(p.date_earned), "yyyy-MM-dd") === dateFilter
-        );
-      }
-
       setPoints(normalized);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
 
-      // ✅ Update FIFO + yearly cap
-      const earnedPoints = normalized.filter((p) => p.status === "Earned");
-      setNextRedeemableId(earnedPoints.length > 0 ? earnedPoints[0].id : null);
-
-      const currentYear = new Date().getFullYear();
-      const redeemedCount = normalized.filter(
-        (p) =>
-          p.status === "Redeemed" &&
-          p.date_earned &&
-          new Date(p.date_earned).getFullYear() === currentYear
-      ).length;
-      setRedeemedThisYear(redeemedCount);
     } catch (err) {
       console.error("Error fetching loyalty points:", err);
     } finally {
@@ -115,27 +91,23 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-xl font-bold">Loyalty Points</CardTitle>
+        <CardTitle className="text-xl font-bold">Loyalty Points History</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         
-        {/* <div className="px-6 py-2 mb-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700">
-          You have used {redeemedThisYear}/3 free cleanings this year.
-        </div> */}
-
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-4 px-6">
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value as any);
-              setCurrentPage(1);
+              setCurrentPage(1); // Reset to first page when filtering
             }}
             className="border rounded px-3 py-2 text-sm"
           >
-            <option value="all">All</option>
+            <option value="all">All Status</option>
             <option value="Earned">Earned</option>
-            <option value="Redeem">Redeem</option>
+            <option value="Redeemed">Redeemed</option>
             <option value="Expired">Expired</option>
           </select>
 
@@ -144,10 +116,26 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
             value={dateFilter}
             onChange={(e) => {
               setDateFilter(e.target.value);
-              setCurrentPage(1);
+              setCurrentPage(1); // Reset to first page when filtering
             }}
             className="border rounded px-3 py-2 text-sm"
+            placeholder="Filter by date"
           />
+
+          {/* Clear filters button */}
+          {(statusFilter !== "all" || dateFilter) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setStatusFilter("all");
+                setDateFilter("");
+                setCurrentPage(1);
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
 
         {/* Table */}
@@ -165,21 +153,18 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
                   Date Earned
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Expired
+                  Expiry Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
                 </th>
-                {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Action
-                </th> */}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-6 py-4 text-center text-sm text-gray-500"
                   >
                     Loading...
@@ -189,7 +174,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
                 points.map((p) => (
                   <tr key={p.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {p.appointment?.service?.name || "Referral"}
+                      {p.appointment?.service?.name || "Referral Bonus"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
                       {p.points}
@@ -213,31 +198,18 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
                         {p.status}
                       </Badge>
                     </td>
-                    {/* <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {p.status === "Earned" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={p.id !== nextRedeemableId || redeemedThisYear >= 3}
-                          onClick={() => setRedeemModal({ isOpen: true, point: p })}
-                          className="border-teal-600 bg-white text-teal-500 hover:bg-teal-700"
-                        >
-                          <Gem className="w-4 h-4 text-teal-500" />
-                          Redeem
-                        </Button>
-                      ) : (
-                        "-"
-                      )}
-                    </td> */}
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-6 py-4 text-center text-sm text-gray-500"
                   >
-                    No loyalty points found.
+                    {statusFilter !== "all" || dateFilter 
+                      ? `No loyalty points found for the selected filters.`
+                      : `No loyalty points found for this client.`
+                    }
                   </td>
                 </tr>
               )}
@@ -269,6 +241,14 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
               <span>Next</span>
               <ChevronRight className="w-4 h-4" />
             </Button>
+          </div>
+        )}
+
+        {/* Results summary */}
+        {!loading && (
+          <div className="px-6 mt-2 text-sm text-gray-600">
+            Showing {points.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, totalPages * itemsPerPage)} of {totalPages * itemsPerPage} entries
+            {(statusFilter !== "all" || dateFilter) && " (filtered)"}
           </div>
         )}
 

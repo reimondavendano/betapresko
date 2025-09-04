@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let query = supabase
         .from('appointments')
         .select(`
-          id, appointment_date, appointment_time, status, amount, total_units, notes, stored_discount, discount_type,
+          id, appointment_date, appointment_time, status, amount, total_units, notes, stored_discount, discount_type, stored_loyalty_points,
           clients:client_id(id, name, mobile),
           services:service_id(id, name, description, base_price),
           client_locations:location_id(
@@ -74,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PATCH') {
-      const { id, status, appointment_time, appointment_date, amount, stored_discount, discount_type } = req.body as {
+      const { id, status, appointment_time, appointment_date, amount, stored_discount, discount_type, stored_loyalty_points } = req.body as {
         id: string
         status?: 'completed' | 'confirmed'
         appointment_time?: string | null
@@ -82,6 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         amount?: number
         stored_discount?: number
         discount_type?: 'Standard' | 'Family/Friends'
+        stored_loyalty_points?: number | null
       }
 
       const updatePayload: any = { updated_at: new Date().toISOString() }
@@ -91,6 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (typeof amount !== 'undefined') updatePayload.amount = amount
       if (typeof stored_discount !== 'undefined') updatePayload.stored_discount = stored_discount
       if (typeof discount_type !== 'undefined') updatePayload.discount_type = discount_type
+       if (typeof stored_loyalty_points !== 'undefined') updatePayload.stored_loyalty_points = stored_loyalty_points
 
       // Update appointment fields and fetch needed data for downstream logic
       const { data: appt, error: updateErr } = await supabase
@@ -106,7 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           amount,
           stored_discount,
           discount_type,
-          clients:client_id(id, name, mobile)
+          clients:client_id(id, name, mobile),
+          stored_loyalty_points
         `)
         .single()
 

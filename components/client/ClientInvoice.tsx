@@ -279,7 +279,7 @@ export function ClientInvoice({ clientId }: Props) {
             {/* Show loyalty points deduction if present */}
             {appt.stored_loyalty_points > 0 && (
               <div className="flex justify-between text-purple-600">
-                <span>Loyalty Points Used ({appt.stored_loyalty_points} pts)</span>
+                <span>Presko Rewards: (₱{appt.stored_loyalty_points} OFF)</span>
                 <span>-₱{appt.stored_loyalty_points.toFixed(2)}</span>
               </div>
             )}

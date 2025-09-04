@@ -959,8 +959,8 @@ const finalTotal = discountedAmount - loyaltyPointsDeduction;
         {/* Show loyalty points deduction if present */}
         {editTarget?.stored_loyalty_points > 0 && (
           <div className="mt-1 text-sm text-purple-600">
-            <span className="font-semibold">Loyalty Points Used: </span>
-            {editTarget?.stored_loyalty_points} points (₱{editTarget?.stored_loyalty_points})
+            <span className="font-semibold">Presko Rewards: </span>
+            {editTarget?.stored_loyalty_points} OFF (₱{editTarget?.stored_loyalty_points})
           </div>
         )}
 

@@ -240,6 +240,11 @@ export const loyaltyPointsApi = {
    * This handles fractional points by finding multiple records that sum to the target
    */
   getRedeemablePoints: async (clientId: string, targetPoints: number) => {
+  // Only allow multiples of 5 points
+    const redeemableTargetPoints = Math.floor(targetPoints / 5) * 5;
+    
+    if (redeemableTargetPoints < 5) return []; // Must have at least 5 points to redeem
+    
     const { data, error } = await supabase
       .from("loyalty_points")
       .select("id, points, status, date_earned")
@@ -250,16 +255,8 @@ export const loyaltyPointsApi = {
     if (error) throw error;
 
     const currentYear = new Date().getFullYear();
-    const redeemedThisYear = data.filter(
-      (p) =>
-        p.status === "Redeemed" &&
-        new Date(p.date_earned).getFullYear() === currentYear
-    ).length;
-
-    // Check if already redeemed 3 times this year
-    if (redeemedThisYear >= 3) return [];
-
-    // Find points to redeem that sum up to targetPoints
+    
+    // Find points to redeem that sum up to exactly redeemableTargetPoints
     const earnedPoints = data.filter(
       (p) =>
         p.status === "Earned" &&
@@ -270,29 +267,96 @@ export const loyaltyPointsApi = {
     let currentSum = 0;
 
     for (const point of earnedPoints) {
-      if (currentSum >= targetPoints) break;
-      pointsToRedeem.push(point);
-      currentSum += point.points;
+      if (currentSum >= redeemableTargetPoints) break;
+      
+      const pointsNeeded = redeemableTargetPoints - currentSum;
+      
+      if (point.points <= pointsNeeded) {
+        // Take the entire point record
+        pointsToRedeem.push({
+          ...point,
+          pointsToRedeem: point.points
+        });
+        currentSum += point.points;
+      } else {
+        // Take only part of this point record
+        pointsToRedeem.push({
+          ...point,
+          pointsToRedeem: pointsNeeded
+        });
+        currentSum += pointsNeeded;
+        break;
+      }
     }
 
-    // Only return if we have enough points to cover the target
-    return currentSum >= targetPoints ? pointsToRedeem : [];
+    // Only return if we have exactly the points needed
+    return currentSum >= redeemableTargetPoints ? pointsToRedeem : [];
   },
 
   /**
    * NEW: Update multiple loyalty points to "Redeemed" status
    */
-  redeemMultiplePoints: async (pointIds: string[]) => {
-    if (pointIds.length === 0) return [];
+  redeemMultiplePoints: async (pointsData: Array<{id: string, pointsToRedeem: number, points: number}>) => {
+    if (pointsData.length === 0) return [];
 
-    const { data, error } = await supabase
-      .from("loyalty_points")
-      .update({ status: "Redeemed" })
-      .in("id", pointIds)
-      .select();
-
-    if (error) throw error;
-    return data;
+    const updates = [];
+    
+    for (const pointData of pointsData) {
+      if (pointData.pointsToRedeem === pointData.points) {
+        // Redeem entire point record
+        updates.push(
+          supabase
+            .from("loyalty_points")
+            .update({ status: "Redeemed" })
+            .eq("id", pointData.id)
+        );
+      } else {
+        // Partial redemption - create new redeemed record and update original
+        const remainingPoints = pointData.points - pointData.pointsToRedeem;
+        
+        // Get original record to copy its data
+        const { data: originalRecord, error: fetchError } = await supabase
+          .from("loyalty_points")
+          .select("*")
+          .eq("id", pointData.id)
+          .single();
+          
+        if (fetchError) throw fetchError;
+        
+        // Create new redeemed record
+        updates.push(
+          supabase
+            .from("loyalty_points")
+            .insert({
+              client_id: originalRecord.client_id,
+              appointment_id: originalRecord.appointment_id,
+              points: pointData.pointsToRedeem,
+              status: "Redeemed",
+              date_earned: originalRecord.date_earned,
+              date_expiry: originalRecord.date_expiry,
+              is_referral: originalRecord.is_referral || false
+            })
+        );
+        
+        // Update original record with remaining points
+        updates.push(
+          supabase
+            .from("loyalty_points")
+            .update({ points: remainingPoints })
+            .eq("id", pointData.id)
+        );
+      }
+    }
+    
+    // Execute all updates
+    const results = await Promise.all(updates);
+    
+    // Check for errors
+    for (const result of results) {
+      if (result.error) throw result.error;
+    }
+    
+    return results.map(r => r.data).flat().filter(Boolean);
   },
 
   // Keep the old method for backward compatibility

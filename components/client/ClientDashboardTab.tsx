@@ -594,37 +594,31 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
 
       // --- Handle loyalty points redemption ---
       if (useLoyaltyPoints && loyaltyPointsDiscount > 0) {
-      try {
-        // Find multiple redeemable loyalty points that sum to the discount amount
-        const pointsToRedeem = await loyaltyPointsApi.getRedeemablePoints(client.id, loyaltyPoints);
-        
-        if (pointsToRedeem.length > 0) {
-          // Get the IDs of points to redeem
-          const pointIds = pointsToRedeem.map(point => point.id);
+        try {
+          // Calculate actual points to redeem (only multiples of 5)
+          const pointsToRedeem = Math.floor(loyaltyPoints / 5) * 5;
           
-          await loyaltyPointsApi.redeemMultiplePoints(pointIds);
-          
-          // DON'T increment the local state - fetch fresh data instead
-          // The redemption count should come from the database
-          
-          // // Refresh all loyalty points data including redemption count
-          // const [updatedPoints, updatedHistory, updatedRedemptionCount] = await Promise.all([
-          //   loyaltyPointsApi.getClientPoints(client.id),
-          //   loyaltyPointsApi.getLoyaltyPoints(client.id),
-          //   loyaltyPointsApi.getRedemptionEventCountAccurate(client.id) // Use the accurate version
-          // ]);
-          
-          // setLoyaltyPoints(updatedPoints);
-          // setLoyaltyPointsHistory(updatedHistory.data || []);
-          // setRedemptionEventsThisYear(updatedRedemptionCount); // Set the actual count from DB
-          
-          toast.success('Loyalty points redeemed successfully!');
+          if (pointsToRedeem >= 5) {
+            // Find multiple redeemable loyalty points that sum to the points needed
+            const redeemablePointsData = await loyaltyPointsApi.getRedeemablePoints(client.id, pointsToRedeem);
+            
+            if (redeemablePointsData.length > 0) {
+              await loyaltyPointsApi.redeemMultiplePoints(redeemablePointsData);
+              
+              toast.success(`Redeemed ${pointsToRedeem} loyalty points for ₱${loyaltyPointsDiscount} discount!`);
+              
+              // Show remaining points if any
+              const remainingPoints = loyaltyPoints % 5;
+              if (remainingPoints > 0) {
+                toast.info(`${remainingPoints} point(s) remaining in your account`);
+              }
+            }
+          }
+        } catch (loyaltyError) {
+          console.error('Error handling loyalty points redemption:', loyaltyError);
+          toast.error('Booking successful, but failed to redeem loyalty points. Please contact support.');
         }
-      } catch (loyaltyError) {
-        console.error('Error handling loyalty points redemption:', loyaltyError);
-        toast.error('Booking successful, but failed to redeem loyalty points. Please contact support.');
       }
-    }
 
       // --- Insert new devices for additionalUnits ---
       for (const unit of additionalUnits) {
@@ -1599,8 +1593,10 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
   const calculateLoyaltyPointsDiscount = (points: number): number => {
     if (points <= 0) return 0;
     
-    // Base calculation: every 0.5 points = 50 pesos
-    return points * 100; // 0.5 points = 50 pesos, 1 point = 100 pesos, etc.
+    // New calculation: Only redeem in multiples of 5 points
+    // 1 point = ₱100, but can only redeem 5+ points at a time
+    const redeemablePoints = Math.floor(points / 5) * 5; // Round down to nearest multiple of 5
+    return redeemablePoints * 100; // 1 point = ₱100
   };
 
   // Add this helper function to check if loyalty points can be used
@@ -1969,7 +1965,15 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-bold text-green-800">Use Loyalty Points</h3>
-                      <p className="text-sm text-green-600">Available: {loyaltyPoints} points (₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)</p>
+                      <p className="text-sm text-green-600">
+                        Available: {loyaltyPoints} points 
+                        (Can redeem: {Math.floor(loyaltyPoints / 5) * 5} points = ₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)
+                      </p>
+                      {loyaltyPoints % 5 > 0 && (
+                        <p className="text-xs text-amber-600">
+                          {loyaltyPoints % 5} point(s) will remain (minimum 5 points required for redemption)
+                        </p>
+                      )}
                     </div>
                     <Checkbox
                       checked={useLoyaltyPoints}
@@ -1980,7 +1984,12 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                   {useLoyaltyPoints && (
                     <div className="text-sm text-green-700 bg-green-100 p-3 rounded">
                       <Star className="w-4 h-4 inline mr-1" />
-                      Using {loyaltyPoints} loyalty points for ₱{loyaltyPointsDiscount} discount
+                      Using {Math.floor(loyaltyPoints / 5) * 5} loyalty points for ₱{loyaltyPointsDiscount} discount
+                      {loyaltyPoints % 5 > 0 && (
+                        <div className="text-xs text-amber-700 mt-1">
+                          {loyaltyPoints % 5} point(s) remaining in your account
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

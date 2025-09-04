@@ -1605,7 +1605,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
   // Add this helper function to check if loyalty points can be used
   const canUseLoyaltyPoints = (): boolean => {
-    if (!client || loyaltyPoints <= 0) return false;
+    if (!client || loyaltyPoints <= 5) return false;
     
     // Check if client has friends/family discount (discounted = true)
     if (client.discounted) return false;
@@ -1964,7 +1964,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
               )}
 
               {/* Loyalty Points Section */}
-              {canUseLoyaltyPoints() && loyaltyPoints > 0 && (
+              {canUseLoyaltyPoints() && loyaltyPoints >= 5 && (
                 <div className="p-6 bg-green-50 rounded-lg border-2 border-green-200">
                   <div className="flex items-center justify-between mb-4">
                     <div>

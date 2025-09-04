@@ -258,7 +258,7 @@ export function ClientDevicesTable({
               className="flex items-center space-x-2"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Previous</span>
+              <span>Prev</span>
             </Button>
             <span className="text-sm text-gray-700">
               Page {currentPage} of {totalPages}

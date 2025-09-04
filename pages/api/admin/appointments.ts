@@ -175,11 +175,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         if (transactionAmount >= 500 && transactionAmount <= 999) {
           pointsToAdd = 0.5;
-        } else if (transactionAmount >= 1000 && transactionAmount <= 2000) {
+        } else if (transactionAmount >= 1000 && transactionAmount < 2000) {
           pointsToAdd = 1;
-        } else if (transactionAmount >= 2001 && transactionAmount <= 3000) {
+        } else if (transactionAmount >= 2000 && transactionAmount < 3000) {
           pointsToAdd = 2;
-        } else if (transactionAmount >= 3001) {
+        } else if (transactionAmount >= 3000) {
           pointsToAdd = 3; // capped at 1 point
         }
 

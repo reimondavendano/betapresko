@@ -190,6 +190,16 @@ export function ClientInvoice({ clientId }: Props) {
       // Final total comes from appointment table (trusted amount)
       const finalTotal = appt.amount;
 
+      const today = new Date();
+      const dateStr = today
+        .toISOString()
+        .split("T")[0]
+        .replace(/-/g, ""); // → "20250905"
+
+      const counter = String((page - 1) * 1 + (idx + 1)).padStart(4, "0");
+
+      const invoiceNumber = `${dateStr}-${counter}`;
+
 
         return (
           <Card
@@ -205,7 +215,7 @@ export function ClientInvoice({ clientId }: Props) {
                 <p>preskoac@gmail.com</p>
               </div>
               <div className="text-right space-y-1">
-                <p><strong>Invoice:</strong> {String(idx + 1).padStart(4, "0")}</p>
+                <p><strong>Invoice:</strong> {invoiceNumber}</p>
                 <p><strong>Issue date:</strong> {appt.appointment_date}</p>
                 <p><strong>Due date:</strong> {appt.appointment_date}</p>
 

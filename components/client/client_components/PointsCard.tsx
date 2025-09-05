@@ -78,7 +78,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
 
     } catch (err) {
-      console.error("Error fetching loyalty points:", err);
+      console.error("Error fetching Presko Reward Points:", err);
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-xl font-bold">Loyalty Points History</CardTitle>
+        <CardTitle className="text-xl font-bold">Presko Reward Points History</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         
@@ -207,8 +207,8 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
                     className="px-6 py-4 text-center text-sm text-gray-500"
                   >
                     {statusFilter !== "all" || dateFilter 
-                      ? `No loyalty points found for the selected filters.`
-                      : `No loyalty points found for this client.`
+                      ? `No Presko reward points found for the selected filters.`
+                      : `No Presko reward points found for this client.`
                     }
                   </td>
                 </tr>

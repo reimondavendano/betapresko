@@ -605,7 +605,7 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             if (redeemablePointsData.length > 0) {
               await loyaltyPointsApi.redeemMultiplePoints(redeemablePointsData);
               
-              toast.success(`Redeemed ${pointsToRedeem} loyalty points for ₱${loyaltyPointsDiscount} discount!`);
+              toast.success(`Redeemed ${pointsToRedeem} Presko Reward points for ₱${loyaltyPointsDiscount} discount!`);
               
               // Show remaining points if any
               const remainingPoints = loyaltyPoints % 5;
@@ -615,8 +615,8 @@ export function ClientDashboardTab({ clientId, onBookNewCleaningClick, onReferCl
             }
           }
         } catch (loyaltyError) {
-          console.error('Error handling loyalty points redemption:', loyaltyError);
-          toast.error('Booking successful, but failed to redeem loyalty points. Please contact support.');
+          console.error('Error handling Presko Reward points redemption:', loyaltyError);
+          toast.error('Booking successful, but failed to redeem Presko Reward points. Please contact support.');
         }
       }
 
@@ -1964,14 +1964,14 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                 <div className="p-6 bg-green-50 rounded-lg border-2 border-green-200">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-lg font-bold text-green-800">Use Loyalty Points</h3>
+                      <h3 className="text-lg font-bold text-green-800">Use Presko Reward Points</h3>
                       <p className="text-sm text-green-600">
-                        Available: {loyaltyPoints} points 
+                        Available: {loyaltyPoints}  Presko reward points 
                         (Can redeem: {Math.floor(loyaltyPoints / 5) * 5} points = ₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)
                       </p>
                       {loyaltyPoints % 5 > 0 && (
                         <p className="text-xs text-amber-600">
-                          {loyaltyPoints % 5} point(s) will remain (minimum 5 points required for redemption)
+                          {loyaltyPoints % 5} Presko point(s) will remain (minimum 5 points required for redemption)
                         </p>
                       )}
                     </div>
@@ -2023,7 +2023,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                       </div>
                       {pricing.loyaltyPointsDiscount > 0 && (
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Loyalty Points Discount:</span>
+                          <span className="text-gray-600">Presko Rewards Discount:</span>
                           <span className="font-semibold text-green-600">-₱{pricing.loyaltyPointsDiscount.toLocaleString()}</span>
                         </div>
                       )}

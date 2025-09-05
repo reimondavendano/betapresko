@@ -500,7 +500,7 @@ export function ClientInfoTab({ clientId }: ClientInfoTabProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleUpdate}>Update</Button>
+            <Button className="mt-4 rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md" variant="outline" onClick={handleUpdate}>Update</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

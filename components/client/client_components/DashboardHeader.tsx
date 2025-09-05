@@ -65,7 +65,7 @@ export function DashboardHeader({
             <Crown className="w-8 h-8 text-white" />
           </div>
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            Loyalty Points
+            Presko Reward Points
           </h3>
           <div className="text-4xl font-bold text-orange-600 mb-2">{loyaltyPoints}</div>
           <p className="text-sm text-gray-600">Total earned points</p>

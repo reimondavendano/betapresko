@@ -296,6 +296,7 @@ export const loyaltyPointsApi = {
   /**
    * NEW: Update multiple loyalty points to "Redeemed" status
    */
+  // Alternative cleaner version - delete records with 0 points
   redeemMultiplePoints: async (pointsData: Array<{id: string, pointsToRedeem: number, points: number}>) => {
     if (pointsData.length === 0) return [];
 
@@ -311,7 +312,7 @@ export const loyaltyPointsApi = {
             .eq("id", pointData.id)
         );
       } else {
-        // Partial redemption - create new redeemed record and update original
+        // Partial redemption
         const remainingPoints = pointData.points - pointData.pointsToRedeem;
         
         // Get original record to copy its data
@@ -338,13 +339,23 @@ export const loyaltyPointsApi = {
             })
         );
         
-        // Update original record with remaining points
-        updates.push(
-          supabase
-            .from("loyalty_points")
-            .update({ points: remainingPoints })
-            .eq("id", pointData.id)
-        );
+        if (remainingPoints > 0) {
+          // Update original record with remaining points
+          updates.push(
+            supabase
+              .from("loyalty_points")
+              .update({ points: remainingPoints })
+              .eq("id", pointData.id)
+          );
+        } else {
+          // Delete the original record if no points remain
+          updates.push(
+            supabase
+              .from("loyalty_points")
+              .delete()
+              .eq("id", pointData.id)
+          );
+        }
       }
     }
     

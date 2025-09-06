@@ -25,14 +25,20 @@ export interface LoyaltyPoint {
 interface PointsCardProps {
   clientId: string;
   itemsPerPage?: number;
+  onPointsChanged?: () => void;
 }
 
-export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
+export function PointsCard({ 
+  clientId, 
+  itemsPerPage = 5,
+  onPointsChanged 
+}: PointsCardProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "Earned" | "Redeemed" | "Expired">("all");
   const [dateFilter, setDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [points, setPoints] = useState<LoyaltyPoint[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   // Modal state
@@ -47,7 +53,14 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
   const fetchPoints = async (page: number) => {
     setLoading(true);
     try {
-      // Pass filters to API instead of filtering after
+      console.log('Fetching points with filters:', { 
+        clientId, 
+        page, 
+        itemsPerPage, 
+        statusFilter, 
+        dateFilter 
+      });
+
       const { data, count } = await loyaltyPointsApi.getLoyaltyPoints(
         clientId,
         page,
@@ -56,42 +69,98 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
         dateFilter
       );
 
-      // Normalize data
-      const normalized: LoyaltyPoint[] = (data || []).map((p: any) => ({
-        id: p.id,
-        points: p.points,
-        status:
-          p.status?.toLowerCase() === "earned"
-            ? "Earned"
-            : p.status?.toLowerCase() === "redeemed"
-            ? "Redeemed"
-            : p.status?.toLowerCase() === "expired"
-            ? "Expired"
-            : "Earned",
-        date_earned: p.date_earned || null,
-        date_expiry: p.date_expiry || null,
-        notes: p.notes || null,
-        appointment: p.appointment || null,
-      }));
+      console.log('Raw API response:', { data, count });
+
+      // Improved data normalization with better error handling
+      const normalized: LoyaltyPoint[] = (data || []).map((p: any) => {
+        // More robust status normalization
+        let normalizedStatus: "Earned" | "Redeemed" | "Expired" = "Earned";
+        if (p.status) {
+          const statusLower = p.status.toString().toLowerCase();
+          if (statusLower === "earned") {
+            normalizedStatus = "Earned";
+          } else if (statusLower === "redeemed") {
+            normalizedStatus = "Redeemed";
+          } else if (statusLower === "expired") {
+            normalizedStatus = "Expired";
+          }
+        }
+
+        const normalized = {
+          id: p.id?.toString() || "",
+          points: Number(p.points) || 0,
+          status: normalizedStatus,
+          date_earned: p.date_earned || "",
+          date_expiry: p.date_expiry || null,
+          notes: p.notes || null,
+          appointment: p.appointment || null,
+        };
+
+        console.log('Normalized point:', normalized);
+        return normalized;
+      });
 
       setPoints(normalized);
+      setTotalCount(count || 0);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
+
+      console.log('Final state:', { 
+        pointsCount: normalized.length, 
+        totalCount: count, 
+        totalPages: Math.ceil((count || 0) / itemsPerPage) 
+      });
 
     } catch (err) {
       console.error("Error fetching Presko Reward Points:", err);
+      // Reset state on error
+      setPoints([]);
+      setTotalCount(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPoints(currentPage);
+    if (clientId) {
+      fetchPoints(currentPage);
+    }
   }, [clientId, currentPage, statusFilter, dateFilter]);
+
+  // Add function to handle successful redemption
+  const handleRedemptionSuccess = () => {
+    console.log('Redemption successful, refreshing data...');
+    // Refresh the points data
+    fetchPoints(currentPage);
+    // Notify parent component
+    onPointsChanged?.();
+  };
+
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-";
+    try {
+      return format(new Date(dateString), "MMM d, yyyy");
+    } catch (error) {
+      console.error('Date formatting error:', error, 'for date:', dateString);
+      return dateString; // Return original string if formatting fails
+    }
+  };
+
+  // Calculate pagination info
+  const startIndex = (currentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(currentPage * itemsPerPage, totalCount);
 
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
         <CardTitle className="text-xl font-bold">Presko Reward Points History</CardTitle>
+        {/* Add debug info in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500">
+            Debug: {points.length} points loaded, Total: {totalCount}, Page: {currentPage}/{totalPages}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         
@@ -100,7 +169,9 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
           <select
             value={statusFilter}
             onChange={(e) => {
-              setStatusFilter(e.target.value as any);
+              const newFilter = e.target.value as "all" | "Earned" | "Redeemed" | "Expired";
+              console.log('Status filter changed to:', newFilter);
+              setStatusFilter(newFilter);
               setCurrentPage(1); // Reset to first page when filtering
             }}
             className="border rounded px-3 py-2 text-sm"
@@ -115,6 +186,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
             type="date"
             value={dateFilter}
             onChange={(e) => {
+              console.log('Date filter changed to:', e.target.value);
               setDateFilter(e.target.value);
               setCurrentPage(1); // Reset to first page when filtering
             }}
@@ -128,6 +200,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
               variant="outline"
               size="sm"
               onClick={() => {
+                console.log('Clearing filters');
                 setStatusFilter("all");
                 setDateFilter("");
                 setCurrentPage(1);
@@ -180,7 +253,7 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
                       {p.points}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {p.date_earned ? format(new Date(p.date_earned), "MMM d, yyyy") : "-"}
+                       {p.date_earned ? format(new Date(p.date_earned), "MMM d, yyyy") : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {p.date_expiry ? format(new Date(p.date_expiry), "MMM d, yyyy") : "-"}
@@ -244,10 +317,10 @@ export function PointsCard({ clientId, itemsPerPage = 5 }: PointsCardProps) {
           </div>
         )}
 
-        {/* Results summary */}
-        {!loading && (
+        {/* Results summary - Fixed calculation */}
+        {!loading && totalCount > 0 && (
           <div className="px-6 mt-2 text-sm text-gray-600">
-            Showing {points.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, totalPages * itemsPerPage)} of {totalPages * itemsPerPage} entries
+            Showing {startIndex} to {endIndex} of {totalCount} entries
             {(statusFilter !== "all" || dateFilter) && " (filtered)"}
           </div>
         )}

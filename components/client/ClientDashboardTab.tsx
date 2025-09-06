@@ -1892,81 +1892,85 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
             </button>
             <h2 className="text-3xl font-bold mb-6 text-gray-800">Booking Summary</h2>
             
-            <div className="space-y-6">
-              <div className="p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
+            <div className="space-y-6 max-h-screen overflow-y-auto">
+              <div className="p-4 sm:p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
                 <div className="flex items-center mb-2">
                   {getServiceIcon(allServices.find(s => s.id === selectedServiceId)?.name || 'N/A')}
-                  <h3 className="text-xl font-bold text-blue-800">{allServices.find(s => s.id === selectedServiceId)?.name}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-blue-800 ml-2">{allServices.find(s => s.id === selectedServiceId)?.name}</h3>
                 </div>
                 <div className="flex items-center text-gray-600 mb-4">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-gray-700">{format(new Date(bookingDate), 'MMMM d, yyyy')}</span>
+                  <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span className="font-medium text-gray-700 text-sm sm:text-base">{format(new Date(bookingDate), 'MMMM d, yyyy')}</span>
                 </div>
                 <div className="text-gray-600">
-                  <span className="font-bold">Devices:</span>
+                  <span className="font-bold text-sm sm:text-base">Devices:</span>
                   {(selectedDevices.length > 0 || newUnits.length > 0 || additionalUnits.length > 0) ? (
-                    <ul className="list-disc pl-5 mt-2 text-gray-700 space-y-1">
-                      {selectedDevices.map(deviceId => {
-                        const device = devices.find(d => d.id === deviceId);
-                        if (!device) return null;
-                        const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                        const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                        const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                        return (<li key={`sel-${device.id}`}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
-                      })}
-                      {newUnits.map((unit, index) => {
-                        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
-                        const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
-                        const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
-                        const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
-                        return (<li key={`new-${index}`}>{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
-                      })}
-                      {additionalUnits.map((unit, index) => {
-                        if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
-                        const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
-                        const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
-                        const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
-                        return (<li key={`additional-${index}`}>{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
-                      })}
-                    </ul>
+                    <div className="mt-2 max-h-32 overflow-y-auto">
+                      <ul className="list-disc pl-5 text-gray-700 space-y-1">
+                        {selectedDevices.map(deviceId => {
+                          const device = devices.find(d => d.id === deviceId);
+                          if (!device) return null;
+                          const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                          const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                          const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                          return (<li key={`sel-${device.id}`} className="text-xs sm:text-sm break-words">{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
+                        })}
+                        {newUnits.map((unit, index) => {
+                          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                          const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                          const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                          const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                          return (<li key={`new-${index}`} className="text-xs sm:text-sm break-words">{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
+                        })}
+                        {additionalUnits.map((unit, index) => {
+                          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                          const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                          const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                          const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                          return (<li key={`additional-${index}`} className="text-xs sm:text-sm break-words">{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
+                        })}
+                      </ul>
+                    </div>
                   ) : (<span className="ml-1">-</span>)}
                 </div>
               </div>
 
               {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
-                <div className="p-6 bg-purple-50 rounded-lg border-2 border-purple-200">
+                <div className="p-4 sm:p-6 bg-purple-50 rounded-lg border-2 border-purple-200">
                   <div className="flex items-center mb-2">
                     {getServiceIcon(allServices.find(s => s.id === additionalServiceId)?.name || 'N/A')}
-                    <h3 className="text-xl font-bold text-purple-800">{allServices.find(s => s.id === additionalServiceId)?.name}</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-purple-800 ml-2">{allServices.find(s => s.id === additionalServiceId)?.name}</h3>
                   </div>
                   <div className="flex items-center text-gray-600 mb-4">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    <span className="font-medium text-gray-700">{format(new Date(additionalServiceDate), 'MMMM d, yyyy')}</span>
+                    <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <span className="font-medium text-gray-700 text-sm sm:text-base">{format(new Date(additionalServiceDate), 'MMMM d, yyyy')}</span>
                   </div>
                   <div className="text-gray-600">
-                    <span className="font-bold">Devices:</span>
-                    <ul className="list-disc pl-5 mt-2 text-gray-700 space-y-1">
-                      {additionalServiceDevices.map(deviceId => {
-                        const device = devices.find(d => d.id === deviceId);
-                        if (!device) return null;
-                        const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                        const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                        const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                        return (<li key={device.id}>{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
-                      })}
-                    </ul>
+                    <span className="font-bold text-sm sm:text-base">Devices:</span>
+                    <div className="mt-2 max-h-32 overflow-y-auto">
+                      <ul className="list-disc pl-5 text-gray-700 space-y-1">
+                        {additionalServiceDevices.map(deviceId => {
+                          const device = devices.find(d => d.id === deviceId);
+                          if (!device) return null;
+                          const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                          const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                          const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                          return (<li key={device.id} className="text-xs sm:text-sm break-words">{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
+                        })}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Loyalty Points Section */}
               {canUseLoyaltyPoints() && loyaltyPoints >= 5 && (
-                <div className="p-6 bg-green-50 rounded-lg border-2 border-green-200">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="p-4 sm:p-6 bg-green-50 rounded-lg border-2 border-green-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                     <div>
-                      <h3 className="text-lg font-bold text-green-800">Use Presko Reward Points</h3>
-                      <p className="text-sm text-green-600">
-                        Available: {loyaltyPoints}  Presko reward points 
+                      <h3 className="text-base sm:text-lg font-bold text-green-800">Use Presko Reward Points</h3>
+                      <p className="text-xs sm:text-sm text-green-600">
+                        Available: {loyaltyPoints} Presko reward points 
                         (Can redeem: {Math.floor(loyaltyPoints / 5) * 5} points = ₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)
                       </p>
                       {loyaltyPoints % 5 > 0 && (
@@ -1982,7 +1986,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                     />
                   </div>
                   {useLoyaltyPoints && (
-                    <div className="text-sm text-green-700 bg-green-100 p-3 rounded">
+                    <div className="text-xs sm:text-sm text-green-700 bg-green-100 p-3 rounded">
                       <Star className="w-4 h-4 inline mr-1" />
                       Using {Math.floor(loyaltyPoints / 5) * 5} loyalty points for ₱{loyaltyPointsDiscount} discount
                       {loyaltyPoints % 5 > 0 && (
@@ -1997,22 +2001,22 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
               {/* Friends/Family Discount Warning */}
               {client?.discounted && (
-                <div className="p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
+                <div className="p-3 sm:p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
                   <div className="flex items-center">
-                    <AlertCircle className="w-5 h-5 text-amber-600 mr-2" />
-                    <p className="text-sm text-amber-800">
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mr-2 flex-shrink-0" />
+                    <p className="text-xs sm:text-sm text-amber-800">
                       No points for this booking since a friends discount is applied.
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="p-6 bg-gray-100 rounded-xl">
-                <h3 className="text-2xl font-bold mb-4 text-gray-800">Price Breakdown</h3>
+              <div className="p-4 sm:p-6 bg-gray-100 rounded-xl">
+                <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800">Price Breakdown</h3>
                 {(() => {
                   const pricing = calculateCombinedTotalPriceWithLoyalty();
                   return (
-                    <div className="space-y-3 text-lg">
+                    <div className="space-y-3 text-sm sm:text-lg">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Subtotal:</span>
                         <span className="font-semibold text-gray-800">₱{pricing.subtotal.toLocaleString()}</span>
@@ -2028,7 +2032,7 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
                         </div>
                       )}
                       <div className="border-t-2 border-gray-300 pt-4 mt-4">
-                        <div className="flex justify-between items-center text-xl font-extrabold">
+                        <div className="flex justify-between items-center text-lg sm:text-xl font-extrabold">
                           <span className="text-gray-800">Total Amount:</span>
                           <span className="text-blue-600">₱{pricing.finalTotal.toLocaleString()}</span>
                         </div>

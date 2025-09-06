@@ -34,7 +34,7 @@ export function PointsCard({
   itemsPerPage = 5,
   onPointsChanged 
 }: PointsCardProps) {
-  const [statusFilter, setStatusFilter] = useState<"all" | "Earned" | "Redeemed" | "Expired">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "Earned" | "Expired">("all");
   const [dateFilter, setDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [points, setPoints] = useState<LoyaltyPoint[]>([]);
@@ -100,16 +100,18 @@ export function PointsCard({
 
         console.log('Normalized point:', normalized);
         return normalized;
-      });
+      })
+      // Filter out redeemed points from the display
+      .filter(p => p.status !== "Redeemed");
 
       setPoints(normalized);
-      setTotalCount(count || 0);
-      setTotalPages(Math.ceil((count || 0) / itemsPerPage));
+      setTotalCount(normalized.length); // Update count to reflect filtered results
+      setTotalPages(Math.ceil(normalized.length / itemsPerPage));
 
       console.log('Final state:', { 
         pointsCount: normalized.length, 
-        totalCount: count, 
-        totalPages: Math.ceil((count || 0) / itemsPerPage) 
+        totalCount: normalized.length, 
+        totalPages: Math.ceil(normalized.length / itemsPerPage) 
       });
 
     } catch (err) {
@@ -170,13 +172,8 @@ export function PointsCard({
   return (
     <Card className="rounded-xl shadow-lg p-6 bg-white">
       <CardHeader className="p-0 mb-4">
-        <CardTitle className="text-xl font-bold">Presko Reward Points History</CardTitle>
-        {/* Add debug info in development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="text-xs text-gray-500">
-            Debug: {points.length} points loaded, Total: {totalCount}, Page: {currentPage}/{totalPages}
-          </div>
-        )}
+        <CardTitle className="text-xl font-bold">Presko Reward Earned Points</CardTitle>
+        
       </CardHeader>
       <CardContent className="p-0">
         
@@ -185,7 +182,7 @@ export function PointsCard({
           <select
             value={statusFilter}
             onChange={(e) => {
-              const newFilter = e.target.value as "all" | "Earned" | "Redeemed" | "Expired";
+              const newFilter = e.target.value as "all" | "Earned" | "Expired";
               console.log('Status filter changed to:', newFilter);
               setStatusFilter(newFilter);
               setCurrentPage(1); // Reset to first page when filtering
@@ -194,7 +191,6 @@ export function PointsCard({
           >
             <option value="all">All Status</option>
             <option value="Earned">Earned</option>
-            <option value="Redeemed">Redeemed</option>
             <option value="Expired">Expired</option>
           </select>
 
@@ -279,8 +275,6 @@ export function PointsCard({
                         className={
                           p.status === "Earned"
                             ? "bg-green-100 text-green-800"
-                            : p.status === "Redeemed"
-                            ? "bg-blue-100 text-blue-800"
                             : "bg-red-100 text-red-800"
                         }
                       >

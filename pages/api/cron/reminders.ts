@@ -1,4 +1,4 @@
-// pages/api/cron/reminders.ts
+// pages/api/cron/reminders.ts - FIXED VERSION
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabase";
 
@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       {
         name: string;
         mobile: string;
-        locations: Record<string, string[]>;
+        locations: Record<string, { count: number; devices: string[] }>;
       }
     > = {};
 
@@ -50,22 +50,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const client = (dev as any).clients;
       if (!client?.id || !client.mobile) continue;
 
-      // 🚨 NEW CONDITION: Skip if client didn't opt in
+      // Skip if client didn't opt in
       if (!client.sms_opt_in) continue;
 
       // Check if this device is due today (3, 4, or 6 months)
       let dueLabel: string | null = null;
-      if (dev.due_3_months === today) dueLabel = "3 mos";
-      else if (dev.due_4_months === today) dueLabel = "4 mos";
-      else if (dev.due_6_months === today) dueLabel = "6 mos";
+      if (dev.due_3_months === today) dueLabel = "3 months";
+      else if (dev.due_4_months === today) dueLabel = "4 months";
+      else if (dev.due_6_months === today) dueLabel = "6 months";
 
       if (!dueLabel) continue;
 
-      const brand = (dev as any).brands?.name || "";
-      const acType = (dev as any).ac_types?.name || "";
-      const hp = (dev as any).horsepower_options?.display_name || "";
+      const brand = (dev as any).brands?.name || "Unknown Brand";
+      const acType = (dev as any).ac_types?.name || "Unknown Type";
+      const hp = (dev as any).horsepower_options?.display_name || "Unknown HP";
 
-      const deviceInfo = `${brand} ${acType} ${hp} (${dueLabel})`;
+      const deviceInfo = `${brand} ${acType} ${hp} - Due: ${dueLabel}`;
 
       if (!clientsMap[client.id]) {
         clientsMap[client.id] = {
@@ -77,11 +77,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const locationName = (dev as any).client_locations?.name || "Unknown Location";
       if (!clientsMap[client.id].locations[locationName]) {
-        clientsMap[client.id].locations[locationName] = [];
+        clientsMap[client.id].locations[locationName] = {
+          count: 0,
+          devices: []
+        };
       }
-      clientsMap[client.id].locations[locationName].push(deviceInfo);
+      
+      clientsMap[client.id].locations[locationName].count++;
+      clientsMap[client.id].locations[locationName].devices.push(deviceInfo);
     }
-
 
     // --- Send one SMS per client ---
     const sent: any[] = [];
@@ -90,44 +94,76 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const clientName = info.name || "Customer";
       const clientMobile = info.mobile;
 
-      let unitDetails = "";
       let totalUnits = 0;
-      for (const [loc, units] of Object.entries(info.locations)) {
-        unitDetails += `\n${loc}\n${units.join("\n")}\n\n`;
-        totalUnits += units.length;
+      let locationDetails = "";
+
+      // Build detailed location and device info
+      for (const [locationName, locationData] of Object.entries(info.locations)) {
+        totalUnits += locationData.count;
+        
+        locationDetails += `\n${locationName}\n`;
+        locationDetails += `${locationData.count} unit(s):\n`;
+        locationDetails += locationData.devices.join("\n") + "\n";
       }
 
-      // Fill placeholders in template
-      let message = template
-        .replace("{0}", clientName)
-        .replace("{total_units}", String(totalUnits))
-        .replace("{client_id}", clientId)
-        .replace("{location}\n{no_of_units} {brand} {types} {horsepower} - {due_date}", unitDetails.trim());
+      // Start with the template and replace placeholders step by step
+      let message = template;
+      
+      // Replace simple placeholders first
+      message = message.replace(/\{0\}/g, clientName);
+      message = message.replace(/\{total_units\}/g, String(totalUnits));
+      message = message.replace(/\{client_id\}/g, clientId);
+      
+      // Replace the complex location placeholder
+      // Look for the pattern and replace it with our formatted details
+      const locationPattern = /\{location\}\n\{no_of_units\} \{brand\} \{types\} \{horsepower\} - \{due_date\}/g;
+      message = message.replace(locationPattern, locationDetails.trim());
 
       // --- Send via Semaphore API ---
       const apikey = process.env.SEMAPHORE_API_KEY!;
       const sendername = process.env.SEMAPHORE_SENDER_NAME || "SEMAPHORE";
 
-      const url = "https://api.semaphore.co/api/v4/messages";
-      const params = new URLSearchParams({
-        apikey: String(apikey),
-        number: String(clientMobile),
-        message: String(message),
-        sendername: String(sendername),
-      });
+      try {
+        const url = "https://api.semaphore.co/api/v4/messages";
+        const params = new URLSearchParams({
+          apikey: String(apikey),
+          number: String(clientMobile),
+          message: String(message),
+          sendername: String(sendername),
+        });
 
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      });
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
 
-      sent.push({ clientId, mobile: clientMobile, totalUnits });
+        const responseData = await response.text();
+        console.log("📡 Semaphore response:", responseData);
+
+        sent.push({ 
+          clientId, 
+          mobile: clientMobile, 
+          totalUnits,
+          locations: Object.keys(info.locations),
+          status: response.ok ? 'sent' : 'failed'
+        });
+      } catch (smsError) {
+        console.error("❌ Failed to send SMS to:", clientMobile, smsError);
+        sent.push({ 
+          clientId, 
+          mobile: clientMobile, 
+          totalUnits,
+          locations: Object.keys(info.locations),
+          status: 'error',
+          error: smsError instanceof Error ? smsError.message : 'Unknown error'
+        });
+      }
     }
 
-    return res.status(200).json({ success: true, message: "Reminders sent", sent });
+    return res.status(200).json({ success: true, message: "Reminders processed", sent });
   } catch (err) {
     console.error("Cron error:", err);
-    return res.status(500).json({ error: "Cron failed" });
+    return res.status(500).json({ error: "Cron failed", details: err instanceof Error ? err.message : 'Unknown error' });
   }
 }

@@ -24,6 +24,7 @@ import type { BlockedDate } from '@/types/database';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/lib/store';
 import { setAppointments } from '@/lib/features/admin/adminSlice';
+import { useRealtime } from '@/app/RealtimeContext';
 // import { subscribeToBookings } from '@/lib/features/admin/RealtimeBooking';
 
 
@@ -69,6 +70,8 @@ export default function AdminBookings() {
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+  const [selectedFilterDate, setSelectedFilterDate] = useState<string>('') // Format: YYYY-MM-DD
+  const [showDateFilter, setShowDateFilter] = useState(false)
 
   // useEffect(() => {
   //   const channel = subscribeToBookings();
@@ -77,8 +80,11 @@ export default function AdminBookings() {
   //   };
   // }, []);
 
+  const { refreshKey } = useRealtime();
+
+// Improved onEventDrop function with better error handling
   const onEventDrop = async ({ event, start, end }: any) => {
-    // Update UI immediately
+    // Update UI immediately for better UX
     const updatedEvents = events.map((existingEvent) => (
       existingEvent === event
         ? { ...existingEvent, start: new Date(start), end: new Date(end) }
@@ -86,26 +92,54 @@ export default function AdminBookings() {
     ))
     setEvents(updatedEvents)
 
-    // Persist to backend: if this is a real appointment, set appointment_date and appointment_time
-    if (event.appointmentId && event.service_id) {
+    // Persist to backend
+    if (event.appointmentId && event.status !== 'blocked') {
       const newDate = moment(start).format('YYYY-MM-DD')
       const newTime = moment(start).format('hh:mm A')
+      
       try {
-        await fetch('/api/admin/appointments', {
+        const response = await fetch('/api/admin/appointments', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: event.appointmentId, appointment_date: newDate, appointment_time: newTime })
+          body: JSON.stringify({ 
+            id: event.appointmentId, 
+            appointment_date: newDate, 
+            appointment_time: newTime 
+          })
         })
-      } catch (e) {
-        // ignore for now
+        
+        if (!response.ok) {
+          throw new Error('Failed to update appointment')
+        }
+        
+        // Update local state
+        const updatedAppointments = appointments.map((appt: any) => 
+          appt.id === event.appointmentId 
+            ? { ...appt, appointment_date: newDate, appointment_time: newTime }
+            : appt
+        )
+        dispatch(setAppointments(updatedAppointments))
+        
+      } catch (error) {
+        console.error('Failed to update appointment:', error)
+        // Revert UI changes on error
+        loadAppointments(statusFilter)
+        // You might want to show a toast error message here
       }
     }
-  };
+  }
 
-    const loadAppointments = useCallback(async (filter: 'all' | 'confirmed' | 'completed') => {
+  const loadAppointments = useCallback(async (filter: 'all' | 'confirmed' | 'completed', specificDate?: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/appointments?status=${filter === 'all' ? '' : filter}`)
+      let url = `/api/admin/appointments?status=${filter === 'all' ? '' : filter}`
+      
+      // Add date parameter if specified
+      if (specificDate) {
+        url += `&date=${specificDate}`
+      }
+      
+      const res = await fetch(url)
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to load appointments')
       dispatch(setAppointments(json.data as any[]));
@@ -114,6 +148,17 @@ export default function AdminBookings() {
       setLoading(false)
     }
   }, [dispatch]);
+
+  const handleDateFilterChange = (selectedDate: string) => {
+    setSelectedFilterDate(selectedDate)
+    
+    // Auto switch to day view and set calendar date when specific date is selected
+    if (selectedDate) {
+      const filterDate = new Date(selectedDate)
+      setDate(filterDate)
+      setView(Views.DAY)
+    }
+  }
 
   const loadBlockedDates = useCallback(async () => {
     try {
@@ -125,12 +170,12 @@ export default function AdminBookings() {
   }, []);
 
   useEffect(() => {
-    loadAppointments(statusFilter);
+    loadAppointments(statusFilter, selectedFilterDate || undefined);
     loadBlockedDates();
-  }, [statusFilter, loadAppointments, loadBlockedDates]);
+  }, [statusFilter, selectedFilterDate, loadAppointments, loadBlockedDates, refreshKey]);
 
   // Reset page when filter changes or when data updates
-  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, searchQuery, appointments.length])
+  useEffect(() => { setCurrentPage(1) }, [statusFilter, dateFilter, searchQuery, appointments.length, refreshKey])
 
   // Derived filtered, sorted and paginated appointments
   const filteredAppointments = appointments.filter((a: any) => {
@@ -170,80 +215,121 @@ export default function AdminBookings() {
   const paginatedAppointments = sortedAppointments.slice(startIndex, startIndex + pageSize)
 
 
+   // Fixed mappedEvents logic
   const mappedEvents = useMemo(() => {
-  const mapped: BookingEvent[] = []
+    const mapped: BookingEvent[] = []
 
-  let hourCursor = 9
-  filteredAppointments.forEach((a: any) => {
-    const baseDate = new Date(a.appointment_date)
-    let start = new Date(baseDate)
-    let end = new Date(baseDate)
-
-    if (a.appointment_time) {
-      const parsed = moment(a.appointment_time, "hh:mm A")
-      start.setHours(parsed.hour(), parsed.minute(), 0, 0)
-      end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
-    } else {
-      start.setHours(hourCursor, 0, 0, 0)
-      end.setHours(hourCursor + 1, 0, 0, 0)
-      hourCursor = hourCursor >= 16 ? 9 : hourCursor + 1
-    }
-
-    mapped.push({
-      title: a.clients?.name || "Client",
-      start,
-      end,
-      status: a.status,
-      draggable: a.status === "confirmed",
-      clientName: a.clients?.name || "Client",
-      city: a.client_locations?.cities?.name || "",
-      barangay: a.client_locations?.barangays?.name || "",
-      appointmentDate: a.appointment_date,
-      appointmentId: a.id,
-      fullAppt: a,
+    // Group appointments by date to handle hour increment properly per date
+    const appointmentsByDate = new Map<string, any[]>()
+    
+    // 🔥 CRITICAL FIX: Use ALL appointments, not filteredAppointments
+    appointments.forEach((a: any) => {
+      const dateKey = moment(a.appointment_date).format('YYYY-MM-DD')
+      if (!appointmentsByDate.has(dateKey)) {
+        appointmentsByDate.set(dateKey, [])
+      }
+      appointmentsByDate.get(dateKey)!.push(a)
     })
-  })
 
-  blockedDates.forEach((b) => {
-    const from = moment(b.from_date).startOf("day")
-    const to = moment(b.to_date).startOf("day")
-    const day = from.clone()
-    while (day.isSameOrBefore(to)) {
-      mapped.push({
-        title: `Blocked: ${b.name}`,
-        start: day.clone().startOf("day").toDate(),
-        end: day.clone().endOf("day").toDate(),
-        status: "blocked",
-        draggable: false,
-        blockedName: b.name,
-        blockedReason: b.reason,
+    // Process appointments for each date separately
+    appointmentsByDate.forEach((dateAppointments, dateKey) => {
+      let hourCursor = 8 // Start at 8 AM for each date
+      
+      // Sort appointments by existing time first, then by creation order
+      const sortedAppointments = dateAppointments.sort((a, b) => {
+        if (a.appointment_time && b.appointment_time) {
+          return moment(a.appointment_time, "hh:mm A").diff(moment(b.appointment_time, "hh:mm A"))
+        }
+        if (a.appointment_time) return -1
+        if (b.appointment_time) return 1
+        return 0
       })
-      day.add(1, "day")
+
+      sortedAppointments.forEach((a: any) => {
+        const baseDate = new Date(a.appointment_date)
+        let start = new Date(baseDate)
+        let end = new Date(baseDate)
+
+        if (a.appointment_time) {
+          // Use existing time if admin has set it
+          const parsed = moment(a.appointment_time, "hh:mm A")
+          start.setHours(parsed.hour(), parsed.minute(), 0, 0)
+          end.setHours(parsed.hour() + 1, parsed.minute(), 0, 0)
+        } else {
+          // Auto-assign time starting from 8 AM
+          start.setHours(hourCursor, 0, 0, 0)
+          end.setHours(hourCursor + 1, 0, 0, 0)
+          hourCursor++
+          
+          // If we go past business hours, wrap around or continue
+          if (hourCursor > 17) { // After 5 PM
+            hourCursor = 8 // Reset to 8 AM for overflow
+          }
+        }
+
+        mapped.push({
+          title: a.clients?.name || "Client",
+          start,
+          end,
+          status: a.status,
+          draggable: a.status === "confirmed",
+          clientName: a.clients?.name || "Client",
+          city: a.client_locations?.cities?.name || "",
+          barangay: a.client_locations?.barangays?.name || "",
+          appointmentDate: a.appointment_date,
+          appointmentId: a.id,
+          fullAppt: a,
+        })
+      })
+    })
+
+    // Add blocked dates (these should always show)
+    blockedDates.forEach((b) => {
+      const from = moment(b.from_date).startOf("day")
+      const to = moment(b.to_date).startOf("day")
+      const day = from.clone()
+      while (day.isSameOrBefore(to)) {
+        mapped.push({
+          title: `Blocked: ${b.name}`,
+          start: day.clone().startOf("day").toDate(),
+          end: day.clone().endOf("day").toDate(),
+          status: "blocked",
+          draggable: false,
+          blockedName: b.name,
+          blockedReason: b.reason,
+        })
+        day.add(1, "day")
+      }
+    })
+
+    return mapped
+  }, [appointments, blockedDates])
+
+
+  useEffect(() => {
+    const isSame =
+      events.length === mappedEvents.length &&
+      events.every((e, i) => {
+        const mapped = mappedEvents[i]
+        return mapped && 
+              e.title === mapped.title && 
+              e.appointmentId === mapped.appointmentId &&
+              e.start.getTime() === mapped.start.getTime() &&
+              e.status === mapped.status
+      })
+
+    if (!isSame) {
+      console.log(`Updating calendar events: ${mappedEvents.length} total appointments`) // Debug log
+      setEvents(mappedEvents)
     }
-  })
-
-  return mapped
-}, [filteredAppointments, blockedDates])
-
-// ✅ Only update if different
-useEffect(() => {
-  const isSame =
-    events.length === mappedEvents.length &&
-    events.every((e, i) => e.title === mappedEvents[i].title && e.start.getTime() === mappedEvents[i].start.getTime())
-
-  if (!isSame) {
-    setEvents(mappedEvents)
-  }
-}, [mappedEvents, events])
+  }, [mappedEvents])
 
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-4 pb-6">
-
-      {/* Main Calendar View - Now Full Width */}
+  <div className="h-full overflow-y-auto">
+    <div className="p-4 pb-6">
       <div className="w-full space-y-4">
-        {/* Top Controls */}
+        {/* Enhanced Top Controls */}
         <div className="flex flex-wrap justify-between items-start gap-2">
           {/* Left section: navigation + view buttons */}
           <div className="flex flex-wrap items-center gap-2">
@@ -262,6 +348,16 @@ useEffect(() => {
               <Button variant={view === Views.WEEK ? 'default' : 'outline'} onClick={() => setView(Views.WEEK)}>Week</Button>
               <Button variant={view === Views.DAY ? 'default' : 'outline'} onClick={() => setView(Views.DAY)}>Day</Button>
             </div>
+
+            {/* Date Filter Toggle */}
+            <Button 
+              variant={showDateFilter ? 'default' : 'outline'} 
+              onClick={() => setShowDateFilter(!showDateFilter)}
+              className="flex items-center gap-2"
+            >
+              <CalendarIcon size={16} />
+              {selectedFilterDate ? 'Date Filtered' : 'Filter by Date'}
+            </Button>
           </div>
 
           {/* Right section: legends */}
@@ -277,6 +373,94 @@ useEffect(() => {
             </span>
           </div>
         </div>
+
+        {/* Date Filter Input Row */}
+        {showDateFilter && (
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Filter by date:</label>
+              <Input
+                type="date"
+                value={selectedFilterDate}
+                onChange={(e) => handleDateFilterChange(e.target.value)}
+                className="w-auto"
+              />
+            </div>
+            
+            {selectedFilterDate && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedFilterDate('')
+                    // Optionally reset view to month when clearing filter
+                    setView(Views.MONTH)
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Clear Filter
+                </Button>
+                <Badge variant="secondary" className="text-xs">
+                  {moment(selectedFilterDate).format('MMM DD, YYYY')}
+                </Badge>
+              </div>
+            )}
+            
+            <div className="text-xs text-gray-500">
+              {selectedFilterDate 
+                ? `Showing appointments for ${moment(selectedFilterDate).format('dddd, MMM DD, YYYY')} • Auto-switched to Day View`
+                : 'Select a date to filter appointments and auto-switch to day view'
+              }
+            </div>
+          </div>
+        )}
+
+        {/* Quick Date Shortcuts */}
+        {showDateFilter && (
+          <div className="flex flex-wrap gap-2 px-4">
+            <span className="text-xs text-gray-500 mr-2">Quick select:</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDateFilterChange(moment().format('YYYY-MM-DD'))}
+              className="text-xs h-7"
+            >
+              Today
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDateFilterChange(moment().add(1, 'day').format('YYYY-MM-DD'))}
+              className="text-xs h-7"
+            >
+              Tomorrow
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDateFilterChange(moment().add(1, 'week').format('YYYY-MM-DD'))}
+              className="text-xs h-7"
+            >
+              Next Week
+            </Button>
+          </div>
+        )}
+
+        {/* Status message when filtering by date */}
+        {selectedFilterDate && (
+          <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-blue-800">
+              <CalendarIcon size={16} />
+              <span>
+                Showing {appointments.length} appointment{appointments.length !== 1 ? 's' : ''} for {moment(selectedFilterDate).format('dddd, MMMM DD, YYYY')}
+              </span>
+              {appointments.length === 0 && (
+                <span className="text-blue-600">• No appointments found for this date</span>
+              )}
+            </div>
+          </div>
+        )}
 
 
         {/* The Calendar component itself - Expanded */}
@@ -435,7 +619,7 @@ useEffect(() => {
               </div>
 
               {/* Actions */}
-              {selectedAppt.status === 'confirmed' && (
+              {/* {selectedAppt.status === 'confirmed' && (
                 <div className="flex justify-end pt-2">
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
@@ -447,7 +631,7 @@ useEffect(() => {
                     Mark as completed
                   </Button>
                 </div>
-              )}
+              )} */}
             </div>
           )}
         </DialogContent>

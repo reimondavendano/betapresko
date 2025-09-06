@@ -16,6 +16,7 @@ export interface LoyaltyPoint {
   date_earned: string;
   date_expiry?: string | null;
   notes?: string | null;
+  is_referral?: boolean;
   appointment?: {
     id: string;
     service?: { id: string; name: string } | null;
@@ -93,6 +94,7 @@ export function PointsCard({
           date_earned: p.date_earned || "",
           date_expiry: p.date_expiry || null,
           notes: p.notes || null,
+          is_referral: Boolean(p.is_referral),
           appointment: p.appointment || null,
         };
 
@@ -134,6 +136,20 @@ export function PointsCard({
     fetchPoints(currentPage);
     // Notify parent component
     onPointsChanged?.();
+  };
+
+  const getServiceDisplayName = (point: LoyaltyPoint) => {
+    // If appointment service name exists, use it
+    if (point.appointment?.service?.name) {
+      return point.appointment.service.name;
+    }
+    
+    // If no service name, check is_referral flag
+    if (point.is_referral === true) {
+      return "Referral Bonus";
+    } else {
+      return "Cleaning";
+    }
   };
 
   // Helper function to safely format dates
@@ -247,7 +263,7 @@ export function PointsCard({
                 points.map((p) => (
                   <tr key={p.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {p.appointment?.service?.name || "Referral Bonus"}
+                      {getServiceDisplayName(p)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
                       {p.points}

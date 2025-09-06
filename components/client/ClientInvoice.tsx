@@ -194,7 +194,7 @@ export function ClientInvoice({ clientId }: Props) {
       const dateStr = today
         .toISOString()
         .split("T")[0]
-        .replace(/-/g, ""); // → "20250905"
+        .replace(/-/g, "");
 
       const counter = String((page - 1) * 1 + (idx + 1)).padStart(4, "0");
 

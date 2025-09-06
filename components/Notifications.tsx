@@ -53,36 +53,30 @@ export default function Notifications({
           }
 
           // ✅ Upsert instead of insert (prevents duplicates)
-          // ✅ Build payload depending on context
-          // ✅ Build payload depending on context
-const payload: any = {
-  subscription: subscription.toJSON(),
-};
+        const payload: any = {
+          subscription: subscription.toJSON(),
+        };
 
-let onConflict: string | undefined;
+        let onConflict: string | undefined;
 
-if (client_id) {
-  payload.client_id = client_id;
-  onConflict = "client_id";
-} else if (admin_id) {
-  payload.admin_id = admin_id;
-  onConflict = "admin_id";
-}
+        if (client_id) {
+          payload.client_id = client_id;
+          onConflict = "client_id";
+        } else if (admin_id) {
+          payload.admin_id = admin_id;
+          onConflict = "admin_id";
+        }
 
-console.log("💾 Attempting to save subscription...");
-console.log("Payload:", JSON.stringify(payload, null, 2));
-console.log("onConflict:", onConflict);
+        const { data, error } = await supabase
+          .from("push_subscriptions")
+          .upsert(payload, onConflict ? { onConflict } : undefined)
+          .select();
 
-const { data, error } = await supabase
-  .from("push_subscriptions")
-  .upsert(payload, onConflict ? { onConflict } : undefined)
-  .select();
-
-if (error) {
-  console.error("❌ Failed to save subscription:", error);
-} else {
-  console.log("✅ Subscription saved/upserted:", data);
-}
+        if (error) {
+          console.error("❌ Failed to save subscription:", error);
+        } else {
+          console.log("✅ Subscription saved/upserted:", data);
+        }
 
 
         })
@@ -93,7 +87,6 @@ if (error) {
       // ✅ Attach listener when SW controller is ready
       const attachListener = () => {
         if (navigator.serviceWorker.controller) {
-          console.log("👂 Listening for push messages from SW");
           navigator.serviceWorker.addEventListener("message", (event) => {
             if (event.data?.type === "PUSH_NOTIFICATION") {
               const { title, body } = event.data.payload;

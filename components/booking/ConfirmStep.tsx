@@ -293,7 +293,8 @@ export function ConfirmStep() {
       try {
     // 🔹 Check if SMS is enabled
       const smsActiveSetting = await customSettingsApi.getSetting('sms_active');
-      const isSmsActive = smsActiveSetting?.setting_value === 'true';
+      const isSmsActive = smsActiveSetting?.setting_value?.toLowerCase() == 'true';
+
 
       if (isSmsActive) {
         const smsTemplateSetting = await customSettingsApi.getSetting('booking_confirmed_sms');
@@ -336,9 +337,9 @@ export function ConfirmStep() {
           } else {
             console.log("SMS sending skipped: sms_active is false");
           }
-        } catch (smsError) {
-          console.error('Failed to send SMS confirmation:', smsError);
-        }
+      } catch (smsError) {
+        console.error('Failed to send SMS confirmation:', smsError);
+      }
 
 
 

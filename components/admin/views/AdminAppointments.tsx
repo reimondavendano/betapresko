@@ -705,44 +705,61 @@ const finalTotal = discountedAmount - loyaltyPointsDeduction;
 
                     {/* Mark as Completed or Voided Button */}
                     {/* Actions when status = confirmed */}
-                    {appointment.status === 'confirmed' && (
-                      <div className="pt-2 flex gap-2">
-                        {/* Mark as Completed */}
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => {
-                            setConfirmTarget(appointment);
-                            setConfirmOpen(true);
-                          }}
-                        >
-                          <CheckCircle size={16} className="mr-2" />
-                          Mark as Completed
-                        </Button>
+                    {/* Actions when status = confirmed */}
+                      {appointment.status === 'confirmed' && (
+                        <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                          {/* Mark as Completed */}
+                          <Button
+                            size="sm"
+                            className="sm:flex-1 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"
+                            onClick={() => {
+                              setConfirmTarget(appointment);
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            <CheckCircle size={14} className="mr-1 sm:mr-2" />
+                            <span className="truncate">Mark as Completed</span>
+                          </Button>
 
-                        {/* Void Button */}
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
-                          onClick={async () => {
-                            try {
-                              await fetch("/api/admin/appointments", {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ id: appointment.id, status: "voided" }),
-                              });
+                          {/* Void Button */}
+                          <Button
+                            size="sm"
+                            className="sm:flex-1 bg-violet-600 hover:bg-violet-700 text-white text-xs sm:text-sm"
+                            onClick={async () => {
+                              try {
+                                await fetch("/api/admin/appointments", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ id: appointment.id, status: "voided" }),
+                                });
 
-                              await loadAppointments(pagination.page); // refresh list
-                            } catch (err) {
-                              console.error("❌ Failed to void appointment:", err);
-                            }
-                          }}
-                        >
-                          < RadarIcon size={16} className="mr-2" />
-                          Void
-                        </Button>
-                      </div>
-                    )}
+                                try {
+                                  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/send-push`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      mode: "admin_to_client",
+                                      client_id: appointment.client_id,
+                                      client_name: appointment?.clients?.name || "Client",
+                                      title: "❌ Appointment Voided",
+                                    }),
+                                  });
+                                  console.log("📩 Push notification sent to client:", appointment.client_id);
+                                } catch (err) {
+                                  console.error("❌ Failed to send push notification to client:", err);
+                                }
+
+                                await loadAppointments(pagination.page); // refresh list
+                              } catch (err) {
+                                console.error("⚠ Failed to void appointment:", err);
+                              }
+                            }}
+                          >
+                            <RadarIcon size={14} className="mr-1 sm:mr-2" />
+                            <span className="truncate">Void</span>
+                          </Button>
+                        </div>
+                      )}
 
 
                     {/* Edit Devices Button for Completed */}

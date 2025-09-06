@@ -115,64 +115,79 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (updateErr) return handleSupabaseError(updateErr, res)
 
-      // If marked completed, update linked devices' last_cleaning_date to the date it was marked
-      if (status === 'completed' && appt) {
-        // Build yyyy-mm-dd for "date it marked"
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const completedDate = `${yyyy}-${mm}-${dd}`;
+  // If marked completed, update linked devices' last_cleaning_date to the date it was marked
 
-        // ✅ Fetch the service linked to this appointment
-        const { data: service, error: serviceErr } = await supabase
-          .from("services")
-          .select("id, name")
-          .eq("id", appt.service_id)
-          .single();
+    if (status === 'completed' && appt) {
+      // Build yyyy-mm-dd for "date it marked"
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const completedDate = `${yyyy}-${mm}-${dd}`;
 
-        if (serviceErr) return handleSupabaseError(serviceErr, res);
+      // Fetch the service linked to this appointment
+      const { data: service, error: serviceErr } = await supabase
+        .from("services")
+        .select("id, name")
+        .eq("id", appt.service_id)
+        .single();
 
-        // Find device ids linked to this appointment
-        const { data: joins, error: joinErr } = await supabase
-          .from("appointment_devices")
-          .select("device_id")
-          .eq("appointment_id", appt.id);
+      if (serviceErr) return handleSupabaseError(serviceErr, res);
 
-        if (joinErr) return handleSupabaseError(joinErr, res);
+      // Find device ids linked to this appointment
+      const { data: joins, error: joinErr } = await supabase
+        .from("appointment_devices")
+        .select("device_id")
+        .eq("appointment_id", appt.id);
 
-        const deviceIds = (joins || []).map((j: any) => j.device_id);
+      if (joinErr) return handleSupabaseError(joinErr, res);
 
-        if (deviceIds.length > 0 && service) {
-          const serviceName = service.name.toLowerCase();
+      const deviceIds = (joins || []).map((j: any) => j.device_id);
 
-          let updatePayload: any = {
-            updated_at: new Date().toISOString(),
-          };
+      if (deviceIds.length > 0 && service) {
+        const serviceName = service.name.toLowerCase();
 
-          if (serviceName.includes("cleaning")) {
-            updatePayload.last_cleaning_date = completedDate;
-          } else if (
-            serviceName.includes("repair") ||
-            serviceName.includes("maintenance")
-          ) {
-            updatePayload.last_repair_date = completedDate;
-          }
+        let updatePayload: any = {
+          updated_at: new Date().toISOString(),
+        };
 
-          if (Object.keys(updatePayload).length > 1) {
-            const { error: devUpdateErr } = await supabase
-              .from("devices")
-              .update(updatePayload)
-              .in("id", deviceIds);
-
-            if (devUpdateErr) return handleSupabaseError(devUpdateErr, res);
-          }
+        if (serviceName.includes("cleaning")) {
+          updatePayload.last_cleaning_date = completedDate;
+        } else if (
+          serviceName.includes("repair") ||
+          serviceName.includes("maintenance")
+        ) {
+          updatePayload.last_repair_date = completedDate;
         }
 
-        // --- Updated Points calculation based on transaction amount ---
+        if (Object.keys(updatePayload).length > 1) {
+          const { error: devUpdateErr } = await supabase
+            .from("devices")
+            .update(updatePayload)
+            .in("id", deviceIds);
+
+          if (devUpdateErr) return handleSupabaseError(devUpdateErr, res);
+        }
+      }
+
+      // --- Updated Points calculation logic ---
+     // Updated points calculation logic section
+
+
+      if (appt.client_id) {
+        // First, fetch client data including the discount flag
+        const { data: client, error: clientErr } = await supabase
+          .from("clients")
+          .select("id, ref_id, points, discounted")
+          .eq("id", appt.client_id)
+          .single();
+
+        if (clientErr) return handleSupabaseError(clientErr, res);
+
         const transactionAmount = appt.amount || 0;
         let pointsToAdd = 0;
         
+        // Calculate points based on transaction amount
         if (transactionAmount >= 500 && transactionAmount <= 999) {
           pointsToAdd = 0.5;
         } else if (transactionAmount >= 1000 && transactionAmount < 2000) {
@@ -180,20 +195,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else if (transactionAmount >= 2000 && transactionAmount < 3000) {
           pointsToAdd = 2;
         } else if (transactionAmount >= 3000) {
-          pointsToAdd = 3; // capped at 1 point
+          pointsToAdd = 3;
         }
 
-        // --- Referral logic with updated points ---
-        if (appt.client_id) {
-          const { data: client, error: clientErr } = await supabase
-            .from("clients")
-            .select("id, ref_id, points")
-            .eq("id", appt.client_id)
-            .single();
-
-
-          if (clientErr) return handleSupabaseError(clientErr, res);
-
+        // NEW LOGIC: Check if client has friends/family discount
+        const isFriendsAndFamily = client?.discounted === true;
+        
+        // NEW LOGIC: Check if loyalty points were redeemed for this appointment
+        const hasRedeemedPoints = appt.stored_loyalty_points && appt.stored_loyalty_points !== 0;
+        
+        // Only award points to the client if they DON'T have friends/family discount 
+        // AND they didn't redeem loyalty points for this appointment
+        if (!isFriendsAndFamily && !hasRedeemedPoints && pointsToAdd > 0) {
           // Add points to client
           const { error: clientUpdateErr } = await supabase
             .from("clients")
@@ -203,81 +216,96 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })
             .eq("id", client.id);
 
+          if (clientUpdateErr) return handleSupabaseError(clientUpdateErr, res);
+
+          // Insert loyalty points record for the client
           const { data: loyaltyData, error: loyaltyErr } = await supabase
             .from("loyalty_points")
             .insert([
               {
                 client_id: appt.client_id,
                 appointment_id: appt.id,
-                points: pointsToAdd, // Use calculated points based on transaction amount
-                date_earned: appt.appointment_date 
+                points: pointsToAdd,
+                date_earned: appt.appointment_date,
+                is_referral: false
               },
             ])
             .select();
 
-     
-          if (clientUpdateErr) return handleSupabaseError(clientUpdateErr, res);
-
-          if (client?.ref_id) {
-            const { data: referrer, error: refErr } = await supabase
-              .from("clients")
-              .select("id, points")
-              .eq("id", client.ref_id)
-              .single();
-            if (refErr) return handleSupabaseError(refErr, res);
-
-            if (referrer?.id) {
-              const { error: incErr } = await supabase
-                .from("clients")
-                .update({
-                  points: (referrer.points || 0) + pointsToAdd,
-                  updated_at: new Date().toISOString() as any,
-                })
-                .eq("id", referrer.id);
-              if (incErr) return handleSupabaseError(incErr, res);
-
-              const { data: referrerLoyaltyData, error: referrerLoyaltyErr } = await supabase
-                .from("loyalty_points")
-                .insert([
-                  {
-                    client_id: referrer.id,
-                    appointment_id: null,
-                    points: 1, 
-                    date_earned: appt.appointment_date,
-                    is_referral: true,
-                  },
-                ])
-                .select();
-                 if (refErr) return handleSupabaseError(refErr, res);
-
-              console.log("Referral points added:", referrerLoyaltyData);
-              }
-           
-
-            const { error: clearErr } = await supabase
-              .from("clients")
-              .update({ ref_id: null, updated_at: new Date().toISOString() as any })
-              .eq("id", client.id);
-            if (clearErr) return handleSupabaseError(clearErr, res);
-          }
+          if (loyaltyErr) return handleSupabaseError(loyaltyErr, res);
         }
 
-        try {
-          await fetch(`${process.env.BASE_URL}/api/send-push`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              mode: "admin_to_client",
-              client_id: appt.client_id,
-              client_name: appt?.clients?.[0]?.name || "Client",
-              title: "✅ Appointment Completed",
-            }),
-          });
-          console.log("📩 Push notification sent to client:", appt.client_id);
-        } catch (err) {
-          console.error("❌ Failed to send push to client:", err);
+        // Handle referral points - this happens regardless of client's discount status
+        // BUT also check if loyalty points were redeemed
+        if (client?.ref_id && !hasRedeemedPoints) {
+          const { data: referrer, error: refErr } = await supabase
+            .from("clients")
+            .select("id, points")
+            .eq("id", client.ref_id)
+            .single();
+            
+          if (refErr) return handleSupabaseError(refErr, res);
+
+          if (referrer?.id) {
+            // Referrer gets 1 point regardless of transaction amount or client's discount status
+            const referralPoints = 1;
+            
+            const { error: incErr } = await supabase
+              .from("clients")
+              .update({
+                points: (referrer.points || 0) + referralPoints,
+                updated_at: new Date().toISOString() as any,
+              })
+              .eq("id", referrer.id);
+              
+            if (incErr) return handleSupabaseError(incErr, res);
+
+            // Insert referral loyalty points record
+            const { data: referrerLoyaltyData, error: referrerLoyaltyErr } = await supabase
+              .from("loyalty_points")
+              .insert([
+                {
+                  client_id: referrer.id,
+                  appointment_id: appt.id, // Link to the appointment that triggered the referral
+                  points: referralPoints,
+                  date_earned: appt.appointment_date,
+                  is_referral: true,
+                },
+              ])
+              .select();
+              
+            if (referrerLoyaltyErr) return handleSupabaseError(referrerLoyaltyErr, res);
+
+            console.log("Referral points added:", referrerLoyaltyData);
+          }
+
+          // Clear the ref_id after processing referral
+          const { error: clearErr } = await supabase
+            .from("clients")
+            .update({ ref_id: null, updated_at: new Date().toISOString() as any })
+            .eq("id", client.id);
+            
+          if (clearErr) return handleSupabaseError(clearErr, res);
         }
       }
+
+      // Send push notification
+      try {
+        await fetch(`${process.env.BASE_URL}/api/send-push`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "admin_to_client",
+            client_id: appt.client_id,
+            client_name: appt?.clients?.[0]?.name || "Client",
+            title: "✅ Appointment Completed",
+          }),
+        });
+        console.log("📩 Push notification sent to client:", appt.client_id);
+      } catch (err) {
+        console.error("❌ Failed to send push to client:", err);
+      }
+    }
 
       return res.status(200).json({ data: appt })
     }

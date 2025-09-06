@@ -1885,171 +1885,237 @@ const handleUpdateAdditionalUnit = (index: number, field: string, value: any) =>
 
       {/* NEW: Summary Modal */}
       {isSummaryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
-            <button onClick={handleCloseSummaryModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-              <X className="w-6 h-6" />
-            </button>
-            <h2 className="text-3xl font-bold mb-6 text-gray-800">Booking Summary</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] relative flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+              <button onClick={handleCloseSummaryModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 z-10">
+                <X className="w-6 h-6" />
+              </button>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 pr-8">Booking Summary</h2>
+            </div>
             
-            <div className="space-y-6 max-h-screen overflow-y-auto">
-              <div className="p-4 sm:p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
-                <div className="flex items-center mb-2">
-                  {getServiceIcon(allServices.find(s => s.id === selectedServiceId)?.name || 'N/A')}
-                  <h3 className="text-lg sm:text-xl font-bold text-blue-800 ml-2">{allServices.find(s => s.id === selectedServiceId)?.name}</h3>
-                </div>
-                <div className="flex items-center text-gray-600 mb-4">
-                  <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="font-medium text-gray-700 text-sm sm:text-base">{format(new Date(bookingDate), 'MMMM d, yyyy')}</span>
-                </div>
-                <div className="text-gray-600">
-                  <span className="font-bold text-sm sm:text-base">Devices:</span>
-                  {(selectedDevices.length > 0 || newUnits.length > 0 || additionalUnits.length > 0) ? (
-                    <div className="mt-2 max-h-32 overflow-y-auto">
-                      <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                        {selectedDevices.map(deviceId => {
-                          const device = devices.find(d => d.id === deviceId);
-                          if (!device) return null;
-                          const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                          const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                          const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                          return (<li key={`sel-${device.id}`} className="text-xs sm:text-sm break-words">{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
-                        })}
-                        {newUnits.map((unit, index) => {
-                          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
-                          const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
-                          const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
-                          const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
-                          return (<li key={`new-${index}`} className="text-xs sm:text-sm break-words">{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
-                        })}
-                        {additionalUnits.map((unit, index) => {
-                          if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
-                          const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
-                          const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
-                          const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
-                          return (<li key={`additional-${index}`} className="text-xs sm:text-sm break-words">{`New Unit: ${brand} ${acType} ${horsepower} (Qty: ${unit.quantity})`}</li>);
-                        })}
-                      </ul>
-                    </div>
-                  ) : (<span className="ml-1">-</span>)}
-                </div>
-              </div>
-
-              {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
-                <div className="p-4 sm:p-6 bg-purple-50 rounded-lg border-2 border-purple-200">
-                  <div className="flex items-center mb-2">
-                    {getServiceIcon(allServices.find(s => s.id === additionalServiceId)?.name || 'N/A')}
-                    <h3 className="text-lg sm:text-xl font-bold text-purple-800 ml-2">{allServices.find(s => s.id === additionalServiceId)?.name}</h3>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-6">
+                {/* Primary Service */}
+                <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <div className="flex items-start mb-2">
+                    {getServiceIcon(allServices.find(s => s.id === selectedServiceId)?.name || 'N/A')}
+                    <h3 className="text-base sm:text-lg lg:text-xl font-bold text-blue-800 ml-2 leading-tight">
+                      {allServices.find(s => s.id === selectedServiceId)?.name}
+                    </h3>
                   </div>
-                  <div className="flex items-center text-gray-600 mb-4">
+                  <div className="flex items-center text-gray-600 mb-3">
                     <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
-                    <span className="font-medium text-gray-700 text-sm sm:text-base">{format(new Date(additionalServiceDate), 'MMMM d, yyyy')}</span>
+                    <span className="font-medium text-gray-700 text-sm sm:text-base">
+                      {format(new Date(bookingDate), 'MMMM d, yyyy')}
+                    </span>
                   </div>
                   <div className="text-gray-600">
-                    <span className="font-bold text-sm sm:text-base">Devices:</span>
-                    <div className="mt-2 max-h-32 overflow-y-auto">
-                      <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                        {additionalServiceDevices.map(deviceId => {
-                          const device = devices.find(d => d.id === deviceId);
-                          if (!device) return null;
-                          const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
-                          const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
-                          const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
-                          return (<li key={device.id} className="text-xs sm:text-sm break-words">{`${device.name} (${brand} ${acType} ${horsepower})`}</li>);
-                        })}
-                      </ul>
-                    </div>
+                    <span className="font-bold text-sm sm:text-base block mb-2">Devices:</span>
+                    {(selectedDevices.length > 0 || newUnits.length > 0 || additionalUnits.length > 0) ? (
+                      <div className="bg-white rounded p-2 max-h-32 sm:max-h-40 overflow-y-auto">
+                        <ul className="space-y-1">
+                          {selectedDevices.map(deviceId => {
+                            const device = devices.find(d => d.id === deviceId);
+                            if (!device) return null;
+                            const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                            const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                            const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                            return (
+                              <li key={`sel-${device.id}`} className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 rounded border-l-4 border-blue-400">
+                                <div className="font-medium">{device.name}</div>
+                                <div className="text-gray-600">{brand} • {acType} • {horsepower}</div>
+                              </li>
+                            );
+                          })}
+                          {newUnits.map((unit, index) => {
+                            if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                            const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                            const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                            const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                            return (
+                              <li key={`new-${index}`} className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 rounded border-l-4 border-green-400">
+                                <div className="font-medium">New Unit (Qty: {unit.quantity})</div>
+                                <div className="text-gray-600">{brand} • {acType} • {horsepower}</div>
+                              </li>
+                            );
+                          })}
+                          {additionalUnits.map((unit, index) => {
+                            if (!unit.brand_id || !unit.ac_type_id || !unit.horsepower_id) return null;
+                            const brand = allBrands.find(b => b.id === unit.brand_id)?.name || 'N/A';
+                            const acType = allACTypes.find(t => t.id === unit.ac_type_id)?.name || 'N/A';
+                            const horsepower = allHorsepowerOptions.find(h => h.id === unit.horsepower_id)?.display_name || 'N/A';
+                            return (
+                              <li key={`additional-${index}`} className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 rounded border-l-4 border-green-400">
+                                <div className="font-medium">New Unit (Qty: {unit.quantity})</div>
+                                <div className="text-gray-600">{brand} • {acType} • {horsepower}</div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Loyalty Points Section */}
-              {canUseLoyaltyPoints() && loyaltyPoints >= 5 && (
-                <div className="p-4 sm:p-6 bg-green-50 rounded-lg border-2 border-green-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-green-800">Use Presko Reward Points</h3>
-                      <p className="text-xs sm:text-sm text-green-600">
-                        Available: {loyaltyPoints} Presko reward points 
-                        (Can redeem: {Math.floor(loyaltyPoints / 5) * 5} points = ₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount)
+                {/* Additional Service */}
+                {showAdditionalService && additionalServiceId && additionalServiceDevices.length > 0 && (
+                  <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                    <div className="flex items-start mb-2">
+                      {getServiceIcon(allServices.find(s => s.id === additionalServiceId)?.name || 'N/A')}
+                      <h3 className="text-base sm:text-lg lg:text-xl font-bold text-purple-800 ml-2 leading-tight">
+                        {allServices.find(s => s.id === additionalServiceId)?.name}
+                      </h3>
+                    </div>
+                    <div className="flex items-center text-gray-600 mb-3">
+                      <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 text-sm sm:text-base">
+                        {format(new Date(additionalServiceDate), 'MMMM d, yyyy')}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-bold text-sm sm:text-base block mb-2">Devices:</span>
+                      <div className="bg-white rounded p-2 max-h-40 overflow-y-auto">
+                        <ul className="space-y-1">
+                          {additionalServiceDevices.map(deviceId => {
+                            const device = devices.find(d => d.id === deviceId);
+                            if (!device) return null;
+                            const brand = allBrands.find(b => b.id === device.brand_id)?.name || 'N/A';
+                            const acType = allACTypes.find(t => t.id === device.ac_type_id)?.name || 'N/A';
+                            const horsepower = allHorsepowerOptions.find(h => h.id === device.horsepower_id)?.display_name || 'N/A';
+                            return (
+                              <li key={device.id} className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 rounded border-l-4 border-purple-400">
+                                <div className="font-medium">{device.name}</div>
+                                <div className="text-gray-600">{brand} • {acType} • {horsepower}</div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Loyalty Points Section */}
+                {canUseLoyaltyPoints() && loyaltyPoints >= 5 && (
+                  <div className="p-3 sm:p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 mr-3">
+                          <h3 className="text-sm sm:text-base lg:text-lg font-bold text-green-800">Use Presko Reward Points</h3>
+                          <p className="text-xs sm:text-sm text-green-600 mt-1">
+                            Available: {loyaltyPoints} Presko reward points
+                          </p>
+                          <p className="text-xs sm:text-sm text-green-600">
+                            Can redeem: {Math.floor(loyaltyPoints / 5) * 5} points = ₱{calculateLoyaltyPointsDiscount(loyaltyPoints)} discount
+                          </p>
+                          {loyaltyPoints % 5 > 0 && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              {loyaltyPoints % 5} point(s) will remain (minimum 5 points required)
+                            </p>
+                          )}
+                        </div>
+                        <Checkbox
+                          checked={useLoyaltyPoints}
+                          onCheckedChange={handleLoyaltyPointsToggle}
+                          className="h-5 w-5 flex-shrink-0"
+                        />
+                      </div>
+                      {useLoyaltyPoints && (
+                        <div className="text-xs sm:text-sm text-green-700 bg-green-100 p-3 rounded">
+                          <div className="flex items-start">
+                            <Star className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div>Using {Math.floor(loyaltyPoints / 5) * 5} loyalty points for ₱{loyaltyPointsDiscount} discount</div>
+                              {loyaltyPoints % 5 > 0 && (
+                                <div className="text-amber-700 mt-1">
+                                  {loyaltyPoints % 5} point(s) remaining in your account
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Friends/Family Discount Warning */}
+                {client?.discounted && (
+                  <div className="p-3 sm:p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
+                    <div className="flex items-start">
+                      <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs sm:text-sm text-amber-800">
+                        No points for this booking since a friends discount is applied.
                       </p>
-                      {loyaltyPoints % 5 > 0 && (
-                        <p className="text-xs text-amber-600">
-                          {loyaltyPoints % 5} Presko point(s) will remain (minimum 5 points required for redemption)
-                        </p>
-                      )}
                     </div>
-                    <Checkbox
-                      checked={useLoyaltyPoints}
-                      onCheckedChange={handleLoyaltyPointsToggle}
-                      className="h-5 w-5"
-                    />
                   </div>
-                  {useLoyaltyPoints && (
-                    <div className="text-xs sm:text-sm text-green-700 bg-green-100 p-3 rounded">
-                      <Star className="w-4 h-4 inline mr-1" />
-                      Using {Math.floor(loyaltyPoints / 5) * 5} loyalty points for ₱{loyaltyPointsDiscount} discount
-                      {loyaltyPoints % 5 > 0 && (
-                        <div className="text-xs text-amber-700 mt-1">
-                          {loyaltyPoints % 5} point(s) remaining in your account
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Friends/Family Discount Warning */}
-              {client?.discounted && (
-                <div className="p-3 sm:p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mr-2 flex-shrink-0" />
-                    <p className="text-xs sm:text-sm text-amber-800">
-                      No points for this booking since a friends discount is applied.
-                    </p>
-                  </div>
+                {/* Price Breakdown */}
+                <div className="p-3 sm:p-4 bg-gray-100 rounded-xl">
+                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-gray-800">Price Breakdown</h3>
+                  {(() => {
+                    const pricing = calculateCombinedTotalPriceWithLoyalty();
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center text-sm sm:text-base">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="font-semibold text-gray-800">₱{pricing.subtotal.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm sm:text-base">
+                          <span className="text-gray-600 flex-1 mr-2">
+                            Discount ({pricing.discount}% - {pricing.discount_type}):
+                          </span>
+                          <span className="font-semibold text-red-600 flex-shrink-0">
+                            -₱{pricing.discountAmount.toLocaleString()}
+                          </span>
+                        </div>
+                        {pricing.loyaltyPointsDiscount > 0 && (
+                          <div className="flex justify-between items-center text-sm sm:text-base">
+                            <span className="text-gray-600 flex-1 mr-2">Presko Rewards Discount:</span>
+                            <span className="font-semibold text-green-600 flex-shrink-0">
+                              -₱{pricing.loyaltyPointsDiscount.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="border-t-2 border-gray-300 pt-3 mt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-base sm:text-lg lg:text-xl font-extrabold text-gray-800 flex-1 mr-2">
+                              Total Amount:
+                            </span>
+                            <span className="text-base sm:text-lg lg:text-xl font-extrabold text-blue-600 flex-shrink-0">
+                              ₱{pricing.finalTotal.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-              )}
-
-              <div className="p-4 sm:p-6 bg-gray-100 rounded-xl">
-                <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800">Price Breakdown</h3>
-                {(() => {
-                  const pricing = calculateCombinedTotalPriceWithLoyalty();
-                  return (
-                    <div className="space-y-3 text-sm sm:text-lg">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-semibold text-gray-800">₱{pricing.subtotal.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Discount ({pricing.discount}% - {pricing.discount_type}):</span>
-                        <span className="font-semibold text-red-600">-₱{pricing.discountAmount.toLocaleString()}</span>
-                      </div>
-                      {pricing.loyaltyPointsDiscount > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Presko Rewards Discount:</span>
-                          <span className="font-semibold text-green-600">-₱{pricing.loyaltyPointsDiscount.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className="border-t-2 border-gray-300 pt-4 mt-4">
-                        <div className="flex justify-between items-center text-lg sm:text-xl font-extrabold">
-                          <span className="text-gray-800">Total Amount:</span>
-                          <span className="text-blue-600">₱{pricing.finalTotal.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
 
-            <div className="flex justify-end mt-8 space-x-4">
-              <Button onClick={handleCloseSummaryModal} variant="outline" className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md">
-                Go Back
-              </Button>
-              <Button variant="outline" onClick={handleConfirmBooking} className="rounded-lg w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white font-bold py-2 px-6">
-                Confirm Booking
-              </Button>
+            {/* Fixed Footer Buttons */}
+            <div className="flex-shrink-0 p-4 sm:p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
+                <Button 
+                  onClick={handleCloseSummaryModal} 
+                  variant="outline" 
+                  className="w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md order-2 sm:order-1"
+                >
+                  Go Back
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleConfirmBooking} 
+                  className="w-full sm:w-auto rounded-lg border-teal-400 text-teal-600 shadow-md bg-white hover:bg-white font-bold py-2 px-6 order-1 sm:order-2"
+                >
+                  Confirm Booking
+                </Button>
+              </div>
             </div>
           </div>
         </div>
